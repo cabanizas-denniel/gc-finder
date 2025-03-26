@@ -261,3 +261,6 @@ header {
 .item-card button:hover {
     background-color: #1e3d23;
 } 
+#user_name {
+    color: white;
+}
