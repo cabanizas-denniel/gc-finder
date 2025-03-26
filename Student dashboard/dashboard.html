@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost and Found Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="Logo.jpg" alt="Gordon College Logo">
+                <h2>GORDON COLLEGE</h2>
+            </div>
+            <nav>
+                <ul>
+                    <li class="active"><i class="fas fa-home"></i> Dashboard</li>
+                    <li><i class="fas fa-file-alt"></i> Report Found Item</li>
+                    <li><i class="fas fa-search"></i> Browse Items</li>
+                    <li><i class="fas fa-tasks"></i> My Claims</li>
+                    <li><i class="fas fa-envelope"></i> Messages</li>
+                </ul>
+            </nav>
+            <div class="bottom-nav">
+                <ul>
+                    <li><i class="fas fa-question-circle"></i> Help</li>
+                    <li><i class="fas fa-sign-out-alt"></i> Log-out</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <div class="user-info">
+                    <span>Denniel Cabanizas</span>
+                    <img src="Profile.webp" alt="Profile" class="profile-pic">
+                    <i class="fas fa-bell"></i>
+                </div>
+            </header>
+
+            <!-- Stats Cards -->
+            <div class="stats-container">
+                <div class="stat-card">
+                    <h3>Active Reports</h3>
+                    <div class="stat-number">1</div>
+                    <p>Items you've reported as lost</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Pending Claims</h3>
+                    <div class="stat-number">2</div>
+                    <p>Claims Awaiting</p>
+                </div>
+                <div class="stat-card quick-actions">
+                    <h3>Quick Actions</h3>
+                    <ul>
+                        <li><i class="fas fa-file-alt"></i> Report Lost Item</li>
+                        <li><i class="fas fa-search"></i> Browse Found Items</li>
+                        <li><i class="fas fa-check-circle"></i> Check Claim Status</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Recently Found Items -->
+            <section class="recent-items">
+                <h2>Recently Found Items</h2>
+                <div class="items-grid">
+                    <!-- Items will be dynamically added here -->
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 

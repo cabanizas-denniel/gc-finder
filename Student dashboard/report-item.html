@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Found Item - Gordon College</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="Logo.jpg" alt="Gordon College Logo">
+                <h2>GORDON COLLEGE</h2>
+            </div>
+            <nav>
+                <ul>
+                    <li><i class="fas fa-home"></i> Dashboard</li>
+                    <li class="active"><i class="fas fa-file-alt"></i> Report Found Item</li>
+                    <li><i class="fas fa-search"></i> Browse Items</li>
+                    <li><i class="fas fa-tasks"></i> My Claims</li>
+                    <li><i class="fas fa-envelope"></i> Messages</li>
+                </ul>
+            </nav>
+            <div class="bottom-nav">
+                <ul>
+                    <li><i class="fas fa-question-circle"></i> Help</li>
+                    <li><i class="fas fa-sign-out-alt"></i> Log-out</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <div class="user-info">
+                    <span>Denniel Cabanizas</span>
+                    <img src="Profile.webp" alt="Profile" class="profile-pic">
+                    <i class="fas fa-bell"></i>
+                </div>
+            </header>
+
+            <div class="report-form-container">
+                <div class="progress-bar">
+                    <div class="step active">Item Details</div>
+                    <div class="step">Media Upload</div>
+                    <div class="step">Security Questions</div>
+                    <div class="step">Confirmation</div>
+                </div>
+
+                <form id="reportForm" class="report-form">
+                    <!-- Step 1: Item Details -->
+                    <div class="form-step active" id="step1">
+                        <h2>Report Found Item</h2>
+                        <p>Please provide details about the item(s) you've found.</p>
+                        
+                        <div class="form-group">
+                            <label for="itemName">Item Name</label>
+                            <input type="text" id="itemName" placeholder="e.g. Cellphone" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" placeholder="Provide a broad description of the item" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="location">Last Seen Location</label>
+                            <input type="text" id="location" placeholder="e.g. 5th Floor" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dateFound">Date Found</label>
+                            <input type="date" id="dateFound" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="category">Category</label>
+                            <select id="category" required>
+                                <option value="">Select a category</option>
+                                <option value="electronics">Electronics</option>
+                                <option value="school-supplies">School Supplies</option>
+                                <option value="personal-items">Personal Items</option>
+                                <option value="documents">Documents</option>
+                                <option value="others">Others</option>
+                            </select>
+                        </div>
+
+                        <div class="form-buttons">
+                            <button type="button" class="next-btn">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Media Upload -->
+                    <div class="form-step" id="step2">
+                        <h2>Upload Media</h2>
+                        <p>Upload clear photos of the found item.</p>
+
+                        <div class="upload-area">
+                            <div class="dropzone" id="dropzone">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Drag & drop files here</p>
+                                <p>or</p>
+                                <button type="button" class="upload-btn">Upload from computer</button>
+                            </div>
+                        </div>
+
+                        <div class="form-buttons">
+                            <button type="button" class="back-btn">Back</button>
+                            <button type="button" class="next-btn">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Security Questions -->
+                    <div class="form-step" id="step3">
+                        <h2>Provide Security Details</h2>
+                        <p>The question and answers will serve as security questions for the person who wishes to claim the item.</p>
+
+                        <div class="form-group">
+                            <label for="exactLocation">Exact location found</label>
+                            <input type="text" id="exactLocation" placeholder="Try to specify the exact location in which the item was found" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="uniqueIdentifier">Unique identifier</label>
+                            <input type="text" id="uniqueIdentifier" placeholder="Engravings/ Special Markings if there are">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="additionalDetails">Additional details</label>
+                            <textarea id="additionalDetails" placeholder="Provide additional details if you can"></textarea>
+                        </div>
+
+                        <div class="form-buttons">
+                            <button type="button" class="back-btn">Back</button>
+                            <button type="button" class="next-btn">Next</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Confirmation -->
+                    <div class="form-step" id="step4">
+                        <h2>Confirm Submission</h2>
+                        <div class="confirmation-details">
+                            <p>Please review the details before submitting:</p>
+                            <div id="summaryDetails"></div>
+                        </div>
+
+                        <div class="disclaimer">
+                            <p>By submitting this report, you confirm that all provided information is accurate and true.</p>
+                        </div>
+
+                        <div class="form-buttons">
+                            <button type="button" class="back-btn">Back</button>
+                            <button type="submit" class="submit-btn">Submit Report</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+    <script src="report-item.js"></script>
+</body>
+</html> 
