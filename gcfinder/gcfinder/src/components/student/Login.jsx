@@ -1,0 +1,208 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaIdCard, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaInfoCircle } from 'react-icons/fa';
+import gcLogo from '../../assets/gc-finder-logo.png';
+import logo from '../../assets/gc-logo.png';
+import { loginWithStudentId } from '../../firebase';
+
+const Login = () => {
+  const [studentId, setStudentId] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(true);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const navigate = useNavigate();
+
+  // Check if terms have been accepted before
+  useEffect(() => {
+    const hasAcceptedTerms = localStorage.getItem('termsAccepted');
+    if (hasAcceptedTerms === 'true') {
+      setTermsAccepted(true);
+      setShowTermsModal(false);
+    }
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    
+    // Ensure terms are accepted before allowing login
+    if (!termsAccepted) {
+      setError('Please accept the Terms & Privacy Policy first');
+      setTimeout(() => {
+        setError('');
+      }, 3000);
+      setShowTermsModal(true);
+      return;
+    }
+    
+    setError('');
+    setLoading(true);
+
+    if (!studentId || !password) {
+      setError('Please enter both Student ID and password');
+      // Clear error message after 3 seconds
+      setTimeout(() => {
+        setError('');
+      }, 3000);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const userData = await loginWithStudentId(studentId, password);
+      
+      // Store user data in localStorage with proper shape for our context
+      const enhancedUserData = {
+        ...userData,
+        displayName: userData.full_name || "User",
+        userEmail: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
+        profilePicture: userData.profileUrl || null,
+      };
+      
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userData', JSON.stringify(enhancedUserData));
+      
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      if (error.message === 'Student ID not found') {
+        setError('Incorrect Student ID or Password');
+      } else if (error.message === 'Incorrect password') {
+        setError('Incorrect Student ID or Password');
+      } else {
+        setError('An error occurred during login. Please try again.');
+      }
+      // Clear error message after 3 seconds
+      setTimeout(() => {
+        setError('');
+      }, 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const handleStudentIdChange = (e) => {
+    const value = e.target.value;
+    // Only allow numbers
+    if (/^\d*$/.test(value)) {
+      setStudentId(value);
+      setError(''); // Clear any previous error
+    } else {
+      setError('Student ID must contain only numbers');
+      // Clear error message after 3 seconds
+      setTimeout(() => {
+        setError('');
+      }, 3000);
+    }
+  };
+
+  const acceptTerms = () => {
+    setTermsAccepted(true);
+    setShowTermsModal(false);
+    localStorage.setItem('termsAccepted', 'true');
+  };
+
+  return (
+    <div className="login-container">
+      {/* Terms and Privacy Policy Modal */}
+      {showTermsModal && (
+        <div className="terms-modal-overlay">
+          <div className="terms-modal">
+            <div className="terms-header">
+              <FaInfoCircle className="terms-icon" />
+              <h2>Terms of Service & Privacy Policy</h2>
+            </div>
+            <div className="terms-content">
+              <h3>Terms of Service</h3>
+              <p>Welcome to GC Finder, the official Lost and Found System of Gordon College. By using this application, you agree to the following terms:</p>
+              <ul>
+                <li>You will provide accurate information when reporting or claiming items.</li>
+                <li>You understand that false reports may result in administrative action.</li>
+                <li>You will respect the privacy of other users and not misuse any information obtained through the system.</li>
+                <li>The administrators have the right to verify your identity before releasing claimed items.</li>
+              </ul>
+
+              <h3>Privacy Policy</h3>
+              <p>At GC Finder, we are committed to protecting your privacy:</p>
+              <ul>
+                <li>We collect your student information solely for the purpose of facilitating the lost and found process.</li>
+                <li>Your personal information will never be shared with third parties outside Gordon College.</li>
+                <li>Item reports and claims will be stored for record-keeping purposes.</li>
+                <li>We use cookies and local storage to improve your experience and maintain your session.</li>
+                <li>You have the right to request deletion of your data upon withdrawal or graduation.</li>
+              </ul>
+            </div>
+            <div className="terms-footer">
+              <button className="accept-terms-btn" onClick={acceptTerms}>
+                <FaCheckCircle />
+                I Accept the Terms & Privacy Policy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Left Section */}
+      <div className="login-left-section">
+        <div className="login-logo-container">
+          <img src={logo} alt="GC Finder Logo" className="login-logo" />
+          <img src={gcLogo} alt="GC Finder Logo" className="login-logo" />
+        </div>
+        <h1>Gordon College</h1>
+        <h2>Lost & Found System</h2>
+      </div>
+
+      {/* Right Section */}
+      <div className="login-right-section">
+        <form onSubmit={handleLogin}>
+          <h2>Welcome Students!</h2>
+          {error && <div className="error-message">{error}</div>}
+          <div className="input-group">
+            <FaIdCard className="input-icon" />
+            <input
+              type="text"
+              placeholder="Student ID"
+              value={studentId}
+              onChange={handleStudentIdChange}
+              disabled={loading}
+              inputMode="numeric"
+              pattern="[0-9]*"
+            />
+          </div>
+          <div className="input-group">
+            <FaLock className="input-icon" />
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={togglePasswordVisibility}
+              disabled={loading}
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+        <p className="terms-link">
+            By signing in, you agree to our <button type="button" className="text-button" onClick={() => setShowTermsModal(true)}>Terms & Privacy Policy</button>
+          </p>
+      </div>
+    </div>
+  );
+};
+
+export default Login; 

@@ -1,9 +1,0 @@
-{
-  "dependencies": {
-    "firebase": "^11.6.0",
-    "react-router-dom": "^7.5.0"
-  },
-  "devDependencies": {
-    "browser-image-compression": "^2.0.2"
-  }
-}
