@@ -1,0 +1,102 @@
+== FIREBASE ==
+// Submit found item to Firebase
+export const submitFoundItem = async (formData, images) => {
+  try {
+
+====================================================
+    // Get current user info from localStorage
+    const userId = localStorage.getItem('userId');
+    const userName = localStorage.getItem('userName');
+====================================================    
+
+    // Instead of uploading to Storage, store image data directly
+    const imageData = images.map(image => ({
+      id: image.id,
+      dataUrl: image.src, // Already contains the resized data URL
+      name: image.name
+    }));
+    
+    // Create item object
+    const itemData = {
+      name: formData.itemName,
+      description: formData.description,
+      location: formData.location,
+      date: formData.dateFound,
+      category: formData.category,
+      exactLocation: formData.exactLocation,
+      uniqueIdentifier: formData.uniqueIdentifier || '',
+      additionalDetails: formData.additionalDetails || '',
+      imageData: imageData, // Store full image data
+      status: 'Available', // Initial status - matching what's shown in the UI
+      adminApproval: false, // Set to false by default for admin review
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+====================================================
+      // Add user information
+      submittedBy: {
+        userId: userId || 'anonymous',
+        userName: userName || 'Anonymous User'
+      }
+====================================================
+    };
+    
+    // Add to Firestore collection
+    const itemsRef = collection(db, 'items');
+    const docRef = await addDoc(itemsRef, itemData);
+    
+    return {
+      id: docRef.id,
+      ...itemData
+    };
+  } catch (error) {
+    console.error('Error submitting item:', error);
+    throw error;
+  }
+};
+
+== DASHBOARD ==
+                        items.push({
+                            id: doc.id,
+                            name: data.name || 'Unnamed Item',
+                            category: data.category || 'Uncategorized',
+                            location: data.location || 'Unknown location',
+                            date: data.date || new Date().toLocaleDateString(),
+                            status: data.status || 'Available',
+                            description: data.description || 'No description provided',
+                            // Get the first image if available
+                            image: data.imageData && data.imageData.length > 0 
+                                ? data.imageData[0].dataUrl 
+                                : null,
+                            currentHolder: data.currentHolder || null,
+                            reportedBy: data.reportedBy || 'Unknown',
+                            createdAt: data.createdAt, // Include the createdAt timestamp
+================================================================================
+                            // Include submitter information
+                            submittedBy: data.submittedBy ? data.submittedBy.userName : 'Unknown User'
+================================================================================
+                        });
+
+== BROWSEITEMS ==
+                        fetchedItems.push({
+                            id: doc.id,
+                            name: data.name || 'Unnamed Item',
+                            category: data.category || 'Uncategorized',
+                            location: data.location || 'Unknown location',
+                            date: data.date || new Date().toLocaleDateString(),
+                            status: data.status || 'Available',
+                            description: data.description || 'No description provided',
+                            // Get the first image if available
+                            image: data.imageData && data.imageData.length > 0 
+                                ? data.imageData[0].dataUrl 
+                                : null,
+                            currentHolder: data.currentHolder || null,
+                            reportedBy: data.reportedBy || 'Unknown',
+                            createdAt: data.createdAt, // Include createdAt timestamp
+================================================================================
+                            // Include submitter information
+                            submittedBy: data.submittedBy ? data.submittedBy.userName : 'Unknown User'
+================================================================================
+                        });
+
+
+

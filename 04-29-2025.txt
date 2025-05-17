@@ -1,0 +1,5 @@
+for items that have been submitted but the attribute is "adminApproval = false;" Make it where if it's false, the item card will only show to the accound of that who submitted it// full_name == full_name. 
+
+The purpose is to still show the user and only the user their reported item which is still not yet approved and is still pending. 
+
+Take your time. 

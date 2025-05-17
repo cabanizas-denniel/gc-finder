@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "chart.js": "^4.4.9",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^4.1.0",
+    "firebase": "^11.6.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-router-dom": "^7.5.0",
+    "recharts": "^2.15.3"
+  },
+  "devDependencies": {
+    "browser-image-compression": "^2.0.2"
+  }
+}
