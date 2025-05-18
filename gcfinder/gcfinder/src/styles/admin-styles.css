@@ -485,7 +485,7 @@ h2{
     margin-bottom: 5px;
 }
 
-.subtitle {
+.admin-subtitle {
     color: #666;
     font-size: 0.9rem;
 }
@@ -529,6 +529,7 @@ h2{
 .filter-section {
     background: white;
     border-radius: 10px;
+    border: 2px solid var(--primary-color);
     padding: 15px;
     margin-bottom: 20px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
@@ -631,6 +632,7 @@ h2{
 .users-table-container {
     background: white;
     border-radius: 10px;
+    border: 2px solid var(--primary-color);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     overflow: hidden;
 }
@@ -1072,6 +1074,7 @@ h2{
 .items-table-container {
     background: white;
     border-radius: 10px;
+    border: 2px solid var(--primary-color);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     overflow: hidden;
 }
@@ -1236,6 +1239,52 @@ h2{
 .item-loading-message p, .item-error-message p {
     font-size: 1rem;
     color: #666;
+}
+
+/* Pagination Controls Styles */
+.pagination-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 15px 0;
+    margin-top: 10px;
+    gap: 10px;
+}
+
+.pagination-controls button {
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    color: #333;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9rem;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+    background-color: #e7e7e7;
+    border-color: #ccc;
+}
+
+.pagination-controls button:disabled {
+    background-color: #f8f8f8;
+    color: #aaa;
+    cursor: not-allowed;
+    border-color: #eee;
+}
+
+.pagination-controls button i {
+    font-size: 0.8rem;
+}
+
+.pagination-controls span {
+    font-size: 0.9rem;
+    color: #555;
+    margin: 0 5px;
 }
 
 /* Responsive Styles */

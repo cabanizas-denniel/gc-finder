@@ -113,7 +113,7 @@ const UserManagement = () => {
                 <div className="page-header">
                     <div className="page-header-content">
                 <h1>User Management</h1>
-                <p className="subtitle">View, flag, and manage user accounts in the GC Finder system</p>
+                <p className="admin-subtitle">View, flag, and manage user accounts in the GC Finder system</p>
                     </div>
                     <div className="action-buttons">
                         <button className="export-btn">

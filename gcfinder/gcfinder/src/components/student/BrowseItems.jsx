@@ -32,11 +32,12 @@ const BrowseItems = () => {
                 }
 
                 const itemsRef = collection(db, 'items');
-                const allItemsQuery = query(itemsRef);
-                const allItemsSnapshot = await getDocs(allItemsQuery);
+                // Fetch all items that are NOT archived
+                const q = query(itemsRef, where('status', '!=', 'archived'));
+                const querySnapshot = await getDocs(q);
                 
                 const fetchedItems = [];
-                allItemsSnapshot.forEach(doc => {
+                querySnapshot.forEach(doc => {
                     const data = doc.data();
                     const item_id = doc.id;
                     const isSubmitter = data.submitter && data.submitter.student_id === currentUserId;

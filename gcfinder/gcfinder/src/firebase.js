@@ -71,7 +71,7 @@ export const submitFoundItem = async (formData, images) => {
       uniqueIdentifier: formData.uniqueIdentifier || '',
       additionalDetails: formData.additionalDetails || '',
       imageData: imageData, // Store full image data
-      status: 'Available', // Initial status - matching what's shown in the UI
+      status: 'Pending', // Initial status - matching what's shown in the UI
       adminApproval: false, // Set to false by default for admin review
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -108,6 +108,9 @@ export const setItemApproval = async (itemId, isApproved) => {
 
     if (isApproved === false) {
       updateData.status = "Disapproved";
+    }
+    if (isApproved === true) {
+      updateData.status = "Available";
     }
     // If isApproved is true, we might want to set status to 'Available'
     // or handle it based on prior status, but for now, only handling disapproval.

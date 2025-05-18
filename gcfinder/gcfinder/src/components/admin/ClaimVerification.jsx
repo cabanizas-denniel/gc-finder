@@ -245,7 +245,7 @@ const ClaimVerification = () => {
             <div className="page-header">
                 <div className="page-header-content">
                     <h1>Claim Verification</h1>
-                    <p className="subtitle">Verify and Change Status of Found Item in the GC Finder system</p>
+                    <p className="admin-subtitle">Verify and Change Status of Found Item in the GC Finder system</p>
                 </div>
             </div>
 

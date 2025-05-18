@@ -37,13 +37,13 @@ const Dashboard = () => {
                     userClaimsSnapshot.forEach(doc => claimedItemIds.add(doc.data().itemId));
                 }
 
-                // 2. Fetch items
+                // 2. Fetch items that are NOT archived
                 const itemsRef = collection(db, 'items');
-                const allItemsQuery = query(itemsRef);
-                const allItemsSnapshot = await getDocs(allItemsQuery);
+                const q = query(itemsRef, where('status', '!=', 'archived'));
+                const querySnapshot = await getDocs(q);
                 
                 const itemsData = [];
-                allItemsSnapshot.forEach(doc => {
+                querySnapshot.forEach(doc => {
                     const data = doc.data();
                     const item_id = doc.id;
                     const isSubmitter = data.submitter && data.submitter.student_id === currentUserId;

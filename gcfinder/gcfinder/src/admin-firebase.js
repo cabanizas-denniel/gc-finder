@@ -99,7 +99,7 @@ export const submitFoundItem = async (formData, images) => {
       additionalDetails: formData.additionalDetails || '',
       imageData: imageData,
       status: 'Available',
-      adminApproval: false,
+      adminApproval: true,
       reporterId: formData.reporterId || '',
       reporterName: formData.reporterName || 'Anonymous',
       createdAt: serverTimestamp(),
@@ -160,8 +160,10 @@ export const approveItem = async (itemId) => {
     const itemRef = doc(db, 'items', itemId);
     await updateDoc(itemRef, {
       adminApproval: true,
+      status: 'Available',
       updatedAt: serverTimestamp()
     });
+    console.log(`Item ${itemId} approved and status set to Available.`);
     return true;
   } catch (error) {
     console.error("Error approving item:", error);

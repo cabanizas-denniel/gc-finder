@@ -16,27 +16,29 @@ const ItemManagement = () => {
     const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
     const [selectedItemForModal, setSelectedItemForModal] = useState(null);
     
+    // Pagination state (generalized)
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10); // Items per page for all tabs
+    
     // Fetch items data from Firebase
     const fetchItems = async () => {
         try {
             setLoading(true);
             const itemsDataFromFirebase = await getAllItems();
+
+            // Mock data removed
             
             const mappedItems = itemsDataFromFirebase.map(item => ({
                 id: item.id,
-                name: item.name || 'N/A', // Map itemName to name
+                name: item.name || 'N/A',
                 location: item.location || 'N/A',
                 category: item.category || 'N/A',
-                // Assuming reportedBy might be stored as full_name or submitted_by_name in item doc
-                reportedBy: item.full_name || item.submitted_by_name || 'N/A', 
-                date: item.date ? new Date(item.date).toLocaleDateString() : 'N/A', // Format date
+                reportedBy: item.reportedBy || item.full_name || item.submitted_by_name || 'N/A', 
+                date: item.date ? (typeof item.date === 'string' ? new Date(item.date).toLocaleDateString() : (item.date.toDate ? item.date.toDate().toLocaleDateString() : new Date(item.date).toLocaleDateString()) ) : 'N/A', 
                 status: item.status ? item.status.toLowerCase() : 'unknown',
-                // Assuming claimRequests is a field on the item document or default to 0
-                // Include other fields if your `getAllItems` returns them and they are needed directly
-                // For example, if you need original `itemName` for `handleViewItem` later:
-                originalItemName: item.name, 
-                description: item.description, 
-                imageData: item.imageData, // if present, for view modal
+                originalItemName: item.originalItemName || item.name,
+                description: item.description,
+                imageData: item.imageData,
                 exactLocation: item.exactLocation,
                 uniqueIdentifier: item.uniqueIdentifier,
                 additionalDetails: item.additionalDetails
@@ -56,28 +58,44 @@ const ItemManagement = () => {
         fetchItems();
     }, []);
 
-    // Filter items based on active tab and search term
+    // Filter items based on active tab and search term, and paginate for all tabs
     useEffect(() => {
-        const filtered = items.filter(item => {
-            // Filter by tab
-            if (activeTab !== 'all' && item.status !== activeTab) {
-                return false;
-            }
-            
-            // Filter by search term
-            if (searchTerm) {
-                return (
-                    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    item.category.toLowerCase().includes(searchTerm.toLowerCase())
-                );
-            }
-            
-            return true;
-        });
-        
-        setFilteredItems(filtered);
-    }, [activeTab, searchTerm, items]);
+        let processedItems = items;
+
+        // Filter by active tab first
+        if (activeTab !== 'all') {
+            processedItems = items.filter(item => item.status === activeTab);
+        }
+
+        // Then, filter by search term
+        if (searchTerm) {
+            processedItems = processedItems.filter(item =>
+                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.category.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        // Apply pagination to the processed (tab-filtered and search-filtered) items
+        const indexOfLastItem = currentPage * itemsPerPage;
+        const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+        setFilteredItems(processedItems.slice(indexOfFirstItem, indexOfLastItem));
+
+        // IMPORTANT: Reset to first page if tab or search term changes,
+        // as this affects the total number of items and pages.
+        // We need to be careful here. This effect runs when currentPage changes too.
+        // A better way to handle page reset is in the handlers for tab/search changes directly,
+        // or by storing previous tab/search and comparing.
+        // For simplicity now, let's check if this reset is necessary or causes issues.
+        // The dependency array includes currentPage, so this will re-run. 
+        // Consider if (prevTab !== activeTab || prevSearchTerm !== searchTerm) { setCurrentPage(1); }
+
+    }, [activeTab, searchTerm, items, currentPage, itemsPerPage]);
+    
+    // Effect to reset page when activeTab or searchTerm changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, searchTerm]);
 
     // Sort items
     const requestSort = (key) => {
@@ -159,7 +177,7 @@ const ItemManagement = () => {
                 <div className="page-header">
                     <div className="page-header-content">
                         <h1>Item Management</h1>
-                        <p className="subtitle">View, flag, and manage lost and found items in the GC Finder system</p>
+                        <p className="admin-subtitle">View, flag, and manage lost and found items in the GC Finder system</p>
                     </div>
                     <div className="action-buttons">
                         <button className="export-btn">
@@ -327,6 +345,44 @@ const ItemManagement = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Pagination Controls - Generalized for all tabs */}
+                {(() => {
+                    // Calculate total items after applying current tab and search filters
+                    let itemsForPaginationCount = items;
+                    if (activeTab !== 'all') {
+                        itemsForPaginationCount = itemsForPaginationCount.filter(item => item.status === activeTab);
+                    }
+                    if (searchTerm) {
+                        itemsForPaginationCount = itemsForPaginationCount.filter(item =>
+                            item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            item.category.toLowerCase().includes(searchTerm.toLowerCase())
+                        );
+                    }
+                    const totalPages = Math.ceil(itemsForPaginationCount.length / itemsPerPage);
+
+                    if (totalPages > 1) {
+                        return (
+                            <div className="pagination-controls">
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <i className="fas fa-chevron-left"></i> Previous
+                                </button>
+                                <span>Page {currentPage} of {totalPages}</span>
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next <i className="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        );
+                    }
+                    return null; // No pagination needed if only one page or no items
+                })()}
 
                 {/* Item Details Modal */}
                 {showItemDetailsModal && selectedItemForModal && (
