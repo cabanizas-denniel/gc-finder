@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 import { getStorage } from 'firebase/storage';
 
@@ -180,6 +180,7 @@ export const disapproveItem = async (itemId) => {
   }
 };
 
+// Get all items from Firestore /ITEM MANAGEMENT
 export const getAllItems = async () => {
     try {
         const itemsCollectionRef = collection(db, "items");
@@ -191,3 +192,54 @@ export const getAllItems = async () => {
         throw error; // Re-throw the error so the calling component can handle it
     }
 };
+
+export const deleteItemFromDb = async (itemId) => {
+    try {
+        const itemRef = doc(db, 'items', itemId);
+        await deleteDoc(itemRef);
+        console.log("Item deleted successfully from Firestore: ", itemId);
+
+        // Delete all claims associated with the deleted item
+        const claimsRef = collection(db, 'claims');
+        const q = query(claimsRef, where('itemId', '==', itemId));
+        const querySnapshot = await getDocs(q);
+
+        const deletePromises = [];
+        querySnapshot.forEach((claimDoc) => {
+            deletePromises.push(deleteDoc(doc(db, 'claims', claimDoc.id)));
+        });
+        await Promise.all(deletePromises);
+        console.log('All claims for deleted item removed successfully.');
+
+    } catch (error) {
+        console.error("Error deleting item from Firestore: ", error);
+        throw error; // Re-throw the error so the calling component can handle it
+    }
+};
+
+export const archiveItemInDb = async (itemId) => {
+  try {
+    const itemRef = doc(db, 'items', itemId);
+    await updateDoc(itemRef, {
+      status: 'archived',
+      updatedAt: serverTimestamp()
+    });
+
+    // Delete pending claims associated with the archived item
+    const claimsRef = collection(db, 'claims');
+    const q = query(claimsRef, where('itemId', '==', itemId), where('claimStatus', '==', 'Pending'));
+    const querySnapshot = await getDocs(q);
+    
+    const deletePromises = [];
+    querySnapshot.forEach((claimDoc) => {
+      deletePromises.push(deleteDoc(doc(db, 'claims', claimDoc.id)));
+    });
+    await Promise.all(deletePromises);
+
+    console.log('Item archived successfully in Firestore with ID:', itemId);
+    console.log('Pending claims for archived item deleted successfully.');
+  } catch (error) {
+    console.error('Error archiving item in Firestore:', error);
+    throw error;
+  }
+}; 

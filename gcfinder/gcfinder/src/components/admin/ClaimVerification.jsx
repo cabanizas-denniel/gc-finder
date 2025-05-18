@@ -229,9 +229,10 @@ const ClaimVerification = () => {
                         </button>
                         <button 
                             className="view-details-btn"
-                            // onClick={() => 
+                            onClick={() => handleViewItemDetails(selectedClaim.itemId)}
+                            disabled={!selectedClaim || !selectedClaim.itemId || loadingItemDetails}
                         >
-                            View Details
+                            {loadingItemDetails ? 'Loading...' : 'View Item Details'}
                         </button>
                     </div>
                 </div>

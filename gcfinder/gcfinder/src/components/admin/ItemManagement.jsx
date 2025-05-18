@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllItems } from '../../admin-firebase';
+import { getAllItems, deleteItemFromDb, archiveItemInDb } from '../../admin-firebase';
 
 const ItemManagement = () => {
     const [activeTab, setActiveTab] = useState('all');
@@ -12,45 +12,47 @@ const ItemManagement = () => {
         key: null,
         direction: 'ascending'
     });
+    // State for Item Details Modal
+    const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
+    const [selectedItemForModal, setSelectedItemForModal] = useState(null);
     
     // Fetch items data from Firebase
+    const fetchItems = async () => {
+        try {
+            setLoading(true);
+            const itemsDataFromFirebase = await getAllItems();
+            
+            const mappedItems = itemsDataFromFirebase.map(item => ({
+                id: item.id,
+                name: item.name || 'N/A', // Map itemName to name
+                location: item.location || 'N/A',
+                category: item.category || 'N/A',
+                // Assuming reportedBy might be stored as full_name or submitted_by_name in item doc
+                reportedBy: item.full_name || item.submitted_by_name || 'N/A', 
+                date: item.date ? new Date(item.date).toLocaleDateString() : 'N/A', // Format date
+                status: item.status ? item.status.toLowerCase() : 'unknown',
+                // Assuming claimRequests is a field on the item document or default to 0
+                // Include other fields if your `getAllItems` returns them and they are needed directly
+                // For example, if you need original `itemName` for `handleViewItem` later:
+                originalItemName: item.name, 
+                description: item.description, 
+                imageData: item.imageData, // if present, for view modal
+                exactLocation: item.exactLocation,
+                uniqueIdentifier: item.uniqueIdentifier,
+                additionalDetails: item.additionalDetails
+            }));
+            
+            setItems(mappedItems);
+            setError('');
+        } catch (err) {
+            console.error("Error fetching items:", err);
+            setError("Failed to load items. Please try again later.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchItems = async () => {
-            try {
-                setLoading(true);
-                const itemsDataFromFirebase = await getAllItems();
-                
-                const mappedItems = itemsDataFromFirebase.map(item => ({
-                    id: item.id,
-                    name: item.itemName || 'N/A', // Map itemName to name
-                    location: item.location || 'N/A',
-                    category: item.category || 'N/A',
-                    // Assuming reportedBy might be stored as full_name or submitted_by_name in item doc
-                    reportedBy: item.full_name || item.submitted_by_name || 'N/A', 
-                    dateFound: item.dateFound ? new Date(item.dateFound).toLocaleDateString() : 'N/A', // Format date
-                    status: item.status ? item.status.toLowerCase() : 'unknown',
-                    // Assuming claimRequests is a field on the item document or default to 0
-                    claimRequests: typeof item.claimRequests === 'number' ? item.claimRequests : 0, 
-                    // Include other fields if your `getAllItems` returns them and they are needed directly
-                    // For example, if you need original `itemName` for `handleViewItem` later:
-                    originalItemName: item.itemName, 
-                    description: item.description, 
-                    imageData: item.imageData, // if present, for view modal
-                    exactLocation: item.exactLocation,
-                    uniqueIdentifier: item.uniqueIdentifier,
-                    additionalDetails: item.additionalDetails
-                }));
-                
-                setItems(mappedItems);
-                setError('');
-            } catch (err) {
-                console.error("Error fetching items:", err);
-                setError("Failed to load items. Please try again later.");
-            } finally {
-                setLoading(false);
-            }
-        };
-        
         fetchItems();
     }, []);
 
@@ -101,12 +103,14 @@ const ItemManagement = () => {
     // Status badge renderer
     const renderStatusBadge = (status) => {
         switch (status) {
-            case 'active':
-                return <span className="item-status-badge active">Active</span>;
+            case 'available':
+                return <span className="item-status-badge active">Available</span>;
             case 'claimed':
                 return <span className="item-status-badge claimed">Claimed</span>;
-            case 'flagged':
-                return <span className="item-status-badge flagged">Flagged</span>;
+            case 'disapproved':
+                return <span className="item-status-badge disapproved">Disapproved</span>;
+            case 'pending':
+                return <span className="item-status-badge pending">Pending</span>;
             case 'archived':
                 return <span className="item-status-badge archived">Archived</span>;
             default:
@@ -116,20 +120,34 @@ const ItemManagement = () => {
 
     // Item actions
     const handleViewItem = (item) => {
-        // This is where you would trigger the modal. 
-        // For now, it uses an alert. You'd need to adapt the modal logic from ClaimVerification.jsx here.
-        alert(`Viewing details for ${item.name} (ID: ${item.id}). Description: ${item.description}`);
-        // Example: setSelectedItemForModal(item); setShowItemDetailsModal(true);
+        setSelectedItemForModal(item);
+        setShowItemDetailsModal(true);
     };
 
-    const handleFlagItem = (item) => {
-        // Implementation for flagging an item
-        alert(`${item.name} has been flagged`);
+    const handleDeleteItem = async (itemId) => {
+        if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+            try {
+                await deleteItemFromDb(itemId);
+                alert('Item deleted successfully!');
+                fetchItems(); // Refresh the list after deletion
+            } catch (error) {
+                console.error("Error deleting item: ", error);
+                alert('Failed to delete item. See console for details.');
+            }
+        }
     };
 
-    const handleArchiveItem = (item) => {
-        // Implementation for archiving an item
-        alert(`${item.name} has been archived`);
+    const handleArchiveItem = async (itemId) => {
+        if (window.confirm('Are you sure you want to archive this item?')) {
+            try {
+                await archiveItemInDb(itemId);
+                alert('Item archived successfully!');
+                fetchItems(); // Refresh the list after archiving
+            } catch (error) {
+                console.error("Error archiving item: ", error);
+                alert('Failed to archive item. See console for details.');
+            }
+        }
     };
 
     const getTabCount = (status) => {
@@ -163,11 +181,11 @@ const ItemManagement = () => {
                             <span className="item-count">{items.length}</span>
                         </button>
                         <button 
-                            className={`item-tab ${activeTab === 'active' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('active')}
+                            className={`item-tab ${activeTab === 'available' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('available')}
                         >
-                            <i className="fas fa-box-open"></i> Active
-                            <span className="item-count">{getTabCount('active')}</span>
+                            <i className="fas fa-box-open"></i> Available
+                            <span className="item-count">{getTabCount('available')}</span>
                         </button>
                         <button 
                             className={`item-tab ${activeTab === 'claimed' ? 'active' : ''}`}
@@ -177,11 +195,18 @@ const ItemManagement = () => {
                             <span className="item-count">{getTabCount('claimed')}</span>
                         </button>
                         <button 
-                            className={`item-tab ${activeTab === 'flagged' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('flagged')}
+                            className={`item-tab ${activeTab === 'disapproved' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('disapproved')}
                         >
-                            <i className="fas fa-flag"></i> Flagged
-                            <span className="item-count">{getTabCount('flagged')}</span>
+                            <i className="fas fa-times-circle"></i> Disapproved
+                            <span className="item-count">{getTabCount('disapproved')}</span>
+                        </button>
+                        <button 
+                            className={`item-tab ${activeTab === 'pending' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('pending')}
+                        >
+                            <i className="fas fa-hourglass-half"></i> Pending
+                            <span className="item-count">{getTabCount('pending')}</span>
                         </button>
                         <button 
                             className={`item-tab ${activeTab === 'archived' ? 'active' : ''}`}
@@ -245,14 +270,13 @@ const ItemManagement = () => {
                                             <i className={`fas fa-sort-${sortConfig.direction === 'ascending' ? 'up' : 'down'}`}></i>
                                         )}
                                     </th>
-                                    <th onClick={() => requestSort('dateFound')}>
+                                    <th onClick={() => requestSort('date')}>
                                         Date Found
-                                        {sortConfig.key === 'dateFound' && (
+                                        {sortConfig.key === 'date' && (
                                             <i className={`fas fa-sort-${sortConfig.direction === 'ascending' ? 'up' : 'down'}`}></i>
                                         )}
                                     </th>
                                     <th>Status</th>
-                                    <th>Claim Requests</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -262,9 +286,8 @@ const ItemManagement = () => {
                                         <td className="item-name">{item.name}</td>
                                         <td>{item.category}</td>
                                         <td>{item.location}</td>
-                                        <td>{item.dateFound}</td>
+                                        <td>{item.date}</td>
                                         <td>{renderStatusBadge(item.status)}</td>
-                                        <td className="item-claim-requests">{item.claimRequests}</td>
                                         <td className="item-actions">
                                             <button 
                                                 className="item-action-btn view" 
@@ -275,18 +298,17 @@ const ItemManagement = () => {
                                                 <i className="fas fa-eye"></i>
                                             </button>
                                             <button 
-                                                className="item-action-btn flag" 
-                                                aria-label="Flag"
-                                                onClick={() => handleFlagItem(item)}
-                                                title="Flag Item"
-                                                disabled={item.status === 'flagged' || item.status === 'archived'}
+                                                className="item-action-btn delete"
+                                                aria-label="Delete"
+                                                onClick={() => handleDeleteItem(item.id)}
+                                                title="Delete Item"
                                             >
-                                                <i className="fas fa-flag"></i>
+                                                <i className="fas fa-trash-alt"></i>
                                             </button>
                                             <button 
                                                 className="item-action-btn archive" 
                                                 aria-label="Archive"
-                                                onClick={() => handleArchiveItem(item)}
+                                                onClick={() => handleArchiveItem(item.id)}
                                                 title="Archive Item"
                                                 disabled={item.status === 'archived'}
                                             >
@@ -305,6 +327,67 @@ const ItemManagement = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Item Details Modal */}
+                {showItemDetailsModal && selectedItemForModal && (
+                    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowItemDetailsModal(false); }}>
+                        <div className="modal-content item-details-modal"> {/* item-details-modal for specific styling if needed */}
+                            <div className="modal-header">
+                                <h2>Item Details</h2>
+                                <button className="close-button" onClick={() => setShowItemDetailsModal(false)}>&times;</button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="item-detail-container"> {/* Reusing class from shared-styles for layout */}
+                                    <div className="item-image-container">
+                                        {selectedItemForModal.imageData && selectedItemForModal.imageData.length > 0 && selectedItemForModal.imageData[0].dataUrl ? (
+                                            <img 
+                                                src={selectedItemForModal.imageData[0].dataUrl} 
+                                                alt={selectedItemForModal.imageData[0].name || selectedItemForModal.name || 'Item Image'} 
+                                            />
+                                        ) : (
+                                            <p>No image available</p>
+                                        )}
+                                    </div>
+                                    <div className="item-info">
+                                        <h3>{selectedItemForModal.name || 'N/A'}</h3>
+                                        <div className="detail-item">
+                                            <i className="fas fa-align-left"></i><strong>Description:</strong> {selectedItemForModal.description || 'N/A'}
+                                        </div>
+                                        <div className="detail-item">
+                                            <i className="fas fa-tag"></i> <strong>Category:</strong> {selectedItemForModal.category || 'N/A'}
+                                        </div>
+                                        <div className="detail-item">
+                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.date || 'N/A'} {/* Uses .date from mappedItems */}
+                                        </div>
+                                        <div className="detail-item">
+                                            <i className="fas fa-map-marker-alt"></i> <strong>Location Found:</strong> {selectedItemForModal.location || 'N/A'}
+                                        </div>
+                                        {selectedItemForModal.exactLocation && (
+                                            <div className="detail-item">
+                                                <i className="fas fa-map-pin"></i> <strong>Exact Location:</strong> {selectedItemForModal.exactLocation}
+                                            </div>
+                                        )}
+                                        {selectedItemForModal.uniqueIdentifier && (
+                                            <div className="detail-item">
+                                                <i className="fas fa-fingerprint"></i> <strong>Unique Identifier:</strong> {selectedItemForModal.uniqueIdentifier}
+                                            </div>
+                                        )}
+                                        {selectedItemForModal.additionalDetails && (
+                                            <p><strong>Additional Details:</strong> {selectedItemForModal.additionalDetails}</p>
+                                        )}
+                                        {/* You can add reportedBy if needed */}
+                                        {/* <div className="detail-item">
+                                            <i className="fas fa-user"></i> <strong>Reported By:</strong> {selectedItemForModal.reportedBy || 'N/A'}
+                                        </div> */}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button className="btn back" onClick={() => setShowItemDetailsModal(false)}>Close</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
     );
 };

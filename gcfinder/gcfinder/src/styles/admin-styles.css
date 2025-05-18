@@ -795,6 +795,11 @@ h2{
     background-color: rgba(255, 193, 7, 0.1);
 }
 
+.item-action-btn.delete:hover:not(:disabled) {
+    color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
 .item-action-btn.archive:hover:not(:disabled) {
     color: #6c757d;
     background-color: rgba(108, 117, 125, 0.1);
@@ -1150,6 +1155,17 @@ h2{
 .item-status-badge.archived {
     background-color: rgba(108, 117, 125, 0.1);
     color: #6c757d;
+}
+
+/* Added styles for new status badges */
+.item-status-badge.disapproved {
+    background-color: rgba(220, 53, 69, 0.1); /* Reddish, similar to banned */
+    color: #dc3545;
+}
+
+.item-status-badge.pending {
+    background-color: rgba(255, 193, 7, 0.1); /* Yellowish, similar to flagged */
+    color: #ffc107; 
 }
 
 /* Row Highlighting */
