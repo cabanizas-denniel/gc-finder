@@ -40,7 +40,7 @@ const Dashboard = () => {
     return (
         <div className="dashboard-container">
             {/* Stats Cards */}
-            <div className="stats-cards">
+            <div className="stats-container">
                 {stats.map((stat, index) => (
                     <div key={index} className="stat-card">
                         <div className="stat-icon">

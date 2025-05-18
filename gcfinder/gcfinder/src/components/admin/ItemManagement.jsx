@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getAllItems } from '../../admin-firebase';
 
 const ItemManagement = () => {
-    const [activeTab, setActiveTab] = useState('active');
+    const [activeTab, setActiveTab] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filteredItems, setFilteredItems] = useState([]);
     const [items, setItems] = useState([]);
@@ -13,73 +13,40 @@ const ItemManagement = () => {
         direction: 'ascending'
     });
     
-    // Sample items data - replace with actual Firebase fetch
+    // Fetch items data from Firebase
     useEffect(() => {
         const fetchItems = async () => {
             try {
                 setLoading(true);
-                // Replace with actual Firebase call when available
-                // const itemsData = await getAllItems();
+                const itemsDataFromFirebase = await getAllItems();
                 
-                // Temporary mock data
-                const itemsData = [
-                    {
-                        id: '1',
-                        name: 'School ID',
-                        location: 'Main Building',
-                        category: 'ID/Documents',
-                        reportedBy: 'John Doe',
-                        dateFound: '2023-05-15',
-                        status: 'active',
-                        claimRequests: 2,
-                    },
-                    {
-                        id: '2',
-                        name: 'Blue Umbrella',
-                        location: 'Library',
-                        category: 'Accessories',
-                        reportedBy: 'Jane Smith',
-                        dateFound: '2023-05-17',
-                        status: 'claimed',
-                        claimRequests: 1,
-                    },
-                    {
-                        id: '3',
-                        name: 'Water Bottle',
-                        location: 'Gym',
-                        category: 'Personal Items',
-                        reportedBy: 'Mike Johnson',
-                        dateFound: '2023-05-18',
-                        status: 'active',
-                        claimRequests: 0,
-                    },
-                    {
-                        id: '4',
-                        name: 'Laptop Charger',
-                        location: 'Computer Lab',
-                        category: 'Electronics',
-                        reportedBy: 'Sarah Williams',
-                        dateFound: '2023-05-20',
-                        status: 'flagged',
-                        claimRequests: 3,
-                    },
-                    {
-                        id: '5',
-                        name: 'Calculator',
-                        location: 'Math Department',
-                        category: 'School Supplies',
-                        reportedBy: 'David Brown',
-                        dateFound: '2023-05-22',
-                        status: 'archived',
-                        claimRequests: 0,
-                    }
-                ];
+                const mappedItems = itemsDataFromFirebase.map(item => ({
+                    id: item.id,
+                    name: item.itemName || 'N/A', // Map itemName to name
+                    location: item.location || 'N/A',
+                    category: item.category || 'N/A',
+                    // Assuming reportedBy might be stored as full_name or submitted_by_name in item doc
+                    reportedBy: item.full_name || item.submitted_by_name || 'N/A', 
+                    dateFound: item.dateFound ? new Date(item.dateFound).toLocaleDateString() : 'N/A', // Format date
+                    status: item.status ? item.status.toLowerCase() : 'unknown',
+                    // Assuming claimRequests is a field on the item document or default to 0
+                    claimRequests: typeof item.claimRequests === 'number' ? item.claimRequests : 0, 
+                    // Include other fields if your `getAllItems` returns them and they are needed directly
+                    // For example, if you need original `itemName` for `handleViewItem` later:
+                    originalItemName: item.itemName, 
+                    description: item.description, 
+                    imageData: item.imageData, // if present, for view modal
+                    exactLocation: item.exactLocation,
+                    uniqueIdentifier: item.uniqueIdentifier,
+                    additionalDetails: item.additionalDetails
+                }));
                 
-                setItems(itemsData);
-                setLoading(false);
+                setItems(mappedItems);
+                setError('');
             } catch (err) {
                 console.error("Error fetching items:", err);
                 setError("Failed to load items. Please try again later.");
+            } finally {
                 setLoading(false);
             }
         };
@@ -149,8 +116,10 @@ const ItemManagement = () => {
 
     // Item actions
     const handleViewItem = (item) => {
-        alert(`Viewing details for ${item.name}`);
-        // Implementation for viewing item details
+        // This is where you would trigger the modal. 
+        // For now, it uses an alert. You'd need to adapt the modal logic from ClaimVerification.jsx here.
+        alert(`Viewing details for ${item.name} (ID: ${item.id}). Description: ${item.description}`);
+        // Example: setSelectedItemForModal(item); setShowItemDetailsModal(true);
     };
 
     const handleFlagItem = (item) => {

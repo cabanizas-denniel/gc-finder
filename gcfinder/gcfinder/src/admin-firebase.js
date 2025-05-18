@@ -179,3 +179,15 @@ export const disapproveItem = async (itemId) => {
     throw error;
   }
 };
+
+export const getAllItems = async () => {
+    try {
+        const itemsCollectionRef = collection(db, "items");
+        const itemSnapshot = await getDocs(itemsCollectionRef);
+        const itemList = itemSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return itemList;
+    } catch (error) {
+        console.error("Error fetching all items: ", error);
+        throw error; // Re-throw the error so the calling component can handle it
+    }
+};

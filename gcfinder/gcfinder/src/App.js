@@ -23,6 +23,7 @@ import AdminMessages from './components/admin/Messages';
 import AdminHelp from './components/admin/Help';
 import './styles/student-styles.css';
 import './styles/admin-styles.css';
+import './styles/shared-styles.css';
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const isAuthenticated = localStorage.getItem('isAuthenticated');
@@ -97,8 +98,8 @@ function App() {
                 </Route>
 
                 {/* Admin Routes */}
-                    <Route path="/admin" element={<AdminLogin />} />
-                    <Route element={<AdminLayout />}>
+                <Route path="/admin" element={<AdminLogin />} />
+                <Route element={<AdminLayout />}>
                     <Route
                         path="/admin/dashboard"
                         element={

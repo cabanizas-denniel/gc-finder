@@ -163,8 +163,8 @@ const Messages = () => {
                 <div className="messages-section">
                     {/* Conversations Panel */}
                     <div className={`conversations-panel ${isMobileView && showChat ? 'hidden' : ''}`}>
-                        <div className="search-bar">
-                            <div className="search-input">
+                        <div className="message-search-bar">
+                            <div className="message-search-input">
                                 <i className="fas fa-search"></i>
                                 <input 
                                     type="text" 

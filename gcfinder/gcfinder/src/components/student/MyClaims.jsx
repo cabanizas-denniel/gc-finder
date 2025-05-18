@@ -165,7 +165,7 @@ const MyClaims = () => {
                                 {claim.claimStatus || 'N/A'} {/* Display claimStatus */}
                             </div>
                             <img src={claim.itemImage || noItem} alt={claim.itemName || 'Item'} /> {/* Display itemImage and itemName */}
-                            <div className="claim-info">
+                            <div className="student-claim-info">
                                 <h3>{claim.itemName || 'Item Name N/A'}</h3>
                                 <p><i className="fas fa-calendar"></i> Claimed on: {claim.displayDate}</p> {/* Display formatted createdAt date */}
                                 {/* Other details from your claim structure can be added here if needed */}

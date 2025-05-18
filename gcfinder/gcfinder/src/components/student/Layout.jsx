@@ -42,7 +42,7 @@ const Layout = () => {
     // Handle clicks outside sidebar for mobile
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (window.innerWidth <= 768) {
+            if (isSidebarOpen && window.innerWidth <= 768) {
                 const sidebar = document.querySelector('.sidebar');
                 const burgerMenu = document.querySelector('.burger-menu');
                 
@@ -59,7 +59,7 @@ const Layout = () => {
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, []);
+    }, [isSidebarOpen]);
 
     // Fetch user data from Firebase
     useEffect(() => {

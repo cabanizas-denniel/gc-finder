@@ -182,7 +182,7 @@ const BrowseItems = () => {
             <p className="subtitle">Browse through items that have been found on campus</p>
             
             <div className="search-filter-container">
-                <div className="search-box">
+                <div className="student-search-box">
                     <i className="fas fa-search"></i>
                     <input 
                         type="text" 
