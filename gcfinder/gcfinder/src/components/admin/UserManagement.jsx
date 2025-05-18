@@ -13,17 +13,24 @@ const UserManagement = () => {
         direction: 'ascending'
     });
     
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10); // Users per page
+    
     // Fetch users from Firestore
     useEffect(() => {
         const fetchUsers = async () => {
             try {
                 setLoading(true);
-                const usersData = await getAllUsers();
-                setUsers(usersData);
-                setLoading(false);
+                const usersDataFromFirebase = await getAllUsers();
+
+                // Mock data removed
+                
+                setUsers(usersDataFromFirebase);
             } catch (err) {
                 console.error("Error fetching users:", err);
                 setError("Failed to load users. Please try again later.");
+            } finally {
                 setLoading(false);
             }
         };
@@ -31,27 +38,34 @@ const UserManagement = () => {
         fetchUsers();
     }, []);
 
-    // Filter users based on active tab and search term
+    // Filter users based on active tab and search term, then paginate
     useEffect(() => {
-        const filtered = users.filter(user => {
-            // Tab
-            if (activeTab !== 'all' && user.status !== activeTab) {
-                return false;
-            }
-            
-            // Search term
-            if (searchTerm) {
-                return (
-                    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-                );
-            }
-            
-            return true;
-        });
+        let processedUsers = users;
+
+        // Filter by active tab first
+        if (activeTab !== 'all') {
+            processedUsers = users.filter(user => user.status === activeTab);
+        }
         
-        setFilteredUsers(filtered);
-    }, [activeTab, searchTerm, users]);
+        // Then, filter by search term
+        if (searchTerm) {
+            processedUsers = processedUsers.filter(user => 
+                user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                user.email.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        // Apply pagination to the processed (tab-filtered and search-filtered) users
+        const indexOfLastUser = currentPage * itemsPerPage;
+        const indexOfFirstUser = indexOfLastUser - itemsPerPage;
+        setFilteredUsers(processedUsers.slice(indexOfFirstUser, indexOfLastUser));
+
+    }, [activeTab, searchTerm, users, currentPage, itemsPerPage]);
+
+    // Effect to reset page when activeTab or searchTerm changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, searchTerm]);
 
     // Sort users
     const requestSort = (key) => {
@@ -74,20 +88,6 @@ const UserManagement = () => {
         setFilteredUsers(sortedUsers);
     };
 
-    // Status badge
-    const renderStatusBadge = (status) => {
-        switch (status) {
-            case 'active':
-                return <span className="status-badge active">Active</span>;
-            case 'flagged':
-                return <span className="status-badge flagged">Flagged</span>;
-            case 'banned':
-                return <span className="status-badge banned">Banned</span>;
-            default:
-                return null;
-        }
-    };
-
     // User actions
     const handleViewUser = (user) => {
         alert(`Viewing profile for ${user.name}`);
@@ -106,6 +106,19 @@ const UserManagement = () => {
 
     const getTabCount = (status) => {
         return users.filter(user => user.status === status).length;
+    };
+
+    const renderStatusBadge = (status) => {
+        switch (status) {
+            case 'active':
+                return <span className="user-status-badge active">Active</span>;
+            case 'flagged':
+                return <span className="user-status-badge flagged">Flagged</span>;
+            case 'banned':
+                return <span className="user-status-badge banned">Banned</span>;
+            default:
+                return null;
+        }
     };
 
     return (
@@ -211,7 +224,7 @@ const UserManagement = () => {
                                     <tr key={user.id || index} className={user.status}>
                                         <td className="user-name">{user.name}</td>
                                         <td>{user.email}</td>
-                                        <td>{renderStatusBadge(user.status)}</td>
+                                        <td className="user-status-badge">{renderStatusBadge(user.status)}</td>
                                         <td className="items-claimed">{user.itemsClaimed}</td>
                                         <td className="items-reported">{user.itemsReported}</td>
                                         <td className="items-archived">{user.itemsArchived}</td>
@@ -255,6 +268,43 @@ const UserManagement = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Pagination Controls */}
+                {(() => {
+                    // Calculate total users after applying current tab and search filters
+                    let usersForPaginationCount = users;
+                    if (activeTab !== 'all') {
+                        usersForPaginationCount = usersForPaginationCount.filter(user => user.status === activeTab);
+                    }
+                    if (searchTerm) {
+                        usersForPaginationCount = usersForPaginationCount.filter(user =>
+                            user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                        );
+                    }
+                    const totalPages = Math.ceil(usersForPaginationCount.length / itemsPerPage);
+
+                    if (totalPages > 1) {
+                        return (
+                            <div className="pagination-controls">
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <i className="fas fa-chevron-left"></i> Previous
+                                </button>
+                                <span>Page {currentPage} of {totalPages}</span>
+                                <button 
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next <i className="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        );
+                    }
+                    return null; // No pagination needed if only one page or no users
+                })()}
             </div>
     );
 };

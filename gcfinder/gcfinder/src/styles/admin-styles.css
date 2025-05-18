@@ -698,17 +698,25 @@ h2{
     font-weight: 500;
 }
 
-.status-badge.active {
+.user-status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.user-status-badge.active {
     background-color: rgba(0, 153, 51, 0.1);
     color: #009933;
 }
 
-.status-badge.flagged {
+.user-status-badge.flagged {
     background-color: rgba(255, 193, 7, 0.1);
     color: #ffc107;
 }
 
-.status-badge.banned {
+.user-status-badge.banned {
     background-color: rgba(220, 53, 69, 0.1);
     color: #dc3545;
 }

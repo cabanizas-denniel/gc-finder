@@ -25,9 +25,6 @@ const ItemManagement = () => {
         try {
             setLoading(true);
             const itemsDataFromFirebase = await getAllItems();
-
-            // Mock data removed
-            
             const mappedItems = itemsDataFromFirebase.map(item => ({
                 id: item.id,
                 name: item.name || 'N/A',
