@@ -199,6 +199,12 @@ const ReviewReports = () => {
                                     {report.additionalDetails && (
                                         <p className="report-description-info"><i className="fas fa-info-circle"></i> Additional Details: {report.additionalDetails}</p>
                                     )}
+                                    {report.reporterName && (
+                                        <p className="report-description-info">
+                                            <i className="fas fa-user"></i> Submitted By: {report.reporterName}
+                                            {report.reporterId && ` (ID: ${report.reporterId})`}
+                                        </p>
+                                    )}
                                     <div className="report-actions">
                                         <button 
                                             className="approve-btn"

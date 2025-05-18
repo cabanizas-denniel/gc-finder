@@ -99,6 +99,9 @@ export const submitFoundItem = async (formData, images) => {
       additionalDetails: formData.additionalDetails || '',
       imageData: imageData,
       status: 'Available',
+      adminApproval: false,
+      reporterId: formData.reporterId || '',
+      reporterName: formData.reporterName || 'Anonymous',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -138,7 +141,9 @@ export const getPendingItems = async () => {
         location: itemData.location,
         exactLocation: itemData.exactLocation,
         uniqueIdentifier: itemData.uniqueIdentifier,
-        additionalDetails: itemData.additionalDetails
+        additionalDetails: itemData.additionalDetails,
+        reporterId: itemData.submitter.student_id || '',
+        reporterName: itemData.submitter.full_name || 'Anonymous'
       });
     });
     
@@ -173,9 +178,10 @@ export const disapproveItem = async (itemId) => {
       adminApproval: true, // True para di nagpapakita sa pending items
       updatedAt: serverTimestamp()
     });
+    console.log(`Item ${itemId} has been disapproved and status updated.`);
     return true;
   } catch (error) {
-    console.error("Error disapproving item:", error);
+    console.error(`Error disapproving item ${itemId}:`, error);
     throw error;
   }
 };
