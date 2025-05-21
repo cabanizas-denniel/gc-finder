@@ -28,6 +28,11 @@ CORS(app, resources={
     }
 })
 
+# Add a simple root route for health checks and base URL access
+@app.route("/")
+def home():
+    return jsonify({"status": "ok", "message": "GCFinder API is running!"}), 200
+
 # Initialize CLIP
 # device = "cuda" if torch.cuda.is_available() else "cpu" # Removed for simplified deployment
 # model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device) # Removed for simplified deployment
