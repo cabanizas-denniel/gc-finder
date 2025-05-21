@@ -33,7 +33,7 @@ db = firestore.client()
 app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:3000", "https://gcfinder.vercel.app", "https://gcfinder.pages.dev"],
+        "origins": ["https://gc-finder.vercel.app", "https://gcfinder.pages.dev"],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
