@@ -197,7 +197,7 @@ const ItemManagement = () => {
             return;
         }
 
-        const exportUrl = `/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`;
+        const exportUrl = `https://gc-finder-backend.onrender.com/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`;
         window.location.href = exportUrl;
         handleCloseExportModal();
     };
