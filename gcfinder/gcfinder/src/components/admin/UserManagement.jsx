@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { getAllUsers } from '../../admin-firebase';
-import config from '../../config';
 
 const UserManagement = () => {
     const [activeTab, setActiveTab] = useState('active');
@@ -125,12 +124,13 @@ const UserManagement = () => {
             alert("Please select both a 'From' and 'To' date.");
             return;
         }
+        // Basic date validation: Start date should not be after end date
         if (new Date(finalStartDate) > new Date(finalEndDate)) {
             alert("'From' date cannot be after 'To' date.");
             return;
         }
 
-        const exportUrl = `${config.apiUrl}/api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`;
+        const exportUrl = `http://localhost:5000/api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`;
         window.location.href = exportUrl;
         handleCloseExportModal();
     };

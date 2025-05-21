@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { getAllItems, deleteItemFromDb, archiveItemInDb } from '../../admin-firebase';
-import config from '../../config';
 
 const ItemManagement = () => {
     const [activeTab, setActiveTab] = useState('all');
@@ -198,7 +197,8 @@ const ItemManagement = () => {
             return;
         }
 
-        const exportUrl = `${config.apiUrl}/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`;
+         // *** Crucial change: type=items ***
+        const exportUrl = `http://localhost:5000/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`;
         window.location.href = exportUrl;
         handleCloseExportModal();
     };
