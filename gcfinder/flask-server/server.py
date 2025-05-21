@@ -18,7 +18,7 @@ from datetime import datetime
 cred = credentials.Certificate("gcfinder-database-firebase-adminsdk-fbsvc-0447799241.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
-
+    
 app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {

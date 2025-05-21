@@ -3,4 +3,5 @@ flask-cors>=4.0.0
 transformers>=4.35.0
 --only-binary :all:
 Pillow>=10.0.0
-numpy>=1.26.0 
+numpy>=1.26.0
+gunicorn 
