@@ -13,16 +13,19 @@ import pandas as pd
 from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 from datetime import datetime
+import json
 
-# Initialize Firebase
-cred = credentials.Certificate("gcfinder-database-firebase-adminsdk-fbsvc-0447799241.json")
+# Initialize Firebase with credentials from environment variable
+firebase_credentials = json.loads(os.getenv('FIREBASE_CREDENTIALS', '{}'))
+cred = credentials.Certificate(firebase_credentials)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 app = Flask(__name__)
+allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:3000", "https://gc-finder.vercel.app"],
+        "origins": allowed_origins,
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }

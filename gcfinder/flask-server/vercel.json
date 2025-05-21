@@ -14,6 +14,8 @@
     ],
     "env": {
         "FLASK_ENV": "production",
-        "FLASK_APP": "server.py"
+        "FLASK_APP": "server.py",
+        "FIREBASE_CREDENTIALS": "@firebase-credentials",
+        "ALLOWED_ORIGINS": "https://gc-finder.vercel.app"
     }
 } 
