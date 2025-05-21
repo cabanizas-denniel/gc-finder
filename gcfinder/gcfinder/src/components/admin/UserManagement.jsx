@@ -17,6 +17,11 @@ const UserManagement = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10); // Users per page
     
+    // Export Modal State
+    const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [exportStartDate, setExportStartDate] = useState('');
+    const [exportEndDate, setExportEndDate] = useState('');
+    
     // Fetch users from Firestore
     useEffect(() => {
         const fetchUsers = async () => {
@@ -104,6 +109,53 @@ const UserManagement = () => {
         alert(`${user.name} has been banned`);
     };
 
+    // Export Modal Handlers
+    const handleOpenExportModal = () => {
+        setExportModalOpen(true);
+    };
+
+    const handleCloseExportModal = () => {
+        setExportModalOpen(false);
+        setExportStartDate('');
+        setExportEndDate('');
+    };
+
+    const handleTriggerExport = (startDateOverride, endDateOverride) => {
+        const finalStartDate = startDateOverride || exportStartDate;
+        const finalEndDate = endDateOverride || exportEndDate;
+
+        if (!finalStartDate || !finalEndDate) {
+            alert("Please select both a 'From' and 'To' date.");
+            return;
+        }
+        // Basic date validation: Start date should not be after end date
+        if (new Date(finalStartDate) > new Date(finalEndDate)) {
+            alert("'From' date cannot be after 'To' date.");
+            return;
+        }
+
+        const exportUrl = `http://localhost:5000/api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`;
+        window.location.href = exportUrl;
+        handleCloseExportModal();
+    };
+
+    const handleThisMonthExport = () => {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+        setExportStartDate(firstDay);
+        setExportEndDate(lastDay);
+        handleTriggerExport(firstDay, lastDay);
+    };
+
+    const handleAllTimeExport = () => {
+        const startDate = '2020-01-01'; // A nominal early date
+        const endDate = new Date().toISOString().split('T')[0]; // Today
+        setExportStartDate(startDate);
+        setExportEndDate(endDate);
+        handleTriggerExport(startDate, endDate);
+    };
+
     const getTabCount = (status) => {
         return users.filter(user => user.status === status).length;
     };
@@ -129,7 +181,7 @@ const UserManagement = () => {
                 <p className="admin-subtitle">View, flag, and manage user accounts in the GC Finder system</p>
                     </div>
                     <div className="action-buttons">
-                        <button className="export-btn">
+                        <button className="export-btn" onClick={handleOpenExportModal}>
                             <i className="fas fa-download"></i> Export Data
                         </button>
                         <button className="refresh-btn" onClick={() => window.location.reload()}>
@@ -137,6 +189,76 @@ const UserManagement = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Export Modal */}
+                {exportModalOpen && (
+                    <div className="export-modal-overlay">
+                        <div className="export-modal-content">
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title">
+                                    Export User Data
+                                </h2>
+                                <button onClick={handleCloseExportModal} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="export-modal-description">
+                                Select the date range for the user data you want to export.
+                            </p>
+                            {/* Quick select buttons */}
+                            <div className="export-modal-quick-select">
+                                <button 
+                                    onClick={handleThisMonthExport} 
+                                    className="export-modal-quick-btn"
+                                >
+                                    This Month
+                                </button>
+                                <button 
+                                    onClick={handleAllTimeExport}
+                                    className="export-modal-quick-btn"
+                                >
+                                    All Time
+                                </button>
+                            </div>
+
+                            {/* Date inputs with labels */}
+                            <div className="export-modal-date-input-group">
+                                <label htmlFor="exportStartDateModalUser">From Date:</label>
+                                <input
+                                    id="exportStartDateModalUser"
+                                    type="date"
+                                    value={exportStartDate}
+                                    onChange={(e) => setExportStartDate(e.target.value)}
+                                    className="export-modal-date-input"
+                                />
+                            </div>
+                            <div className="export-modal-date-input-group">
+                                <label htmlFor="exportEndDateModalUser">To Date:</label>
+                                <input
+                                    id="exportEndDateModalUser"
+                                    type="date"
+                                    value={exportEndDate}
+                                    onChange={(e) => setExportEndDate(e.target.value)}
+                                    className="export-modal-date-input"
+                                />
+                            </div>
+                            <div className="export-modal-actions">
+                                <button 
+                                    onClick={handleCloseExportModal} 
+                                    className="export-modal-cancel-btn"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={() => handleTriggerExport(exportStartDate, exportEndDate)} 
+                                    className="export-modal-confirm-btn"
+                                >
+                                    Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="filter-section">
                 <div className="tabs">
@@ -213,9 +335,6 @@ const UserManagement = () => {
                                     </th>
                                     <th>Email</th>
                                     <th>Status</th>
-                                    <th>Items Claimed</th>
-                                    <th>Items Reported</th>
-                                    <th>Items Archived</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -225,9 +344,6 @@ const UserManagement = () => {
                                         <td className="user-name">{user.name}</td>
                                         <td>{user.email}</td>
                                         <td className="user-status-badge">{renderStatusBadge(user.status)}</td>
-                                        <td className="items-claimed">{user.itemsClaimed}</td>
-                                        <td className="items-reported">{user.itemsReported}</td>
-                                        <td className="items-archived">{user.itemsArchived}</td>
                                         <td className="actions">
                                             <button 
                                                 className="action-btn view" 

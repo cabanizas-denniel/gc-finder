@@ -19,6 +19,11 @@ const ItemManagement = () => {
     // Pagination state (generalized)
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10); // Items per page for all tabs
+
+    // Export Modal State
+    const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [exportStartDate, setExportStartDate] = useState('');
+    const [exportEndDate, setExportEndDate] = useState('');
     
     // Fetch items data from Firebase
     const fetchItems = async () => {
@@ -139,6 +144,11 @@ const ItemManagement = () => {
         setShowItemDetailsModal(true);
     };
 
+    const handleCloseItemModal = () => {
+        setShowItemDetailsModal(false);
+        setSelectedItemForModal(null);
+    };
+
     const handleDeleteItem = async (itemId) => {
         if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
             try {
@@ -169,6 +179,53 @@ const ItemManagement = () => {
         return items.filter(item => item.status === status).length;
     };
 
+    // Export Modal Handlers (Copied and adapted from UserManagement)
+    const handleOpenExportModal = () => {
+        setExportModalOpen(true);
+    };
+
+    const handleCloseExportModal = () => {
+        setExportModalOpen(false);
+        setExportStartDate('');
+        setExportEndDate('');
+    };
+
+    const handleTriggerExport = (startDateOverride, endDateOverride) => {
+        const finalStartDate = startDateOverride || exportStartDate;
+        const finalEndDate = endDateOverride || exportEndDate;
+
+        if (!finalStartDate || !finalEndDate) {
+            alert("Please select both a 'From' and 'To' date.");
+            return;
+        }
+        if (new Date(finalStartDate) > new Date(finalEndDate)) {
+            alert("'From' date cannot be after 'To' date.");
+            return;
+        }
+
+        // *** Crucial change: type=items ***
+        const exportUrl = `http://localhost:5000/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`;
+        window.location.href = exportUrl;
+        handleCloseExportModal();
+    };
+
+    const handleThisMonthExport = () => {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+        setExportStartDate(firstDay);
+        setExportEndDate(lastDay);
+        handleTriggerExport(firstDay, lastDay); // Pass dates directly to avoid state lag
+    };
+
+    const handleAllTimeExport = () => {
+        const startDate = '2020-01-01'; // A nominal early date
+        const endDate = new Date().toISOString().split('T')[0]; // Today
+        setExportStartDate(startDate);
+        setExportEndDate(endDate);
+        handleTriggerExport(startDate, endDate); // Pass dates directly
+    };
+
     return (
             <div className="item-management-container">
                 <div className="page-header">
@@ -177,14 +234,82 @@ const ItemManagement = () => {
                         <p className="admin-subtitle">View, flag, and manage lost and found items in the GC Finder system</p>
                     </div>
                     <div className="action-buttons">
-                        <button className="export-btn">
+                        {/* Updated export button */}
+                        <button className="export-btn" onClick={handleOpenExportModal}>
                             <i className="fas fa-download"></i> Export Data
                         </button>
-                        <button className="refresh-btn" onClick={() => window.location.reload()}>
+                        <button className="refresh-btn" onClick={fetchItems}>
                             <i className="fas fa-sync-alt"></i> Refresh
                         </button>
                     </div>
                 </div>
+
+                {/* Export Modal (copied from UserManagement.jsx and adapted) */}
+                {exportModalOpen && (
+                    <div className="export-modal-overlay">
+                        <div className="export-modal-content">
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title">
+                                    Export Item Data
+                                </h2>
+                                <button onClick={handleCloseExportModal} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="export-modal-description">
+                                Select the date range for the item data you want to export.
+                            </p>
+                            <div className="export-modal-quick-select">
+                                <button 
+                                    onClick={handleThisMonthExport} 
+                                    className="export-modal-quick-btn"
+                                >
+                                    This Month
+                                </button>
+                                <button 
+                                    onClick={handleAllTimeExport}
+                                    className="export-modal-quick-btn"
+                                >
+                                    All Time
+                                </button>
+                            </div>
+                            <div className="export-modal-date-input-group">
+                                <label htmlFor="exportStartDateModalItem">From Date:</label>
+                                <input
+                                    id="exportStartDateModalItem" // Unique ID for item modal
+                                    type="date"
+                                    value={exportStartDate}
+                                    onChange={(e) => setExportStartDate(e.target.value)}
+                                    className="export-modal-date-input"
+                                />
+                            </div>
+                            <div className="export-modal-date-input-group">
+                                <label htmlFor="exportEndDateModalItem">To Date:</label>
+                                <input
+                                    id="exportEndDateModalItem" // Unique ID for item modal
+                                    type="date"
+                                    value={exportEndDate}
+                                    onChange={(e) => setExportEndDate(e.target.value)}
+                                    className="export-modal-date-input"
+                                />
+                            </div>
+                            <div className="export-modal-actions">
+                                <button 
+                                    onClick={handleCloseExportModal} 
+                                    className="export-modal-cancel-btn"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={() => handleTriggerExport(exportStartDate, exportEndDate)} 
+                                    className="export-modal-confirm-btn"
+                                >
+                                    Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="filter-section">
                     <div className="tabs">
@@ -383,11 +508,12 @@ const ItemManagement = () => {
 
                 {/* Item Details Modal */}
                 {showItemDetailsModal && selectedItemForModal && (
-                    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowItemDetailsModal(false); }}>
-                        <div className="modal-content item-details-modal"> {/* item-details-modal for specific styling if needed */}
+                    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleCloseItemModal(); }}>
+                        <div className="modal-content item-details-modal"> 
                             <div className="modal-header">
-                                <h2>Item Details</h2>
-                                <button className="close-button" onClick={() => setShowItemDetailsModal(false)}>&times;</button>
+                                {/* Ensure title uses selectedItemForModal.name */}
+                                <h2>Item Details: {selectedItemForModal.name || 'N/A'}</h2> 
+                                <button className="close-button" onClick={handleCloseItemModal}>&times;</button>
                             </div>
                             <div className="modal-body">
                                 <div className="item-detail-container"> {/* Reusing class from shared-styles for layout */}
@@ -436,7 +562,7 @@ const ItemManagement = () => {
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                <button className="btn back" onClick={() => setShowItemDetailsModal(false)}>Close</button>
+                                <button className="btn back" onClick={handleCloseItemModal}>Close</button>
                             </div>
                         </div>
                     </div>

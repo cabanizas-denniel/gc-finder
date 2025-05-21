@@ -109,9 +109,6 @@ export const setItemApproval = async (itemId, isApproved) => {
     if (isApproved === false) {
       updateData.status = "Disapproved";
     }
-    if (isApproved === true) {
-      updateData.status = "Available";
-    }
     // If isApproved is true, we might want to set status to 'Available'
     // or handle it based on prior status, but for now, only handling disapproval.
 

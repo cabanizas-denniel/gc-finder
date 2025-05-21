@@ -63,9 +63,6 @@ export const getAllUsers = async () => {
         id: doc.id,
         name: userData.name || `${userData.full_name}`,
         email: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
-        itemsClaimed: userData.items_claimed ? `${userData.items_claimed.length} Items` : '0 Items',
-        itemsReported: userData.items_reported ? `${userData.items_reported.length} Items` : '0 Items',
-        itemsArchived: userData.items_archived ? `${userData.items_archived.length} Items` : '0 Items',
         status: userData.status || 'active'
       });
     });
@@ -100,8 +97,10 @@ export const submitFoundItem = async (formData, images) => {
       imageData: imageData,
       status: 'Available',
       adminApproval: true,
-      reporterId: formData.reporterId || '',
-      reporterName: formData.reporterName || 'Anonymous',
+      submitter: {
+        full_name: 'Disciplinary Office',
+        student_id: 'N/A',
+      },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -142,8 +141,10 @@ export const getPendingItems = async () => {
         exactLocation: itemData.exactLocation,
         uniqueIdentifier: itemData.uniqueIdentifier,
         additionalDetails: itemData.additionalDetails,
-        reporterId: itemData.submitter.student_id || '',
-        reporterName: itemData.submitter.full_name || 'Anonymous'
+        submitter: {
+          full_name: itemData.submitter?.name || 'N/A',
+          position: itemData.submitter?.position || null
+        }
       });
     });
     

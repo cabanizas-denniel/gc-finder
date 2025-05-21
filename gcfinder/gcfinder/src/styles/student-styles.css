@@ -594,6 +594,7 @@
 
 .student-search-box input {
     border: none;
+    outline: none;
     background-color: transparent;
     padding: 10px;
     width: 100%;
@@ -604,6 +605,7 @@
     background: none;
     border: none;
     cursor: pointer;
+    line-height: 1;
     color: #666;
     font-size: 18px;
     padding: 8px;
