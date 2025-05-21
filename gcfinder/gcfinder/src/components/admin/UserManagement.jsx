@@ -94,10 +94,6 @@ const UserManagement = () => {
     };
 
     // User actions
-    const handleViewUser = (user) => {
-        alert(`Viewing profile for ${user.name}`);
-        // TODO: viewing user details
-    };
 
     const handleFlagUser = (user) => {
         // TODO: flagging a user

@@ -505,7 +505,7 @@ const ReportItem = () => {
                         </div>
 
                         <div className="disclaimer">
-                            <p>By submitting this report, you confirm that all provided information is accurate and true.</p>
+                        <p>By submitting this report, you confirm that all information provided is accurate and true, and that the item has already been, or will be, submitted to the Disciplinary Office.</p>
                         </div>
 
                         <div className="form-buttons">

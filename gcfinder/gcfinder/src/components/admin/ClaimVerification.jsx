@@ -164,25 +164,16 @@ const ClaimVerification = () => {
                             {selectedClaim.status.charAt(0).toUpperCase() + selectedClaim.status.slice(1)}
                         </div>
                     </div>
-
+                    <div className="claim-content-header">
                     <div className="claim-item-details">
-                        <h4>Item Details</h4>
-                        
-
-                    </div>
-
-                    <div className="claim-info">
                         <div className="info-group">
-                            <label>Claimant Student ID</label>
-                            <p>{selectedClaim.student_id}</p>
+                            <label>Claimant Student ID: </label>{selectedClaim.student_id}
                         </div>
                         <div className="info-group">
-                            <label>Claimed By</label>
-                            <p>{selectedClaim.claimedBy}</p>
+                            <label>Claimed By: </label>{selectedClaim.claimedBy}
                         </div>
                         <div className="info-group">
-                            <label>Date Claimed</label>
-                            <p>{selectedClaim.date}</p>
+                            <label>Date Claimed: </label>{selectedClaim.date}
                         </div>
                         <div className="info-group">
                             <label>Last Seen Location</label>
@@ -200,16 +191,17 @@ const ClaimVerification = () => {
                                 <p>{selectedClaim.additionalDetails}</p>
                             </div>
                         )}
-                        {selectedClaim.proofImageUrl && (
-                            <div className="info-group">
-                                <label>Proof Image</label>
-                                <img 
-                                    src={selectedClaim.proofImageUrl} 
-                                    alt="Proof of ownership" 
-                                    style={{ maxWidth: '100%', marginTop: '10px' }}
-                                />
-                            </div>
-                        )}
+                    </div>
+
+                    <div className="info-group">
+                        <label>Proof Image</label>
+                        <img 
+                            src={selectedClaim.proofImageUrl} 
+                            alt="Proof of ownership" 
+                            style={{ maxWidth: '350px', marginTop: '10px', marginLeft: '10px', marginRight: 'auto', display: 'block' }}
+                        />
+                    </div>
+
                     </div>
 
                     <div className="claim-actions">
@@ -285,7 +277,7 @@ const ClaimVerification = () => {
                                             <i className="fas fa-tag"></i> <strong>Category:</strong> {selectedItemForModal.category || 'N/A'}
                                         </div>
                                         <div className="detail-item">
-                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.dateFound ? new Date(selectedItemForModal.dateFound.toDate ? selectedItemForModal.dateFound.toDate() : selectedItemForModal.dateFound).toLocaleDateString() : 'N/A'}
+                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.date ? new Date(selectedItemForModal.date.toDate ? selectedItemForModal.date.toDate() : selectedItemForModal.date).toLocaleDateString() : 'N/A'}
                                         </div>
                                         <div className="detail-item">
                                             <i className="fas fa-map-marker-alt"></i> <strong>Location Found:</strong> {selectedItemForModal.location || 'N/A'}

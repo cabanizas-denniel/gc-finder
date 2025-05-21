@@ -43,11 +43,17 @@ const Dashboard = () => {
                 const querySnapshot = await getDocs(q);
                 
                 const itemsData = [];
+                let currentUserSubmittedItemsCount = 0; // Counter for user's submitted items
+
                 querySnapshot.forEach(doc => {
                     const data = doc.data();
                     const item_id = doc.id;
                     const isSubmitter = data.submitter && data.submitter.student_id === currentUserId;
                     const isDisapproved = data.status === "Disapproved";
+
+                    if (isSubmitter) {
+                        currentUserSubmittedItemsCount++; // Increment if item is submitted by the current user
+                    }
 
                     let isVisible;
                     if (isDisapproved) {
@@ -88,9 +94,11 @@ const Dashboard = () => {
                 const limitedItems = itemsData.slice(0, 6);
                 setRecentItems(limitedItems);
                 
-                // Update dashboard stats (optional: base on filtered data or total data before filtering?)
-                // Let's keep basing activeReports on the number shown (after filtering)
-                setDashboardStats(prev => ({ ...prev, activeReports: itemsData.length.toString() }));
+                // Update dashboard stats
+                setDashboardStats(prev => ({ 
+                    ...prev, 
+                    activeReports: currentUserSubmittedItemsCount.toString() // Use the new counter
+                }));
 
             } catch (error) {
                 console.error("Error fetching dashboard items/claims:", error);

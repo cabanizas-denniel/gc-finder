@@ -92,6 +92,16 @@ h2{
     align-items: center;
 }
 
+.claim-content-header {
+    display: flex;
+    justify-content: space-between;
+}
+
+.claim-item-details {
+    gap: 10px;
+    text-align: left;
+}
+
 .claim-item-info {
     display: flex;
     flex-direction: row;
@@ -217,7 +227,7 @@ h2{
 .claim-header .status {
     margin: 0;
 }
-.claim-info {
+.claim-security {
     gap: 32px;
     margin-bottom: 24px;
     display: flex;
@@ -1437,4 +1447,51 @@ h2{
 }
 /* End of Export Modal Styles */
 
+.dashboard-chart h3 {
+    font-size: 0.95rem; /* Smaller for subtitle */
+    color: var(--sub-color);
+    margin-top: 15px; /* Space above subtitle, after chart */
+    font-weight: 400;
+}
 
+/* Styling for the new Pie Chart container */
+.dashboard-pie-chart-container {
+    background-color: #FFFFFF;
+    padding: 25px;
+    border-radius: 15px;
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    margin-top: 25px; /* Space from elements above */
+    text-align: center; /* Center align title and subtitle */
+}
+
+.dashboard-pie-chart-container h2 {
+    font-size: 1.5rem;
+    color: var(--text-color);
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+/* Ensure ResponsiveContainer takes available space if not already */
+.dashboard-chart .recharts-responsive-container {
+    width: 100%;
+    height: 300px;
+}
+
+/* Styling for the Resolution Rate Pie Chart container */
+.dashboard-resolution-chart-container {
+    background-color: #FFFFFF;
+    padding: 25px;
+    border-radius: 15px;
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    margin-top: 25px; /* Space from elements above */
+    text-align: center; /* Center align title and subtitle */
+}
+
+.dashboard-resolution-chart-container h2 {
+    font-size: 1.5rem;
+    color: var(--text-color);
+    margin-bottom: 20px;
+    font-weight: 600;
+}
