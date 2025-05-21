@@ -13,10 +13,21 @@ import pandas as pd
 from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 from datetime import datetime
+import json # Added for parsing JSON from environment variable
 
-# Initialize Firebase
-cred = credentials.Certificate("gcfinder-database-firebase-adminsdk-fbsvc-0447799241.json")
-firebase_admin.initialize_app(cred)
+# Initialize Firebase from environment variable
+cred_json_str = os.environ.get('FIREBASE_CREDENTIALS_JSON')
+if cred_json_str:
+    cred_dict = json.loads(cred_json_str)
+    cred = credentials.Certificate(cred_dict)
+else:
+    # Fallback to local file if environment variable is not set (for local development)
+    # You might want to remove this fallback in pure production or handle it more strictly
+    print("WARNING: FIREBASE_CREDENTIALS_JSON environment variable not found. Falling back to local file.")
+    cred = credentials.Certificate("gcfinder-database-firebase-adminsdk-fbsvc-0447799241.json")
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
 db = firestore.client()
     
 app = Flask(__name__)
