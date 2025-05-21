@@ -285,7 +285,7 @@ const ClaimVerification = () => {
                                             <i className="fas fa-tag"></i> <strong>Category:</strong> {selectedItemForModal.category || 'N/A'}
                                         </div>
                                         <div className="detail-item">
-                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.dateFound ? new Date(selectedItemForModal.dateFound).toLocaleDateString() : 'N/A'}
+                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.dateFound ? new Date(selectedItemForModal.dateFound.toDate ? selectedItemForModal.dateFound.toDate() : selectedItemForModal.dateFound).toLocaleDateString() : 'N/A'}
                                         </div>
                                         <div className="detail-item">
                                             <i className="fas fa-map-marker-alt"></i> <strong>Location Found:</strong> {selectedItemForModal.location || 'N/A'}
@@ -300,8 +300,16 @@ const ClaimVerification = () => {
                                                 <i className="fas fa-fingerprint"></i> <strong>Unique Identifier:</strong> {selectedItemForModal.uniqueIdentifier}
                                             </div>
                                         )}
+                                        {selectedItemForModal.submitter && (
+                                        <div className="detail-item">
+                                            <i className="fas fa-user"></i> <strong>Submitted By:</strong> {selectedItemForModal.submitter.full_name || 'N/A'}
+                                            {selectedItemForModal.submitter.student_id && ` (ID: ${selectedItemForModal.submitter.student_id})`}
+                                        </div>
+                                        )}
                                         {selectedItemForModal.additionalDetails && (
-                                            <p><strong>Additional Details:</strong> {selectedItemForModal.additionalDetails}</p>
+                                            <div className="detail-item">
+                                                <i className="fas fa-info-circle"></i> <strong>Additional Details:</strong> {selectedItemForModal.additionalDetails}
+                                            </div>
                                         )}
                                     </div>
                                 </div>

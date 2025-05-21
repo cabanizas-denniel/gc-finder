@@ -199,10 +199,10 @@ const ReviewReports = () => {
                                     {report.additionalDetails && (
                                         <p className="report-description-info"><i className="fas fa-info-circle"></i> Additional Details: {report.additionalDetails}</p>
                                     )}
-                                    {report.reporterName && (
+                                    {report.submitter && (
                                         <p className="report-description-info">
-                                            <i className="fas fa-user"></i> Submitted By: {report.reporterName}
-                                            {report.reporterId && ` (ID: ${report.reporterId})`}
+                                            <i className="fas fa-user"></i> Submitted By: {report.submitter.full_name}
+                                            {report.submitter.student_id && ` (ID: ${report.submitter.student_id})`}
                                         </p>
                                     )}
                                     <div className="report-actions">

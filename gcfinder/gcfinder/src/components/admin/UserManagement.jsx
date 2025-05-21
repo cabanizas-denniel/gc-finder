@@ -346,14 +346,6 @@ const UserManagement = () => {
                                         <td className="user-status-badge">{renderStatusBadge(user.status)}</td>
                                         <td className="actions">
                                             <button 
-                                                className="action-btn view" 
-                                                aria-label="View"
-                                                onClick={() => handleViewUser(user)}
-                                                title="View User Details"
-                                            >
-                                                <i className="fas fa-eye"></i>
-                                            </button>
-                                            <button 
                                                 className="action-btn flag" 
                                                 aria-label="Flag"
                                                 onClick={() => handleFlagUser(user)}

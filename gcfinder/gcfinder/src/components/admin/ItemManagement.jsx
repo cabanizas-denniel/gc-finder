@@ -35,7 +35,7 @@ const ItemManagement = () => {
                 name: item.name || 'N/A',
                 location: item.location || 'N/A',
                 category: item.category || 'N/A',
-                reportedBy: item.reportedBy || item.full_name || item.submitted_by_name || 'N/A', 
+                reportedBy: item.submitter?.full_name || item.reportedBy || item.full_name || item.submitted_by_name || 'N/A', 
                 date: item.date ? (typeof item.date === 'string' ? new Date(item.date).toLocaleDateString() : (item.date.toDate ? item.date.toDate().toLocaleDateString() : new Date(item.date).toLocaleDateString()) ) : 'N/A', 
                 status: item.status ? item.status.toLowerCase() : 'unknown',
                 originalItemName: item.originalItemName || item.name,
@@ -43,7 +43,8 @@ const ItemManagement = () => {
                 imageData: item.imageData,
                 exactLocation: item.exactLocation,
                 uniqueIdentifier: item.uniqueIdentifier,
-                additionalDetails: item.additionalDetails
+                additionalDetails: item.additionalDetails,
+                submitter: item.submitter || null // Ensure the whole submitter object is passed
             }));
             
             setItems(mappedItems);
@@ -550,6 +551,12 @@ const ItemManagement = () => {
                                             <div className="detail-item">
                                                 <i className="fas fa-fingerprint"></i> <strong>Unique Identifier:</strong> {selectedItemForModal.uniqueIdentifier}
                                             </div>
+                                        )}
+                                        {selectedItemForModal.submitter && (
+                                        <div className="detail-item">
+                                            <i className="fas fa-user"></i> <strong>Submitted By:</strong> {selectedItemForModal.submitter.full_name}
+                                            {selectedItemForModal.submitter.student_id && ` (ID: ${selectedItemForModal.submitter.student_id})`}
+                                        </div>
                                         )}
                                         {selectedItemForModal.additionalDetails && (
                                             <p><strong>Additional Details:</strong> {selectedItemForModal.additionalDetails}</p>

@@ -142,8 +142,8 @@ export const getPendingItems = async () => {
         uniqueIdentifier: itemData.uniqueIdentifier,
         additionalDetails: itemData.additionalDetails,
         submitter: {
-          full_name: itemData.submitter?.name || 'N/A',
-          position: itemData.submitter?.position || null
+          full_name: itemData.submitter?.full_name || 'N/A',
+          student_id: itemData.submitter?.student_id || null
         }
       });
     });
