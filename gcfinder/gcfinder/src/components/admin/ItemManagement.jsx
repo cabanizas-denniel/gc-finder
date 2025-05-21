@@ -184,7 +184,7 @@ const ItemManagement = () => {
         setExportEndDate('');
     };
 
-    const handleTriggerExport = (startDateOverride, endDateOverride) => {
+    const handleTriggerExport = async (startDateOverride, endDateOverride) => {
         const finalStartDate = startDateOverride || exportStartDate;
         const finalEndDate = endDateOverride || exportEndDate;
 
@@ -197,10 +197,42 @@ const ItemManagement = () => {
             return;
         }
 
-         // *** Crucial change: type=items ***
-        const exportUrl = `/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`;
-        window.location.href = exportUrl;
-        handleCloseExportModal();
+        try {
+            const response = await fetch(`/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`);
+            
+            if (!response.ok) {
+                throw new Error('Export failed');
+            }
+
+            // Get the filename from the Content-Disposition header or use a default
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'GCFinder_items_export.xlsx';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+
+            // Convert the response to a blob
+            const blob = await response.blob();
+            
+            // Create a download link and trigger it
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            handleCloseExportModal();
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Failed to export data. Please try again.');
+        }
     };
 
     const handleThisMonthExport = () => {
