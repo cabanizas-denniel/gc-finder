@@ -2,12 +2,12 @@ import os
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 # import torch # Removed for simplified deployment
-from PIL import Image
+# from PIL import Image
 # from transformers import CLIPProcessor, CLIPModel # Removed for simplified deployment
 # import numpy as np # Removed as it was primarily for CLIP embeddings
 import firebase_admin
 from firebase_admin import credentials, firestore
-import base64 # Keep if used elsewhere, or remove if only for get_image_embedding
+# import base64 # Keep if used elsewhere, or remove if only for get_image_embedding
 from io import BytesIO # Keep if used elsewhere, or remove if only for get_image_embedding
 import pandas as pd
 from openpyxl.styles import Font, Alignment
