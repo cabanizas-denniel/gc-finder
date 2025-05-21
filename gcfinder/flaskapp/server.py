@@ -191,12 +191,14 @@ def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
         submitter_user_id = None
         full_name = 'N/A'
         student_id = 'N/A'
+        year_level = 'N/A'
 
         if isinstance(submitter_map, dict):
             # Try to get userId and denormalized details directly from the submitter_map
             submitter_user_id = submitter_map.get('userId') # Assumes userId is within the submitter map
             full_name = submitter_map.get('displayName', submitter_map.get('full_name', 'N/A'))
             student_id = submitter_map.get('studentId', submitter_map.get('student_id', 'N/A'))
+            year_level = submitter_map.get('yearLevel', submitter_map.get('year_level', 'N/A'))
         else:
             # Fallback if submitter is not a map, but a direct ID (less likely given your description)
             submitter_user_id = item_data.get('userId', item_data.get('submitter')) 
@@ -207,7 +209,7 @@ def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
             # Only fetch from users collection if details weren't fully populated from submitter_map
             # or if you have a policy to always fetch the latest user details.
             # For this example, let's assume if full_name is still N/A, we try to fetch.
-            if full_name == 'N/A' or student_id == 'N/A': 
+            if full_name == 'N/A' or student_id == 'N/A' or year_level == 'N/A':
                 try:
                     user_doc_ref = db.collection('users').document(submitter_user_id)
                     user_doc = user_doc_ref.get()
@@ -218,6 +220,8 @@ def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
                             full_name = user_details.get('displayName', user_details.get('name', 'N/A'))
                         if student_id == 'N/A':
                             student_id = user_details.get('studentId', user_details.get('studentID', 'N/A'))
+                        if year_level == 'N/A':
+                            year_level = user_details.get('yearLevel', user_details.get('year_level', 'N/A'))
                     else:
                         print(f"User document not found for ID: {submitter_user_id} (item {doc.id})")
                 except Exception as e:
@@ -235,11 +239,12 @@ def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
             'Description': item_data.get('description', 'N/A'),
             'Student_ID': student_id, 
             'Full_Name': full_name,    
+            'Year_Level': year_level,
             'Admin_Approved': item_data.get('adminApproval', False)
         })
     
     if not data:
-        return pd.DataFrame(columns=['Item_ID', 'Item_Name', 'Category', 'Location_Found', 'Submitted_At', 'Status', 'Description', 'Submitter', 'Full_Name', 'Admin_Approved'])
+        return pd.DataFrame(columns=['Item_ID', 'Item_Name', 'Category', 'Location_Found', 'Submitted_At', 'Status', 'Description', 'Submitter', 'Full_Name', 'Year_Level', 'Admin_Approved'])
     return pd.DataFrame(data)
 
 def fetch_users_for_export(start_date_dt=None, end_date_dt=None):
@@ -248,144 +253,108 @@ def fetch_users_for_export(start_date_dt=None, end_date_dt=None):
     Date filtering is currently disabled as 'students' documents lack a date field.
     """
     # Corrected collection name
-    users_ref = db.collection('students') 
-    query = users_ref
-    
-    # Date filtering is removed for now as 'students' documents do not have a creation/join date field.
-    # If a 'createdAt' or similar timestamp is added to student documents in the future,
-    # the following date querying logic can be reinstated:
-    # if start_date_dt:
-    #     query = query.where('createdAt', '>=', start_date_dt) 
-    # if end_date_dt:
-    #     query = query.where('createdAt', '<=', end_date_dt)
-        
-    docs = query.stream()
+    users_ref = db.collection('users') # Use 'users' collection
+    docs = users_ref.stream()
     data = []
+
     for doc in docs:
-        user = doc.to_dict()
-        user_data_for_df = {
+        user_data = doc.to_dict()
+        # Assuming 'createdAt' or a similar field might exist for filtering by date.
+        # If not, date filtering for users remains non-operational as stated.
+        # For this example, we'll proceed without date filtering for users.
+
+        data.append({
             'User_ID': doc.id,
-            'Name': user.get('full_name', user.get('name', 'N/A')), 
-            'Email': user.get('email', 'N/A'),
-            'Student_ID': user.get('student_id', 'N/A'),
-            'Year_Level': user.get('year_level', 'N/A'),
-            'Status': user.get('status', 'active')
-        }
-        data.append(user_data_for_df)
-        
-    # Define column order for the DataFrame
-    df_columns = ['User_ID', 'Name', 'Email', 'Student_ID', 'Year_Level', 'Status']
-    
+            'Email': user_data.get('email', 'N/A'),
+            'Full_Name': user_data.get('displayName', user_data.get('name', 'N/A')),
+            'Student_ID': user_data.get('studentId', user_data.get('studentID', 'N/A')),
+            'Year_Level': user_data.get('yearLevel', user_data.get('year_level', 'N/A')), # Ensure year_level is fetched
+            'Status': user_data.get('status', 'active'), # Default to 'active' or as per your data model
+            'Created_At': user_data.get('createdAt', 'N/A') # Example: if you have a creation timestamp
+        })
+
     if not data:
-        return pd.DataFrame(columns=df_columns)
-    return pd.DataFrame(data, columns=df_columns)
+        # Added 'Year_Level' to the columns list
+        return pd.DataFrame(columns=['User_ID', 'Email', 'Full_Name', 'Student_ID', 'Year_Level', 'Status', 'Created_At'])
+    return pd.DataFrame(data)
 
 def generate_excel_report_to_buffer(data_type, start_date_str=None, end_date_str=None):
+    """Generates an Excel file for items or users and returns it as a BytesIO buffer."""
+    # Convert string dates to datetime objects if provided
     start_date_dt = None
     end_date_dt = None
-    if start_date_str:
-        try:
+    try:
+        if start_date_str:
             start_date_dt = datetime.strptime(start_date_str, '%Y-%m-%d')
-        except ValueError:
-            # Allow 'None' or empty string to pass through as no date filter
-            if start_date_str.lower() != 'none' and start_date_str != '':
-                raise ValueError(f"Invalid start_date format: {start_date_str}. Expected YYYY-MM-DD.")
-    if end_date_str:
-        try:
+        if end_date_str:
             end_date_dt = datetime.strptime(end_date_str, '%Y-%m-%d')
-        except ValueError:
-            if end_date_str.lower() != 'none' and end_date_str != '':
-                raise ValueError(f"Invalid end_date format: {end_date_str}. Expected YYYY-MM-DD.")
+    except ValueError:
+        # Consider how to handle invalid date formats; maybe raise an error or log
+        print("Invalid date format provided for export.")
+        return None
 
-    if data_type == 'items':
+    if data_type == "items":
         df = fetch_items_for_export(start_date_dt, end_date_dt)
-        main_sheet_name = 'Items Report'
-        title = 'GC Finder: Items Report'
-        summary_field = 'Status' 
-        summary_title = 'Item Status Summary'
-    elif data_type == 'users':
-        df = fetch_users_for_export(start_date_dt, end_date_dt) # Dates are now effectively ignored by fetch_users_for_export
-        main_sheet_name = 'Users Report'
-        title = 'GC Finder: Users Report'
-        summary_field = 'Status' 
-        summary_title = 'User Status Summary'
+        # Define the desired order of columns for items, including 'Year_Level'
+        ordered_columns = ['Item_ID', 'Item_Name', 'Category', 'Location_Found', 'Submitted_At', 'Status', 'Description', 'Full_Name', 'Student_ID', 'Year_Level', 'Admin_Approved']
+        # Reorder DataFrame columns
+        df = df.reindex(columns=[col for col in ordered_columns if col in df.columns])
+    elif data_type == "users":
+        df = fetch_users_for_export(start_date_dt, end_date_dt) # Assuming date filtering might be added later
+        # Define the desired order of columns for users, including 'Year_Level'
+        ordered_columns = ['User_ID', 'Full_Name', 'Email', 'Student_ID', 'Year_Level', 'Status', 'Created_At']
+        # Reorder DataFrame columns
+        # Ensure all columns in ordered_columns that are present in df are included, in the specified order.
+        # And any columns in df not in ordered_columns are appended at the end.
+        present_ordered_columns = [col for col in ordered_columns if col in df.columns]
+        additional_columns = [col for col in df.columns if col not in present_ordered_columns]
+        final_columns = present_ordered_columns + additional_columns
+        df = df.reindex(columns=final_columns)
     else:
-        return None # Should not happen with frontend validation
+        print(f"Invalid data_type for export: {data_type}")
+        return None # Or raise an error for invalid data_type
 
     if df.empty:
-        # Create an empty buffer with a message or just return an empty file
-        output_buffer = BytesIO()
-        # Optionally, write a message to the Excel file that no data was found
-        empty_df_message = pd.DataFrame([{'message': f'No {data_type} found for the selected criteria.'}])
-        with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-            empty_df_message.to_excel(writer, sheet_name='No Data', index=False)
-        output_buffer.seek(0)
-        return output_buffer
-        
-    output_buffer = BytesIO()
-    with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name=main_sheet_name, index=False, startrow=1)
-        
-        workbook = writer.book
-        worksheet = writer.sheets[main_sheet_name]
-        
-        worksheet['A1'] = title
-        last_col_letter = get_column_letter(len(df.columns) if not df.empty else 1)
-        worksheet.merge_cells(f'A1:{last_col_letter}1')
-        title_cell = worksheet['A1']
-        title_cell.font = Font(size=14, bold=True, name='Calibri')
-        title_cell.alignment = Alignment(horizontal='center')
-        
-        for col_idx, column_title in enumerate(df.columns):
-            cell = worksheet.cell(row=2, column=col_idx + 1)
-            cell.value = column_title
-            cell.font = Font(bold=True, name='Calibri')
-            cell.alignment = Alignment(horizontal='center')
+        # Create a buffer with a message indicating no data
+        output = BytesIO()
+        writer = pd.ExcelWriter(output, engine='openpyxl')
+        # Create a placeholder DataFrame with a message
+        no_data_df = pd.DataFrame([{"Message": f"No data found for {data_type} within the selected criteria."}])
+        no_data_df.to_excel(writer, index=False, sheet_name='Report')
+        writer.close() # Use close instead of save for modern pandas/openpyxl
+        output.seek(0)
+        return output
 
-        status_col_name = summary_field
-        if not df.empty and status_col_name in df.columns and not df[status_col_name].dropna().empty:
-            status_summary_df = df[status_col_name].value_counts().reset_index()
-            status_summary_df.columns = [status_col_name, 'Count']
-            
-            summary_sheet_name = summary_title
-            status_summary_df.to_excel(writer, sheet_name=summary_sheet_name, index=False, startrow=1)
-            
-            summary_ws = writer.sheets[summary_sheet_name]
-            summary_ws['A1'] = f"{main_sheet_name} - {summary_title}"
-            summary_ws.merge_cells('A1:B1')
-            summary_ws['A1'].font = Font(size=14, bold=True, name='Calibri')
-            summary_ws['A1'].alignment = Alignment(horizontal='center')
+    output = BytesIO()
+    # Using with ensures the writer is properly closed, even if errors occur
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Report')
+        worksheet = writer.sheets['Report']
 
-            summary_ws.cell(row=2, column=1).value = status_col_name
-            summary_ws.cell(row=2, column=1).font = Font(bold=True, name='Calibri')
-            summary_ws.cell(row=2, column=1).alignment = Alignment(horizontal='center')
-            summary_ws.cell(row=2, column=2).value = 'Count'
-            summary_ws.cell(row=2, column=2).font = Font(bold=True, name='Calibri')
-            summary_ws.cell(row=2, column=2).alignment = Alignment(horizontal='center')
+        # Auto-adjust column widths and apply basic styling
+        for col_idx, column in enumerate(df.columns):
+            column_letter = get_column_letter(col_idx + 1)
+            max_length = 0
+            # Get the max_length of the header
+            column_header_length = len(str(column))
+            max_length = max(max_length, column_header_length)
+            # Get the max_length of the data in the column
+            for cell in df[column]:
+                try:
+                    if len(str(cell)) > max_length:
+                        max_length = len(str(cell))
+                except:
+                    pass # Handle potential errors with cell content length
+            adjusted_width = (max_length + 2) * 1.2 # Add padding and scale factor
+            worksheet.column_dimensions[column_letter].width = adjusted_width
 
-        for sheetname_iter in writer.sheets:
-            current_sheet = writer.sheets[sheetname_iter]
-            for col_idx_iter, column_obj in enumerate(current_sheet.columns):
-                max_cell_length = 0
-                column_letter_val = get_column_letter(col_idx_iter + 1)
-                
-                header_cell_val = current_sheet.cell(row=1, column=col_idx_iter + 1) # Title row
-                if header_cell_val.value and len(str(header_cell_val.value)) > max_cell_length:
-                     max_cell_length = len(str(header_cell_val.value))
-                
-                header_cell_val_2 = current_sheet.cell(row=2, column=col_idx_iter + 1) # Header row
-                if header_cell_val_2.value and len(str(header_cell_val_2.value)) > max_cell_length:
-                     max_cell_length = len(str(header_cell_val_2.value))
+            # Style header
+            header_cell = worksheet[f'{column_letter}1']
+            header_cell.font = Font(bold=True)
+            header_cell.alignment = Alignment(horizontal='center', vertical='center')
 
-                for cell_obj in column_obj:
-                    if cell_obj.value:
-                        cell_len_val = len(str(cell_obj.value))
-                        if cell_len_val > max_cell_length:
-                            max_cell_length = cell_len_val
-                current_sheet.column_dimensions[column_letter_val].width = max_cell_length + 3 if max_cell_length > 0 else 12
-    
-    output_buffer.seek(0)
-    return output_buffer
+    output.seek(0)
+    return output
 
 @app.route('/api/export', methods=['GET'])
 def export_data_route():
