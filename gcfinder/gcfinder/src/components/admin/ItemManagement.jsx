@@ -198,10 +198,22 @@ const ItemManagement = () => {
         }
 
         try {
-            const response = await fetch(`/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`);
+            const response = await fetch(`/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                }
+            });
             
             if (!response.ok) {
-                throw new Error('Export failed');
+                const errorData = await response.text();
+                console.error('Export error response:', errorData);
+                throw new Error('Export failed: ' + (errorData || response.statusText));
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+                throw new Error('Invalid response format: Expected Excel file');
             }
 
             // Get the filename from the Content-Disposition header or use a default
@@ -231,7 +243,7 @@ const ItemManagement = () => {
             handleCloseExportModal();
         } catch (error) {
             console.error('Export error:', error);
-            alert('Failed to export data. Please try again.');
+            alert('Failed to export data: ' + error.message);
         }
     };
 
