@@ -130,7 +130,7 @@ const UserManagement = () => {
             return;
         }
 
-        const exportUrl = `http://localhost:5000/api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`;
+        const exportUrl = `api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`;
         window.location.href = exportUrl;
         handleCloseExportModal();
     };
