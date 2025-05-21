@@ -44,7 +44,8 @@ const ItemManagement = () => {
                 exactLocation: item.exactLocation,
                 uniqueIdentifier: item.uniqueIdentifier,
                 additionalDetails: item.additionalDetails,
-                submitter: item.submitter || null // Ensure the whole submitter object is passed
+                submitter: item.submitter || null, // Ensure the whole submitter object is passed
+                adminApproval: item.adminApproval // Add adminApproval status
             }));
             
             setItems(mappedItems);
@@ -63,14 +64,15 @@ const ItemManagement = () => {
 
     // Filter items based on active tab and search term, and paginate for all tabs
     useEffect(() => {
-        let processedItems = items;
+        // Start with all items and then filter by adminApproval
+        let processedItems = items.filter(item => item.adminApproval === true);
 
-        // Filter by active tab first
+        // Filter by active tab if not 'all'
         if (activeTab !== 'all') {
-            processedItems = items.filter(item => item.status === activeTab);
+            processedItems = processedItems.filter(item => item.status === activeTab);
         }
 
-        // Then, filter by search term
+        // Then, filter by search term if a search term exists
         if (searchTerm) {
             processedItems = processedItems.filter(item =>
                 item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -83,15 +85,6 @@ const ItemManagement = () => {
         const indexOfLastItem = currentPage * itemsPerPage;
         const indexOfFirstItem = indexOfLastItem - itemsPerPage;
         setFilteredItems(processedItems.slice(indexOfFirstItem, indexOfLastItem));
-
-        // IMPORTANT: Reset to first page if tab or search term changes,
-        // as this affects the total number of items and pages.
-        // We need to be careful here. This effect runs when currentPage changes too.
-        // A better way to handle page reset is in the handlers for tab/search changes directly,
-        // or by storing previous tab/search and comparing.
-        // For simplicity now, let's check if this reset is necessary or causes issues.
-        // The dependency array includes currentPage, so this will re-run. 
-        // Consider if (prevTab !== activeTab || prevSearchTerm !== searchTerm) { setCurrentPage(1); }
 
     }, [activeTab, searchTerm, items, currentPage, itemsPerPage]);
     

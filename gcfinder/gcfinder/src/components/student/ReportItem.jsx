@@ -203,8 +203,6 @@ const ReportItem = () => {
     // Accept disclaimer
     const handleAcceptDisclaimer = useCallback(() => {
         setHasAcceptedDisclaimer(true);
-        // In a real application, you might want to store this in sessionStorage
-        // sessionStorage.setItem('hasAcceptedDisclaimer', 'true');
     }, []);
 
     // Handle next button click with validation
