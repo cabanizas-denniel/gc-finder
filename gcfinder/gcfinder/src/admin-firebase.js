@@ -193,7 +193,11 @@ export const disapproveItem = async (itemId) => {
 export const getAllItems = async () => {
     try {
         const itemsCollectionRef = collection(db, "items");
-        const itemSnapshot = await getDocs(itemsCollectionRef);
+        const q = query(
+            itemsCollectionRef,
+            where('adminApproval', '==', true)
+        );
+        const itemSnapshot = await getDocs(q);
         const itemList = itemSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return itemList;
     } catch (error) {

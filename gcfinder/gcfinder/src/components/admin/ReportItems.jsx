@@ -174,7 +174,7 @@ const ReportItem = () => {
             await submitFoundItem(formData, uploadedImages);
             
             alert('Report submitted successfully!');
-            navigate('/dashboard');
+            navigate('/admin/dashboard');
         } catch (error) {
             console.error('Error submitting form:', error);
             alert('An error occurred while submitting the report. Please try again.');

@@ -8,11 +8,7 @@ const NotFound = () => {
     const goBack = () => {
         navigate(-1); // Go back to the previous page
     };
-    
-    const goHome = () => {
-        navigate('/dashboard'); // Go to dashboard/home
-    };
-    
+
     return (
         <div className="not-found-container">
             <div className="not-found-content">
@@ -26,9 +22,6 @@ const NotFound = () => {
                 <div className="not-found-buttons">
                     <button className="go-back-btn" onClick={goBack}>
                         <i className="fas fa-arrow-left"></i> Go Back
-                    </button>
-                    <button className="go-home-btn" onClick={goHome}>
-                        <i className="fas fa-home"></i> Go to Dashboard
                     </button>
                 </div>
             </div>
