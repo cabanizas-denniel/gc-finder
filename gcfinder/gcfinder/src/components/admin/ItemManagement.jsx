@@ -197,8 +197,16 @@ const ItemManagement = () => {
             return;
         }
 
+        const apiUrl = process.env.REACT_APP_API_URL; // Get the API URL
+        if (!apiUrl) {
+            alert("API URL is not configured. Please check environment settings.");
+            console.error("REACT_APP_API_URL is not set");
+            return;
+        }
+
         try {
-            const response = await fetch(`/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
+            // Prepend the apiUrl to your endpoint
+            const response = await fetch(`${apiUrl}/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -206,30 +214,28 @@ const ItemManagement = () => {
             });
             
             if (!response.ok) {
-                const errorData = await response.text();
+                const errorData = await response.text(); // Or .json() if your backend sends JSON errors
                 console.error('Export error response:', errorData);
                 throw new Error('Export failed: ' + (errorData || response.statusText));
             }
-
+    
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-                throw new Error('Invalid response format: Expected Excel file');
+                const errorText = await response.text();
+                console.error("Unexpected response content type:", contentType, "Response body:", errorText);
+                throw new Error('Invalid response format: Expected Excel file, but received ' + contentType);
             }
-
-            // Get the filename from the Content-Disposition header or use a default
+    
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'GCFinder_items_export.xlsx';
+            let filename = 'GCFinder_items_export.xlsx'; // Default filename
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
                 if (filenameMatch && filenameMatch[1]) {
                     filename = filenameMatch[1].replace(/['"]/g, '');
                 }
             }
-
-            // Convert the response to a blob
+    
             const blob = await response.blob();
-            
-            // Create a download link and trigger it
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -237,10 +243,10 @@ const ItemManagement = () => {
             document.body.appendChild(a);
             a.click();
             
-            // Clean up
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             handleCloseExportModal();
+
         } catch (error) {
             console.error('Export error:', error);
             alert('Failed to export data: ' + error.message);

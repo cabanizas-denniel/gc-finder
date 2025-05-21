@@ -22,6 +22,9 @@ const UserManagement = () => {
     const [exportStartDate, setExportStartDate] = useState('');
     const [exportEndDate, setExportEndDate] = useState('');
     
+    // Show Export Modal State
+    const [showExportModal, setShowExportModal] = useState(false);
+    
     // Fetch users from Firestore
     useEffect(() => {
         const fetchUsers = async () => {
@@ -116,23 +119,77 @@ const UserManagement = () => {
         setExportEndDate('');
     };
 
-    const handleTriggerExport = (startDateOverride, endDateOverride) => {
+    const handleTriggerExport = async (startDateOverride, endDateOverride) => {
         const finalStartDate = startDateOverride || exportStartDate;
         const finalEndDate = endDateOverride || exportEndDate;
-
+    
         if (!finalStartDate || !finalEndDate) {
             alert("Please select both a 'From' and 'To' date.");
             return;
         }
-        // Basic date validation: Start date should not be after end date
         if (new Date(finalStartDate) > new Date(finalEndDate)) {
             alert("'From' date cannot be after 'To' date.");
             return;
         }
-
-        const exportUrl = `api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`;
-        window.location.href = exportUrl;
-        handleCloseExportModal();
+    
+        const apiUrl = process.env.REACT_APP_API_URL; // Get the API URL
+        if (!apiUrl) {
+            alert("API URL is not configured. Please check environment settings.");
+            console.error("REACT_APP_API_URL is not set");
+            return;
+        }
+        
+        // Consider adding setIsLoading(true) here if you implement loading state
+    
+        try {
+            // Prepend the apiUrl and use fetch
+            const response = await fetch(`${apiUrl}/api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                }
+            });
+    
+            if (!response.ok) {
+                const errorData = await response.text(); // Or .json()
+                console.error('Export error response:', errorData);
+                throw new Error('Export failed: ' + (errorData || response.statusText));
+            }
+    
+            const contentType = response.headers.get('content-type');
+             if (!contentType || !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+                const errorText = await response.text();
+                console.error("Unexpected response content type:", contentType, "Response body:", errorText);
+                throw new Error('Invalid response format: Expected Excel file, but received ' + contentType);
+            }
+    
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'GCFinder_users_export.xlsx'; // Default filename
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+    
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            handleCloseExportModal();
+    
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Failed to export user data: ' + error.message);
+        } finally {
+            // Consider adding setIsLoading(false) here
+        }
     };
 
     const handleThisMonthExport = () => {
