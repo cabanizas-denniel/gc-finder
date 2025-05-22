@@ -138,11 +138,8 @@ const UserManagement = () => {
             console.error("REACT_APP_API_URL is not set");
             return;
         }
-        
-        // Consider adding setIsLoading(true) here if you implement loading state
     
         try {
-            // Prepend the apiUrl and use fetch
             const response = await fetch(`${apiUrl}/api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
                 method: 'GET',
                 headers: {
@@ -151,7 +148,7 @@ const UserManagement = () => {
             });
     
             if (!response.ok) {
-                const errorData = await response.text(); // Or .json()
+                const errorData = await response.text();
                 console.error('Export error response:', errorData);
                 throw new Error('Export failed: ' + (errorData || response.statusText));
             }
@@ -187,8 +184,6 @@ const UserManagement = () => {
         } catch (error) {
             console.error('Export error:', error);
             alert('Failed to export user data: ' + error.message);
-        } finally {
-            // Consider adding setIsLoading(false) here
         }
     };
 

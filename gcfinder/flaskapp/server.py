@@ -22,7 +22,6 @@ if cred_json_str:
     cred = credentials.Certificate(cred_dict)
 else:
     # Fallback to local file if environment variable is not set (for local development)
-    # You might want to remove this fallback in pure production or handle it more strictly
     print("WARNING: FIREBASE_CREDENTIALS_JSON environment variable not found. Falling back to local file.")
     cred = credentials.Certificate("gcfinder-database-firebase-adminsdk-fbsvc-0447799241.json")
 
@@ -138,7 +137,6 @@ def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
     Handles various date formats stored in Firestore.
     """
     items_ref = db.collection('items')
-    # Fetch all documents; filtering will be done in Python
     docs = items_ref.stream()
     data = []
 
@@ -198,15 +196,9 @@ def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
             full_name = submitter_map.get('displayName', submitter_map.get('full_name', 'N/A'))
             student_id = submitter_map.get('studentId', submitter_map.get('student_id', 'N/A'))
         else:
-            # Fallback if submitter is not a map, but a direct ID (less likely given your description)
             submitter_user_id = item_data.get('userId', item_data.get('submitter')) 
 
-        # If full_name or student_id were not found in submitter_map OR if you always want to fetch fresh user data:
-        # Proceed to fetch from 'users' collection if a valid userId was found
         if submitter_user_id and isinstance(submitter_user_id, str) and submitter_user_id != 'N/A':
-            # Only fetch from users collection if details weren't fully populated from submitter_map
-            # or if you have a policy to always fetch the latest user details.
-            # For this example, let's assume if full_name is still N/A, we try to fetch.
             if full_name == 'N/A' or student_id == 'N/A': 
                 try:
                     user_doc_ref = db.collection('users').document(submitter_user_id)
@@ -247,17 +239,9 @@ def fetch_users_for_export(start_date_dt=None, end_date_dt=None):
     Fetches user data from Firestore for Excel export.
     Date filtering is currently disabled as 'students' documents lack a date field.
     """
-    # Corrected collection name
+
     users_ref = db.collection('students') 
     query = users_ref
-    
-    # Date filtering is removed for now as 'students' documents do not have a creation/join date field.
-    # If a 'createdAt' or similar timestamp is added to student documents in the future,
-    # the following date querying logic can be reinstated:
-    # if start_date_dt:
-    #     query = query.where('createdAt', '>=', start_date_dt) 
-    # if end_date_dt:
-    #     query = query.where('createdAt', '<=', end_date_dt)
         
     docs = query.stream()
     data = []
@@ -310,12 +294,10 @@ def generate_excel_report_to_buffer(data_type, start_date_str=None, end_date_str
         summary_field = 'Status' 
         summary_title = 'User Status Summary'
     else:
-        return None # Should not happen with frontend validation
+        return None
 
     if df.empty:
-        # Create an empty buffer with a message or just return an empty file
         output_buffer = BytesIO()
-        # Optionally, write a message to the Excel file that no data was found
         empty_df_message = pd.DataFrame([{'message': f'No {data_type} found for the selected criteria.'}])
         with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
             empty_df_message.to_excel(writer, sheet_name='No Data', index=False)

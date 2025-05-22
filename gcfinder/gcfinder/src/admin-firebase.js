@@ -105,7 +105,7 @@ export const submitFoundItem = async (formData, images) => {
       updatedAt: serverTimestamp()
     };
     
-    // Nilalagay sa Firestore
+    // Add to Firestore
     const itemsRef = collection(db, 'items');
     const docRef = await addDoc(itemsRef, itemData);
     

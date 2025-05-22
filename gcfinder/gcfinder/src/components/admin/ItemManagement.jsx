@@ -44,8 +44,8 @@ const ItemManagement = () => {
                 exactLocation: item.exactLocation,
                 uniqueIdentifier: item.uniqueIdentifier,
                 additionalDetails: item.additionalDetails,
-                submitter: item.submitter || null, // Ensure the whole submitter object is passed
-                adminApproval: item.adminApproval // Add adminApproval status
+                submitter: item.submitter || null, 
+                adminApproval: item.adminApproval 
             }));
             
             setItems(mappedItems);
@@ -173,7 +173,7 @@ const ItemManagement = () => {
         return items.filter(item => item.status === status).length;
     };
 
-    // Export Modal Handlers (Copied and adapted from UserManagement)
+    // Export Modal Handlers
     const handleOpenExportModal = () => {
         setExportModalOpen(true);
     };
@@ -205,7 +205,6 @@ const ItemManagement = () => {
         }
 
         try {
-            // Prepend the apiUrl to your endpoint
             const response = await fetch(`${apiUrl}/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
                 method: 'GET',
                 headers: {
@@ -214,7 +213,7 @@ const ItemManagement = () => {
             });
             
             if (!response.ok) {
-                const errorData = await response.text(); // Or .json() if your backend sends JSON errors
+                const errorData = await response.text();
                 console.error('Export error response:', errorData);
                 throw new Error('Export failed: ' + (errorData || response.statusText));
             }
@@ -278,7 +277,6 @@ const ItemManagement = () => {
                         <p className="admin-subtitle">View, flag, and manage lost and found items in the GC Finder system</p>
                     </div>
                     <div className="action-buttons">
-                        {/* Updated export button */}
                         <button className="export-btn" onClick={handleOpenExportModal}>
                             <i className="fas fa-download"></i> Export Data
                         </button>
@@ -288,7 +286,7 @@ const ItemManagement = () => {
                     </div>
                 </div>
 
-                {/* Export Modal (copied from UserManagement.jsx and adapted) */}
+                {/* Export Modal */}
                 {exportModalOpen && (
                     <div className="export-modal-overlay">
                         <div className="export-modal-content">
@@ -320,7 +318,7 @@ const ItemManagement = () => {
                             <div className="export-modal-date-input-group">
                                 <label htmlFor="exportStartDateModalItem">From Date:</label>
                                 <input
-                                    id="exportStartDateModalItem" // Unique ID for item modal
+                                    id="exportStartDateModalItem"
                                     type="date"
                                     value={exportStartDate}
                                     onChange={(e) => setExportStartDate(e.target.value)}
@@ -330,7 +328,7 @@ const ItemManagement = () => {
                             <div className="export-modal-date-input-group">
                                 <label htmlFor="exportEndDateModalItem">To Date:</label>
                                 <input
-                                    id="exportEndDateModalItem" // Unique ID for item modal
+                                    id="exportEndDateModalItem"
                                     type="date"
                                     value={exportEndDate}
                                     onChange={(e) => setExportEndDate(e.target.value)}
@@ -512,7 +510,7 @@ const ItemManagement = () => {
                     )}
                 </div>
 
-                {/* Pagination Controls - Generalized for all tabs */}
+                {/* Pagination Controls */}
                 {(() => {
                     // Calculate total items after applying current tab and search filters
                     let itemsForPaginationCount = items;
@@ -555,12 +553,11 @@ const ItemManagement = () => {
                     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleCloseItemModal(); }}>
                         <div className="modal-content item-details-modal"> 
                             <div className="modal-header">
-                                {/* Ensure title uses selectedItemForModal.name */}
                                 <h2>Item Details: {selectedItemForModal.name || 'N/A'}</h2> 
                                 <button className="close-button" onClick={handleCloseItemModal}>&times;</button>
                             </div>
                             <div className="modal-body">
-                                <div className="item-detail-container"> {/* Reusing class from shared-styles for layout */}
+                                <div className="item-detail-container">
                                     <div className="item-image-container">
                                         {selectedItemForModal.imageData && selectedItemForModal.imageData.length > 0 && selectedItemForModal.imageData[0].dataUrl ? (
                                             <img 
@@ -580,7 +577,7 @@ const ItemManagement = () => {
                                             <i className="fas fa-tag"></i> <strong>Category:</strong> {selectedItemForModal.category || 'N/A'}
                                         </div>
                                         <div className="detail-item">
-                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.date || 'N/A'} {/* Uses .date from mappedItems */}
+                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.date || 'N/A'}
                                         </div>
                                         <div className="detail-item">
                                             <i className="fas fa-map-marker-alt"></i> <strong>Location Found:</strong> {selectedItemForModal.location || 'N/A'}
@@ -604,10 +601,6 @@ const ItemManagement = () => {
                                         {selectedItemForModal.additionalDetails && (
                                             <p><strong>Additional Details:</strong> {selectedItemForModal.additionalDetails}</p>
                                         )}
-                                        {/* You can add reportedBy if needed */}
-                                        {/* <div className="detail-item">
-                                            <i className="fas fa-user"></i> <strong>Reported By:</strong> {selectedItemForModal.reportedBy || 'N/A'}
-                                        </div> */}
                                     </div>
                                 </div>
                             </div>

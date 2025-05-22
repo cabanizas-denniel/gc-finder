@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { getPendingItems, db } from '../../admin-firebase'; // Assuming db is exported from admin-firebase
+import { getPendingItems, db } from '../../admin-firebase'; 
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
-// Helper function to check if a date was today or yesterday
 const wasTodayOrYesterday = (date) => {
     if (!date) return false;
 
@@ -28,16 +27,16 @@ const wasTodayOrYesterday = (date) => {
     return isToday || isActuallyYesterday;
 };
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A020F0', '#FF69B4', '#778899', '#2E8B57']; // Added one more color for variety
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A020F0', '#FF69B4', '#778899', '#2E8B57'];
 
 const Dashboard = () => {
     const [mounted, setMounted] = useState(false);
     const [dashboardStats, setDashboardStats] = useState({
-        pendingReports: { count: 0, fromYesterday: 0 }, // "fromYesterday" now means today or yesterday
-        pendingClaims: { count: 0, fromYesterday: 0 },  // "fromYesterday" now means today or yesterday
-        activeItems: { count: 0, fromYesterday: 0 },   // "fromYesterday" now means today or yesterday
-        itemCategoryDistribution: [], // Added for pie chart data
-        reportResolutionData: [], // Added for resolution rate pie chart
+        pendingReports: { count: 0, fromYesterday: 0 },
+        pendingClaims: { count: 0, fromYesterday: 0 }, 
+        activeItems: { count: 0, fromYesterday: 0 }, 
+        itemCategoryDistribution: [],
+        reportResolutionData: [],
     });
     const [loadingStats, setLoadingStats] = useState(true);
     const [errorStats, setErrorStats] = useState(null);
@@ -112,7 +111,6 @@ const Dashboard = () => {
                     if (status === 'Claimed' || status === 'Archived' || status === 'Disapproved') {
                         resolvedCount++;
                     } else if (status === 'Available' || status === 'Pending' || itemData.adminApproval === false) {
-                        // Ensure adminApproval === false also counts as unresolved if status is not yet 'Pending'
                         unresolvedCount++;
                     }
                 });
@@ -125,11 +123,11 @@ const Dashboard = () => {
                     ...prevStats,
                     pendingReports: {
                         count: pendingItemsData.length,
-                        fromYesterday: reportsFromTodayOrYesterday // Updated variable name
+                        fromYesterday: reportsFromTodayOrYesterday
                     },
                     pendingClaims: {
                         count: claimsSnapshot.size,
-                        fromYesterday: claimsFromTodayOrYesterday // Updated variable name
+                        fromYesterday: claimsFromTodayOrYesterday
                     },
                     activeItems: {
                         count: activeItemsSnapshot.size,
