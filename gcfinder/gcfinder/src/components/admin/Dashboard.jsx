@@ -70,7 +70,7 @@ const Dashboard = () => {
 
                 // Fetch Active (Available) Items
                 const itemsRef = collection(db, 'items');
-                const qActiveItems = query(itemsRef, where('status', '==', 'Available'));
+                const qActiveItems = query(itemsRef, where('status', '==', 'Unclaimed'));
                 const activeItemsSnapshot = await getDocs(qActiveItems);
                 let activeItemsFromTodayOrYesterday = 0;
                 activeItemsSnapshot.forEach(doc => {
@@ -108,9 +108,9 @@ const Dashboard = () => {
                 allItemsSnapshot.forEach(doc => {
                     const itemData = doc.data();
                     const status = itemData.status;
-                    if (status === 'Claimed' || status === 'Archived' || status === 'Disapproved') {
+                    if ((status !== 'Archived' && status === 'Claimed') || (status === 'Archived' && status === 'Claimed')) {
                         resolvedCount++;
-                    } else if (status === 'Available' || status === 'Pending' || itemData.adminApproval === false) {
+                    } else if ((status !== 'Archived' && status === 'Unclaimed') || (status === 'Pending' && itemData.adminApproval === true) || (status === 'Archived' && status !== 'Claimed')) {
                         unresolvedCount++;
                     }
                 });
@@ -203,8 +203,8 @@ const Dashboard = () => {
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                // label // You can add custom label rendering here if desired
-                                outerRadius={100} // Adjusted for better visibility
+                                label={({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                                outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
                                 nameKey="name"
@@ -214,7 +214,13 @@ const Dashboard = () => {
                                 ))}
                             </Pie>
                             <Tooltip />
-                            <Legend />
+                            <Legend 
+                                verticalAlign="middle" 
+                                align="right" 
+                                layout="vertical"
+                                iconSize={12}
+                                wrapperStyle={{ paddingLeft: '20px', fontSize: '14px' }}
+                            />
                         </PieChart>
                     </ResponsiveContainer>
                 )}
@@ -240,17 +246,24 @@ const Dashboard = () => {
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                outerRadius={100}
+                                label={({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                                outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
                                 nameKey="name"
                             >
                                 {dashboardStats.reportResolutionData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.name === 'Resolved' ? COLORS[1] : COLORS[3]} /> // Example: Green for Resolved, Orange for Unresolved
+                                    <Cell key={`cell-${index}`} fill={entry.name === 'Resolved' ? COLORS[1] : COLORS[3]} />
                                 ))}
                             </Pie>
                             <Tooltip formatter={(value, name, props) => [`${value} (${(props.payload.percent * 100).toFixed(0)}%)`, name]} />
-                            <Legend />
+                            <Legend 
+                                verticalAlign="middle" 
+                                align="right" 
+                                layout="vertical"
+                                iconSize={12}
+                                wrapperStyle={{ paddingLeft: '20px', fontSize: '14px' }}
+                            />
                         </PieChart>
                     </ResponsiveContainer>
                 )}

@@ -136,7 +136,7 @@ const ReportItem = () => {
                 return formData.itemName && formData.description && formData.location && 
                        formData.dateFound && formData.category;
             case 1: // Media Upload
-                return true; // Media is optional
+                return uploadedImages.length > 0; // Media is now required
             case 2: // Security Questions
                 return formData.exactLocation; // Only exact location is required
             case 3: // Confirmation
@@ -144,7 +144,7 @@ const ReportItem = () => {
             default:
                 return false;
         }
-    }, [formData]);
+    }, [formData, uploadedImages]);
 
     // Handle form submission
     const handleSubmit = useCallback(async (e) => {
@@ -353,6 +353,7 @@ const ReportItem = () => {
                                         accept="image/*" 
                                         multiple 
                                         onChange={handleFileInputChange} 
+                                        required
                                     />
                                 </div>
                                 

@@ -7,7 +7,7 @@ const Help = () => {
 
     // Handle contact button clicks
     const handleSendMessage = useCallback(() => {
-        navigate('/messages');
+        navigate('/admin/messages');
     }, [navigate]);
 
     const handleVisitOffice = useCallback(() => {

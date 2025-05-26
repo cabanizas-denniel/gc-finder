@@ -12,6 +12,7 @@ const Layout = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showLeaveDialog, setShowLeaveDialog] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [currentUser, setCurrentUser] = useState({
         displayName: "Loading...",
         userEmail: "",
@@ -22,6 +23,7 @@ const Layout = () => {
     useEffect(() => {
         const handleResize = () => {
             const width = window.innerWidth;
+            setIsMobile(width <= 768);
             if (width <= 768) {
                 setIsSidebarOpen(false);
             } else {
@@ -183,6 +185,11 @@ const Layout = () => {
                     </ul>
                 </div>
             </aside>
+
+            {/* Dark Overlay for Mobile */}
+            {isSidebarOpen && isMobile && (
+                <div className="sidebar-overlay" onClick={toggleSidebar} />
+            )}
 
             {/* Main Content */}
             <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>

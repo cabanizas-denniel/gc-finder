@@ -1,8 +1,7 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { submitItemClaim } from '../../firebase';
-import noItem from '../../assets/NoItemPlaceholder.png';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { submitItemClaim, deleteStudentReportedItem } from '../../firebase';
 
-const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaimed }) => {
+const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdated }) => {
     const [showModal, setShowModal] = useState(false);
     const [showClaimModal, setShowClaimModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
@@ -17,6 +16,29 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
     const [claimError, setClaimError] = useState('');
     const fileInputRef = useRef(null);
     const dropzoneRef = useRef(null);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    useEffect(() => {
+        setCurrentImageIndex(0); // Reset when selectedItem or modal visibility changes
+    }, [selectedItem, showModal]);
+
+    
+    const handlePrevImage = () => {
+        setCurrentImageIndex(prevIndex => Math.max(0, prevIndex - 1));
+    };
+
+    const handleNextImage = () => {
+        // Ensure selectedItem and its imageData exist before trying to access length
+        if (selectedItem && selectedItem.imageData && currentImageIndex < selectedItem.imageData.length - 1) {
+            setCurrentImageIndex(prevIndex => prevIndex + 1);
+        }
+    };
+
+    // Derived state for image display logic, based on selectedItem
+    const displayImages = selectedItem && selectedItem.imageData && selectedItem.imageData.length > 0;
+    const singleFallbackImage = !displayImages && selectedItem && selectedItem.image;
+    const multipleImages = displayImages && selectedItem.imageData.length > 1;
+
 
     // Item detail view handler
     const viewDetails = useCallback((itemId) => {
@@ -96,8 +118,8 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
             alert('Claim submitted successfully! You can track its status in My Claims.');
 
             // Call the callback to update parent's state
-            if (onItemClaimed && submissionResult.itemNewStatus) {
-                onItemClaimed(selectedItem.id, submissionResult.itemNewStatus);
+            if (onItemUpdated && submissionResult.itemNewStatus) {
+                onItemUpdated(selectedItem.id, submissionResult.itemNewStatus);
             }
             // navigate('/my-claims'); 
 
@@ -107,7 +129,7 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
         } finally {
             setIsSubmittingClaim(false);
         }
-    }, [selectedItem, claimForm, onItemClaimed]);
+    }, [selectedItem, claimForm, onItemUpdated]);
 
     // Check if current user is the item reporter
     const isReporter = useCallback((item) => {
@@ -177,6 +199,22 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
         fileInputRef.current?.click();
     }, []);
 
+    const handleDeleteItem = async (itemIdToDelete) => {
+        if (window.confirm("Are you sure you want to delete this report? This action cannot be undone.")) {
+            try {
+                await deleteStudentReportedItem(itemIdToDelete);
+                alert("Report deleted successfully.");
+                if (onItemUpdated) {
+                    onItemUpdated(itemIdToDelete, 'deleted'); // Notify parent to remove the item
+                }
+                closeModal(); // Close the modal after successful deletion
+            } catch (error) {
+                console.error("Error deleting item:", error);
+                alert("Failed to delete report. Please try again.");
+            }
+        }
+    };
+
     return (
         <section className="recent-items">
             {title && <h2>{title}</h2>}
@@ -192,7 +230,34 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
                         <div className="modal-body">
                             <div className="item-detail-container">
                                 <div className="item-image-container">
-                                    <img src={selectedItem.image || noItem} alt={selectedItem.name} />
+                                    {displayImages ? (
+                                        <img 
+                                            src={selectedItem.imageData[currentImageIndex].dataUrl} 
+                                            alt={selectedItem.imageData[currentImageIndex].name || `${selectedItem.name} - Image ${currentImageIndex + 1}`}
+                                            style={{ width: '100%', height: 'auto', maxHeight: '300px', objectFit: 'contain', borderRadius: '4px', marginBottom: multipleImages ? '10px' : '0' }}
+                                        />
+                                    ) : singleFallbackImage ? (
+                                        <img 
+                                            src={selectedItem.image} 
+                                            alt={selectedItem.name || 'Item Image'} 
+                                            style={{ width: '100%', height: 'auto', maxHeight: '300px', objectFit: 'contain', borderRadius: '4px' }}
+                                        />
+                                    ) : (
+                                        <p style={{ textAlign: 'center', padding: '20px' }}>No image available</p>
+                                    )}
+                                    {multipleImages && (
+                                        <div className="image-pagination-controls" style={{ textAlign: 'center', marginTop: '10px' }}>
+                                            <button onClick={handlePrevImage} disabled={currentImageIndex === 0}>
+                                                Previous
+                                            </button>
+                                            <span style={{ margin: '0 10px', fontSize: '0.9em' }}>
+                                                Image {currentImageIndex + 1} of {selectedItem.imageData.length}
+                                            </span>
+                                            <button onClick={handleNextImage} disabled={currentImageIndex === selectedItem.imageData.length - 1}>
+                                                Next
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="item-info">
                                     <div className="info-group">
@@ -226,14 +291,23 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
                         </div>
                         <div className="modal-footer">
                             <button className="btn back" onClick={closeModal}>Back to list</button>
-                            {!isReporter(selectedItem) && selectedItem.status === 'Available' && (
+                            {!isReporter(selectedItem) && selectedItem.status === 'Unclaimed' && (
                                 <button className="btn claim" onClick={handleClaimClick}>
                                     <i className="fas fa-hand-holding"></i> Claim Item
                                 </button>
                             )}
-                            {isReporter(selectedItem) && selectedItem.status === 'Available' &&  (
+                            {isReporter(selectedItem) && selectedItem.status === 'Unclaimed' && !selectedItem.adminApproval && (
                                 <button className="btn edit" onClick={() => console.log('Edit item clicked:', selectedItem.id)}>
                                     <i className="fas fa-edit"></i> Edit Item
+                                </button>
+                            )}
+                            {isReporter(selectedItem) && selectedItem.adminApproval === false && (
+                                <button 
+                                    className="btn delete-report-modal-btn"
+                                    onClick={() => handleDeleteItem(selectedItem.id)}
+                                    title="Delete this report"
+                                >
+                                    <i className="fas fa-trash-alt"></i> Delete Report
                                 </button>
                             )}
                         </div>
@@ -369,7 +443,7 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
                                 </div>
                             )}
                             <div className="item-card-image-container">
-                                <img src={item.image || noItem} alt={item.name} />
+                                <img src={item.image || ''} alt={item.image ? item.name : 'No image available'} />
                                 {item.adminApproval === false && item.status !== 'Disapproved' && (
                                     <div className="pending-approval-indicator">
                                         <i className="fas fa-hourglass-half"></i> Pending Approval from Admin
@@ -400,3 +474,94 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemClaim
 };
 
 export default ItemsList; 
+
+// New Component for Claim Detail Modal
+export const ClaimDetailModalDisplay = ({ claim, onClose }) => {
+    if (!claim) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content claim-detail-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>Claim Details: {claim.itemName}</h2>
+                    <button className="close-button" onClick={onClose}>×</button>
+                </div>
+                <div className="modal-body">
+                    <div className="item-detail-container">
+                        <div className="item-image-container">
+                            {claim.itemImage ? (
+                                <img src={claim.itemImage} alt={claim.itemName} />
+                            ) : (
+                                <p style={{ textAlign: 'center', padding: '20px' }}>No item image available</p>
+                            )}
+                            <div className={`claim-status status-${claim.claimStatus ? claim.claimStatus.toLowerCase() : 'unknown'}`} style={{ position: 'absolute', top: '10px', right: '10px', borderRadius: '15px' }}>
+                                Status: {claim.claimStatus}
+                            </div>
+                        </div>
+                        <div className="item-info">
+                            <h3>Security Answers Provided:</h3>
+                            <div className="detail-item">
+                                <i className="fas fa-map-pin"></i> <strong>Last Seen Location:</strong> 
+                                {claim.lastSeenLocation || 'N/A'}
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-fingerprint"></i> <strong>Unique Identifier:</strong> 
+                                {claim.uniqueIdentifier || 'N/A'}
+                            </div>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start'}}>
+                                <div><i className="fas fa-info-circle"></i> <strong>Additional Details:</strong></div>
+                                <p style={{ whiteSpace: 'pre-wrap', width: '100%', marginTop: '5px', background: 'transparent', padding: '0' }}>
+                                    {claim.additionalDetails || 'None provided'}
+                                </p>
+                            </div>
+
+                            <h3>Proof Image Provided:</h3>
+                            {claim.proofImageUrl ? (
+                                <div className="proof-image-preview" style={{ marginTop: '10px', textAlign: 'center' }}>
+                                    <img src={claim.proofImageUrl} alt="Proof provided" style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain' }}/>
+                                </div>
+                            ) : (
+                                <p>No proof image was uploaded with this claim.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="modal-footer">
+                    <button className="btn back" onClick={onClose}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// New Component for Displaying Claims Grid
+export const ClaimsGridDisplay = ({ claims, onViewDetails }) => {
+    if (!claims || claims.length === 0) {
+        // This case should ideally be handled by the parent component (MyClaims)
+        // before even rendering this grid component.
+        return null; 
+    }
+
+    return (
+        <div className="claims-grid">
+            {claims.map(claim => (
+                <div key={claim.id} className="claim-card">
+                    <div className={`claim-status status-${claim.claimStatus ? claim.claimStatus.toLowerCase() : 'unknown'}`}>
+                        {claim.claimStatus || 'N/A'}
+                    </div>
+                    <img src={claim.itemImage || ''} alt={claim.itemImage ? claim.itemName : 'No image available'} />
+                    <div className="student-claim-info">
+                        <h3>{claim.itemName || 'Item Name N/A'}</h3>
+                        <p><i className="fas fa-calendar"></i> Claimed on: {claim.displayDate}</p>
+                    </div>
+                    <button
+                        className="view-details-btn"
+                        onClick={() => onViewDetails(claim.id)}
+                    >
+                        View Details
+                    </button>
+                </div>
+            ))}
+        </div>
+    );
+}; 

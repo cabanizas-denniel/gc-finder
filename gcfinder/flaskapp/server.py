@@ -104,7 +104,7 @@ def search():
     #                     'location': item_data.get('location', 'Unknown location'),
     #                     'date': item_data.get('date', ''),
     #                     'description': item_data.get('description', ''),
-    #                     'status': item_data.get('status', 'Available'),
+    #                     'status': item_data.get('status', 'Unclaimed'),
     #                     'image': image_data,
     #                     'submitter': item_data.get('submitter', None)
     #                 })

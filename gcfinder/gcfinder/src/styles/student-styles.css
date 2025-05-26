@@ -185,7 +185,7 @@
     color: white;
 }
 
-.status-badge.available {
+.status-badge.unclaimed {
     background-color: var(--primary-color);
 }
 

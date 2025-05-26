@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { collection, getDocs, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../../admin-firebase';
+import { AdminViewItemDetailsModal } from './ItemsLIst';
 
 const ClaimVerification = () => {
     const [claims, setClaims] = useState([]);
@@ -11,6 +12,12 @@ const ClaimVerification = () => {
     const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
     const [selectedItemForModal, setSelectedItemForModal] = useState(null);
     const [loadingItemDetails, setLoadingItemDetails] = useState(false);
+
+    // New state for proof of return modal
+    const [showProofModal, setShowProofModal] = useState(false);
+    const [proofOfReturnImage, setProofOfReturnImage] = useState(null); // Will store data URL
+    const [claimToApproveWithProof, setClaimToApproveWithProof] = useState(null);
+    const proofFileInputRef = useRef(null); // For triggering file input
 
     useEffect(() => {
         fetchClaims();
@@ -53,24 +60,24 @@ const ClaimVerification = () => {
 
     const handleClaimAction = async (claimId, itemId, approve) => {
         try {
-            // Update claim status
             const claimRef = doc(db, 'claims', claimId);
-            await updateDoc(claimRef, {
+            const updateData = {
                 claimStatus: approve ? 'Approved' : 'Rejected',
                 updatedAt: serverTimestamp()
-            });
+            };
+            await updateDoc(claimRef, updateData);
 
-            // Update item status
-            const itemRef = doc(db, 'items', itemId);
-            await updateDoc(itemRef, {
-                status: approve ? 'Claimed' : 'Available',
-                updatedAt: serverTimestamp()
-            });
+            // If approved, update item status to "Claiming"
+            if (approve) {
+                const itemRef = doc(db, 'items', itemId);
+                await updateDoc(itemRef, {
+                    status: 'Claiming',
+                    updatedAt: serverTimestamp()
+                });
+            }
 
-            // Refresh claims list
             await fetchClaims();
             
-            // Update selected claim
             setSelectedClaim(prev => ({
                 ...prev,
                 status: approve ? 'approved' : 'rejected'
@@ -81,7 +88,71 @@ const ClaimVerification = () => {
         }
     };
 
-    // Function to fetch and display item details
+    const handleProofOfReturn = async (claimId, itemId, imageProofDataUrl) => {
+        try {
+            const claimRef = doc(db, 'claims', claimId);
+            await updateDoc(claimRef, {
+                claimStatus: 'Claimed',
+                ownershipProof: imageProofDataUrl,
+                updatedAt: serverTimestamp()
+            });
+
+            const itemRef = doc(db, 'items', itemId);
+            await updateDoc(itemRef, {
+                status: 'Claimed',
+                updatedAt: serverTimestamp()
+            });
+
+            await fetchClaims();
+            
+            setSelectedClaim(prev => ({
+                ...prev,
+                status: 'claimed'
+            }));
+
+        } catch (error) {
+            console.error('Error updating proof of return:', error);
+        }
+    };
+
+    const openProofModal = (claim) => {
+        setClaimToApproveWithProof(claim);
+        setProofOfReturnImage(null); // Reset previous image
+        setShowProofModal(true);
+    };
+
+    const closeProofModal = () => {
+        setShowProofModal(false);
+        setProofOfReturnImage(null);
+        setClaimToApproveWithProof(null);
+    };
+
+    const handleProofImageChange = (event) => {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProofOfReturnImage(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleConfirmApproval = async () => {
+        if (!proofOfReturnImage) {
+            alert("Please upload an image as proof of return.");
+            return;
+        }
+        if (claimToApproveWithProof) {
+            await handleProofOfReturn(
+                claimToApproveWithProof.id,
+                claimToApproveWithProof.itemId,
+                proofOfReturnImage
+            );
+            closeProofModal();
+        }
+    };
+
     const handleViewItemDetails = async (itemId) => {
         if (!itemId) {
             alert("Item ID is missing.");
@@ -93,7 +164,12 @@ const ClaimVerification = () => {
             const itemRef = doc(db, 'items', itemId);
             const itemSnap = await getDoc(itemRef);
             if (itemSnap.exists()) {
-                setSelectedItemForModal({ id: itemSnap.id, ...itemSnap.data() });
+                const itemData = itemSnap.data();
+                setSelectedItemForModal({
+                     id: itemSnap.id, 
+                     ...itemData,
+                     date: itemData.date?.toDate ? itemData.date.toDate().toLocaleDateString() : itemData.date
+                    });
             } else {
                 console.error("No such item document!");
                 setSelectedItemForModal(null);
@@ -107,7 +183,11 @@ const ClaimVerification = () => {
         setLoadingItemDetails(false);
     };
 
-    // Claims List Component
+    const closeItemDetailsModal = () => {
+        setShowItemDetailsModal(false);
+        setSelectedItemForModal(null);
+    };
+
     const ClaimsList = () => (
         <div className="claims-list">
             <h2>Claims list</h2>
@@ -141,7 +221,6 @@ const ClaimVerification = () => {
         </div>
     );
 
-    // Claim Details Component
     const ClaimDetails = () => {
         if (!selectedClaim) {
             return (
@@ -205,20 +284,60 @@ const ClaimVerification = () => {
                     </div>
 
                     <div className="claim-actions">
-                        <button 
-                            className="approve-btn"
-                            disabled={selectedClaim.status === 'approved'}
-                            onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, true)}
-                        >
-                            Approve Claim
-                        </button>
-                        <button 
-                            className="reject-btn"
-                            disabled={selectedClaim.status === 'rejected'}
-                            onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, false)}
-                        >
-                            Reject Claim
-                        </button>
+                        {selectedClaim.status === 'pending' && (
+                            <>
+                                <button 
+                                    className="approve-btn"
+                                    onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, true)}
+                                >
+                                    Approve Claim
+                                </button>
+                                <button 
+                                    className="reject-btn"
+                                    onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, false)}
+                                >
+                                    Reject Claim
+                                </button>
+                            </>
+                        )}
+                        {selectedClaim.status === 'approved' && (
+                            <>
+                            <button 
+                                className="approve-btn"
+                                onClick={() => openProofModal(selectedClaim)}
+                            >
+                                Proof of Return
+                            </button>
+                            <button 
+                                className="reject-btn"
+                                onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, false)}
+                            >
+                                Reject Claim
+                            </button>
+                            </>
+                        )}
+                        {selectedClaim.status === 'rejected' && (
+                            <>
+                            <button 
+                                className="approve-btn"
+                                onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, true)}
+                            >
+                                Approve Claim
+                            </button>
+                            <p className="status-message">This claim has been rejected.</p>
+                            </>
+                        )}
+                        {selectedClaim.status === 'claimed' && (
+                            <>
+                            <p className="status-message">This item has been claimed and returned to owner.</p>
+                            <button 
+                                className="reject-btn"
+                                onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, false)}
+                            >
+                                Reject Claim
+                            </button>
+                            </>
+                        )}
                         <button 
                             className="view-details-btn"
                             onClick={() => handleViewItemDetails(selectedClaim.itemId)}
@@ -246,70 +365,53 @@ const ClaimVerification = () => {
                 <ClaimDetails />
             </div>
 
-            {/* Item Details Modal */}
-            {showItemDetailsModal && (
-                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowItemDetailsModal(false); }}>
-                    <div className="modal-content item-details-modal">
+            <AdminViewItemDetailsModal 
+                show={showItemDetailsModal}
+                item={selectedItemForModal}
+                onClose={closeItemDetailsModal}
+                loading={loadingItemDetails}
+            />
+
+            {/* Proof of Return Modal */}
+            {showProofModal && claimToApproveWithProof && (
+                <div className="modal-overlay" onClick={closeProofModal}> {/* Optional: close on overlay click */}
+                    <div className="modal-content proof-return-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2>Item Details</h2>
-                            <button className="close-button" onClick={() => setShowItemDetailsModal(false)}>&times;</button>
+                            <h2>Proof of Return to Owner</h2>
+                            <button className="close-button" onClick={closeProofModal}>&times;</button>
                         </div>
                         <div className="modal-body">
-                            {loadingItemDetails && <p>Loading item details...</p>}
-                            {!loadingItemDetails && selectedItemForModal && (
-                                <div className="item-detail-container">
-                                    <div className="item-image-container">
-                                        {selectedItemForModal.imageData && selectedItemForModal.imageData.length > 0 && selectedItemForModal.imageData[0].dataUrl ? (
-                                            <img 
-                                                src={selectedItemForModal.imageData[0].dataUrl} 
-                                                alt={selectedItemForModal.imageData[0].name || selectedItemForModal.name || 'Item Image'} 
-                                            />
-                                        ) : (
-                                            <p>No image available</p>
-                                        )}
-                                    </div>
-                                    <div className="item-info">
-                                        <h3>{selectedItemForModal.name || 'N/A'}</h3>
-                                        <div className="detail-item">
-                                            <i className="fas fa-align-left"></i><strong>Description:</strong> {selectedItemForModal.description || 'N/A'}
-                                        </div>
-                                        <div className="detail-item">
-                                            <i className="fas fa-tag"></i> <strong>Category:</strong> {selectedItemForModal.category || 'N/A'}
-                                        </div>
-                                        <div className="detail-item">
-                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.date ? new Date(selectedItemForModal.date.toDate ? selectedItemForModal.date.toDate() : selectedItemForModal.date).toLocaleDateString() : 'N/A'}
-                                        </div>
-                                        <div className="detail-item">
-                                            <i className="fas fa-map-marker-alt"></i> <strong>Location Found:</strong> {selectedItemForModal.location || 'N/A'}
-                                        </div>
-                                        {selectedItemForModal.exactLocation && (
-                                            <div className="detail-item">
-                                                <i className="fas fa-map-pin"></i> <strong>Exact Location:</strong> {selectedItemForModal.exactLocation}
-                                            </div>
-                                        )}
-                                        {selectedItemForModal.uniqueIdentifier && (
-                                            <div className="detail-item">
-                                                <i className="fas fa-fingerprint"></i> <strong>Unique Identifier:</strong> {selectedItemForModal.uniqueIdentifier}
-                                            </div>
-                                        )}
-                                        {selectedItemForModal.submitter && (
-                                        <div className="detail-item">
-                                            <i className="fas fa-user"></i> <strong>Submitted By:</strong> {selectedItemForModal.submitter.full_name || 'N/A'}
-                                            {selectedItemForModal.submitter.student_id && ` (ID: ${selectedItemForModal.submitter.student_id})`}
-                                        </div>
-                                        )}
-                                        {selectedItemForModal.additionalDetails && (
-                                            <div className="detail-item">
-                                                <i className="fas fa-info-circle"></i> <strong>Additional Details:</strong> {selectedItemForModal.additionalDetails}
-                                            </div>
-                                        )}
-                                    </div>
+                            <p style={{ marginBottom: '15px', textAlign: 'center' }}>Upload an image as proof that the item has been returned to its rightful owner.</p>
+                            <div style={{ marginBottom: '15px', textAlign: 'center' }}>
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    ref={proofFileInputRef}
+                                    onChange={handleProofImageChange} 
+                                    style={{ display: 'none' }} 
+                                />
+                                <button onClick={() => proofFileInputRef.current.click()} className="btn-upload-proof">
+                                    <i className="fas fa-upload"></i> Upload Image
+                                </button>
+                            </div>
+                            {proofOfReturnImage && (
+                                <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+                                    <img src={proofOfReturnImage} alt="Proof of return" style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '4px' }}/>
                                 </div>
                             )}
-                            {!loadingItemDetails && !selectedItemForModal && <p>Item details could not be loaded or found.</p>}
                         </div>
-                        <div className="modal-footer">
-                            <button className="btn back" onClick={() => setShowItemDetailsModal(false)}>Close</button>
+                        <div className="modal-footer" style={{ justifyContent: 'center'}}>
+                            <button type="button" className="btn btn-secondary" onClick={closeProofModal} style={{marginRight: '10px'}}>
+                                Cancel
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-primary" 
+                                onClick={handleConfirmApproval} 
+                                disabled={!proofOfReturnImage}
+                            >
+                                Confirm Return
+                            </button>
                         </div>
                     </div>
                 </div>

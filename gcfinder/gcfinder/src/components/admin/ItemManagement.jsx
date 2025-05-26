@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAllItems, deleteItemFromDb, archiveItemInDb } from '../../admin-firebase';
+import { AdminViewItemDetailsModal } from './ItemsLIst'; // Import the shared modal
 
 const ItemManagement = () => {
     const [activeTab, setActiveTab] = useState('all');
@@ -117,8 +118,10 @@ const ItemManagement = () => {
     // Status badge renderer
     const renderStatusBadge = (status) => {
         switch (status) {
-            case 'available':
-                return <span className="item-status-badge active">Available</span>;
+            case 'unclaimed':
+                return <span className="item-status-badge active">Unclaimed</span>;
+            case 'claiming':
+                return <span className="item-status-badge claiming">Claiming</span>;
             case 'claimed':
                 return <span className="item-status-badge claimed">Claimed</span>;
             case 'disapproved':
@@ -363,11 +366,18 @@ const ItemManagement = () => {
                             <span className="item-count">{items.length}</span>
                         </button>
                         <button 
-                            className={`item-tab ${activeTab === 'available' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('available')}
+                            className={`item-tab ${activeTab === 'unclaimed' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('unclaimed')}
                         >
-                            <i className="fas fa-box-open"></i> Available
-                            <span className="item-count">{getTabCount('available')}</span>
+                            <i className="fas fa-box-open"></i> Unclaimed
+                            <span className="item-count">{getTabCount('unclaimed')}</span>
+                        </button>
+                        <button 
+                            className={`item-tab ${activeTab === 'claiming' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('claiming')}
+                        >
+                            <i className="fas fa-hand-holding"></i> Claiming
+                            <span className="item-count">{getTabCount('claiming')}</span>
                         </button>
                         <button 
                             className={`item-tab ${activeTab === 'claimed' ? 'active' : ''}`}
@@ -548,68 +558,13 @@ const ItemManagement = () => {
                     return null; // No pagination needed if only one page or no items
                 })()}
 
-                {/* Item Details Modal */}
-                {showItemDetailsModal && selectedItemForModal && (
-                    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleCloseItemModal(); }}>
-                        <div className="modal-content item-details-modal"> 
-                            <div className="modal-header">
-                                <h2>Item Details: {selectedItemForModal.name || 'N/A'}</h2> 
-                                <button className="close-button" onClick={handleCloseItemModal}>&times;</button>
-                            </div>
-                            <div className="modal-body">
-                                <div className="item-detail-container">
-                                    <div className="item-image-container">
-                                        {selectedItemForModal.imageData && selectedItemForModal.imageData.length > 0 && selectedItemForModal.imageData[0].dataUrl ? (
-                                            <img 
-                                                src={selectedItemForModal.imageData[0].dataUrl} 
-                                                alt={selectedItemForModal.imageData[0].name || selectedItemForModal.name || 'Item Image'} 
-                                            />
-                                        ) : (
-                                            <p>No image available</p>
-                                        )}
-                                    </div>
-                                    <div className="item-info">
-                                        <h3>{selectedItemForModal.name || 'N/A'}</h3>
-                                        <div className="detail-item">
-                                            <i className="fas fa-align-left"></i><strong>Description:</strong> {selectedItemForModal.description || 'N/A'}
-                                        </div>
-                                        <div className="detail-item">
-                                            <i className="fas fa-tag"></i> <strong>Category:</strong> {selectedItemForModal.category || 'N/A'}
-                                        </div>
-                                        <div className="detail-item">
-                                            <i className="fas fa-calendar"></i> <strong>Date Found:</strong> {selectedItemForModal.date || 'N/A'}
-                                        </div>
-                                        <div className="detail-item">
-                                            <i className="fas fa-map-marker-alt"></i> <strong>Location Found:</strong> {selectedItemForModal.location || 'N/A'}
-                                        </div>
-                                        {selectedItemForModal.exactLocation && (
-                                            <div className="detail-item">
-                                                <i className="fas fa-map-pin"></i> <strong>Exact Location:</strong> {selectedItemForModal.exactLocation}
-                                            </div>
-                                        )}
-                                        {selectedItemForModal.uniqueIdentifier && (
-                                            <div className="detail-item">
-                                                <i className="fas fa-fingerprint"></i> <strong>Unique Identifier:</strong> {selectedItemForModal.uniqueIdentifier}
-                                            </div>
-                                        )}
-                                        {selectedItemForModal.submitter && (
-                                        <div className="detail-item">
-                                            <i className="fas fa-user"></i> <strong>Submitted By:</strong> {selectedItemForModal.submitter.full_name}
-                                            {selectedItemForModal.submitter.student_id && ` (ID: ${selectedItemForModal.submitter.student_id})`}
-                                        </div>
-                                        )}
-                                        {selectedItemForModal.additionalDetails && (
-                                            <p><strong>Additional Details:</strong> {selectedItemForModal.additionalDetails}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button className="btn back" onClick={handleCloseItemModal}>Close</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Use the shared AdminViewItemDetailsModal */}
+                <AdminViewItemDetailsModal 
+                    show={showItemDetailsModal}
+                    item={selectedItemForModal}
+                    onClose={handleCloseItemModal} 
+                    // loading prop can be added if ItemManagement has a specific loading state for this modal
+                />
             </div>
     );
 };

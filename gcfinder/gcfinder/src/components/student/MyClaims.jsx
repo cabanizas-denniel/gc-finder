@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase'; 
-import noItem from '../../assets/NoItemPlaceholder.png'; // Fallback image
+import { ClaimDetailModalDisplay, ClaimsGridDisplay } from './ItemsList'; // Import both display components
+import noItem from '../../assets/NoItemPlaceholder.png'; // Re-import noItem for claim card images
 
 const MyClaims = () => {
     const [activeStatus, setActiveStatus] = useState('all');
@@ -9,8 +10,6 @@ const MyClaims = () => {
     const [filteredClaims, setFilteredClaims] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
-    // State for Claim Detail Modal
     const [showClaimDetailModal, setShowClaimDetailModal] = useState(false);
     const [selectedClaimForDetail, setSelectedClaimForDetail] = useState(null);
 
@@ -155,84 +154,23 @@ const MyClaims = () => {
                 <div>Error: {error}</div>
             ) : filteredClaims.length === 0 ? (
                 <div>
-                    {activeStatus !== 'all' ? `you have no ${activeStatus} items` : 'you have no claims yet'}.
+                    {activeStatus !== 'all' ? `You have no ${activeStatus} items` : 'You have no claims yet'}.
                 </div>
             ) : (
-                <div className="claims-grid">
-                    {filteredClaims.map(claim => (
-                        <div key={claim.id} className="claim-card">
-                            <div className={`claim-status status-${claim.claimStatus ? claim.claimStatus.toLowerCase() : 'unknown'}`}>
-                                {claim.claimStatus || 'N/A'} {/* Display claimStatus */}
-                            </div>
-                            <img src={claim.itemImage || noItem} alt={claim.itemName || 'Item'} /> {/* Display itemImage and itemName */}
-                            <div className="student-claim-info">
-                                <h3>{claim.itemName || 'Item Name N/A'}</h3>
-                                <p><i className="fas fa-calendar"></i> Claimed on: {claim.displayDate}</p> {/* Display formatted createdAt date */}
-                                {/* Other details from your claim structure can be added here if needed */}
-                                {/* e.g., <p>Item ID: {claim.itemId}</p> */}
-                            </div>
-                            <button
-                                className="view-details-btn"
-                                onClick={() => viewClaimDetails(claim.id)}
-                            >
-                                View Details
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                // Use the imported ClaimsGridDisplay component
+                <ClaimsGridDisplay 
+                    claims={filteredClaims} 
+                    onViewDetails={viewClaimDetails}
+                    noItemPlaceholder={noItem} // Pass the imported noItem as a prop
+                />
             )}
 
-            {/* Claim Detail Modal */}
-            {showClaimDetailModal && selectedClaimForDetail && (
-                <div className="modal-overlay" onClick={closeClaimDetailModal}> {/* Close on overlay click */}
-                    {/* Use existing modal-content style, maybe add a specific class if needed */} 
-                    <div className="modal-content claim-detail-modal" onClick={(e) => e.stopPropagation()}> {/* Stop propagation */}
-                        <div className="modal-header">
-                            <h2>Claim Details: {selectedClaimForDetail.itemName}</h2>
-                            <button className="close-button" onClick={closeClaimDetailModal}>×</button>
-                        </div>
-                        <div className="modal-body">
-                             {/* Mimic item-detail-container layout */}
-                            <div className="item-detail-container"> 
-                                <div className="item-image-container">
-                                    <img src={selectedClaimForDetail.itemImage || noItem} alt={selectedClaimForDetail.itemName} />
-                                    <div className={`claim-status status-${selectedClaimForDetail.claimStatus ? selectedClaimForDetail.claimStatus.toLowerCase() : 'unknown'}`} style={{ position: 'absolute', top: '10px', right: '10px', borderRadius: '15px' }}>
-                                        Status: {selectedClaimForDetail.claimStatus}
-                                    </div>
-                                </div>
-                                <div className="item-info"> {/* Reuse item-info for structure */}
-                                    <h3>Security Answers Provided:</h3>
-                                    <div className="detail-item">
-                                        <i className="fas fa-map-pin"></i> <strong>Last Seen Location:</strong> 
-                                        {selectedClaimForDetail.lastSeenLocation || 'N/A'}
-                                    </div>
-                                    <div className="detail-item">
-                                        <i className="fas fa-fingerprint"></i> <strong>Unique Identifier:</strong> 
-                                        {selectedClaimForDetail.uniqueIdentifier || 'N/A'}
-                                    </div>
-                                    <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start'}}> {/* Custom style for textarea-like content */}
-                                        <div><i className="fas fa-info-circle"></i> <strong>Additional Details:</strong></div>
-                                        <p style={{ whiteSpace: 'pre-wrap', width: '100%', marginTop: '5px', background: 'transparent', padding: '0' }}>
-                                            {selectedClaimForDetail.additionalDetails || 'None provided'}
-                                        </p>
-                                    </div>
-
-                                    <h3>Proof Image Provided:</h3>
-                                    {selectedClaimForDetail.proofImageUrl ? (
-                                        <div className="proof-image-preview" style={{ marginTop: '10px', textAlign: 'center' }}>
-                                            <img src={selectedClaimForDetail.proofImageUrl} alt="Proof provided" style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain' }}/>
-                                        </div>
-                                    ) : (
-                                        <p>No proof image was uploaded with this claim.</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn back" onClick={closeClaimDetailModal}>Close</button>
-                        </div>
-                    </div>
-                </div>
+            {/* Use the imported Claim Detail Modal Component */}
+            {showClaimDetailModal && (
+                <ClaimDetailModalDisplay 
+                    claim={selectedClaimForDetail} 
+                    onClose={closeClaimDetailModal} 
+                />
             )}
         </section>
     );

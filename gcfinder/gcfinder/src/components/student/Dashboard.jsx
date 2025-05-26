@@ -72,8 +72,9 @@ const Dashboard = () => {
                             category: data.category || 'Uncategorized',
                             location: data.location || 'Unknown location',
                             date: data.date || new Date().toLocaleDateString(),
-                            status: data.status || 'Available',
+                            status: data.status || 'Unclaimed',
                             description: data.description || 'No description provided',
+                            imageData: data.imageData || [],
                             image: data.imageData && data.imageData.length > 0 
                                 ? data.imageData[0].dataUrl 
                                 : null,

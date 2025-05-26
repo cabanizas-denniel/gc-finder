@@ -95,7 +95,7 @@ export const submitFoundItem = async (formData, images) => {
       uniqueIdentifier: formData.uniqueIdentifier || '',
       additionalDetails: formData.additionalDetails || '',
       imageData: imageData,
-      status: 'Available',
+      status: 'Unclaimed',
       adminApproval: true,
       submitter: {
         full_name: 'Disciplinary Office',
@@ -161,10 +161,10 @@ export const approveItem = async (itemId) => {
     const itemRef = doc(db, 'items', itemId);
     await updateDoc(itemRef, {
       adminApproval: true,
-      status: 'Available',
+      status: 'Unclaimed',
       updatedAt: serverTimestamp()
     });
-    console.log(`Item ${itemId} approved and status set to Available.`);
+    console.log(`Item ${itemId} approved and status set to Unclaimed.`);
     return true;
   } catch (error) {
     console.error("Error approving item:", error);

@@ -288,6 +288,15 @@ h2{
     cursor: not-allowed;
 }
 
+.btn-upload-proof {
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    padding: 10px 22px;
+    border-radius: 10px;
+}
+
 /*Review Reports*/
 .review-reports-container {
     margin: 20px;
@@ -1162,6 +1171,11 @@ h2{
     color: #009933;
 }
 
+.item-status-badge.claiming {
+    background-color: rgba(255, 165, 0, 0.1);
+    color: #ff8c00;
+}
+
 .item-status-badge.claimed {
     background-color: rgba(0, 123, 255, 0.1);
     color: #0d6efd;
@@ -1191,6 +1205,10 @@ h2{
 /* Row Highlighting */
 .item-row-flagged td {
     background-color: rgba(255, 193, 7, 0.03);
+}
+
+.item-row-claiming td {
+    background-color: rgba(255, 165, 0, 0.03);
 }
 
 .item-row-archived td {

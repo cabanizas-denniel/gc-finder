@@ -137,7 +137,7 @@ const ReportItem = () => {
                 return formData.itemName && formData.description && formData.location && 
                        formData.dateFound && formData.category;
             case 1: // Media Upload
-                return true; // Media is optional
+                return uploadedImages.length > 0; // Media is now required
             case 2: // Security Questions
                 return formData.exactLocation; // Only exact location is required
             case 3: // Confirmation
@@ -145,7 +145,7 @@ const ReportItem = () => {
             default:
                 return false;
         }
-    }, [formData]);
+    }, [formData, uploadedImages]);
 
     // Handle form submission
     const handleSubmit = useCallback(async (e) => {
@@ -252,12 +252,14 @@ const ReportItem = () => {
                             </div>
                             <h2>Disclaimer</h2>
                             <p>Please be aware that reporting found items comes with responsibilities. Ensure that all information provided is accurate and truthful.</p>
-                            <p>The following items are <strong>prohibited</strong> from being reported:</p>
+                            <p>The following items and behaviors are <strong>prohibited</strong> from being reported:</p>
                             <div className="prohibited-items">
                                 <span className="prohibited-tag">Weapons</span>
                                 <span className="prohibited-tag">Dangerous Items</span>
                                 <span className="prohibited-tag">Illegal Substances</span>
-                                <span className="prohibited-tag">Something Else</span>
+                                <span className="prohibited-tag">Spamming</span>
+                                <span className="prohibited-tag">Misinformation</span>
+                                <span className="prohibited-tag">False Reports</span>
                             </div>
                             <button className="understand-btn" onClick={handleAcceptDisclaimer}>I Understand</button>
                         </div>
@@ -379,6 +381,7 @@ const ReportItem = () => {
                                     accept="image/*" 
                                     multiple 
                                     onChange={handleFileInputChange} 
+                                    required
                                 />
                             </div>
                             
