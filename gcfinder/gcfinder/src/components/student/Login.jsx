@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaIdCard, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaInfoCircle } from 'react-icons/fa';
-import gcLogo from '../../assets/gc-finder-logo.png';
+import gcLogo from '../../assets/gc-finder.png';
 import logo from '../../assets/gc-logo.png';
 import { loginWithStudentId } from '../../firebase';
 

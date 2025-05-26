@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { submitItemClaim, deleteStudentReportedItem } from '../../firebase';
 
 const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdated }) => {
@@ -17,6 +18,11 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
     const fileInputRef = useRef(null);
     const dropzoneRef = useRef(null);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const navigate = useNavigate();
+
+    const handleContact = useCallback(() => {
+        navigate('/messages');
+    }, [navigate]);
 
     useEffect(() => {
         setCurrentImageIndex(0); // Reset when selectedItem or modal visibility changes
@@ -296,10 +302,13 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                                     <i className="fas fa-hand-holding"></i> Claim Item
                                 </button>
                             )}
-                            {isReporter(selectedItem) && selectedItem.status === 'Unclaimed' && !selectedItem.adminApproval && (
-                                <button className="btn edit" onClick={() => console.log('Edit item clicked:', selectedItem.id)}>
-                                    <i className="fas fa-edit"></i> Edit Item
-                                </button>
+                            {!isReporter(selectedItem) && (selectedItem.status === "Claimed" || selectedItem.status === "Claiming") && (
+                                <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px'}}>
+                                    <p>Believe this item is yours?</p>
+                                    <button className="btn edit" onClick={handleContact}>
+                                        <i className="fas fa-edit"></i> Contact Disciplinary Office.
+                                    </button>
+                                </div>
                             )}
                             {isReporter(selectedItem) && selectedItem.adminApproval === false && (
                                 <button 

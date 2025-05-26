@@ -1,13 +1,3 @@
-:root {
-    --primary-color: #049516;
-    --primary-color-light: #4CAF50;
-    --secondary-color: #f5f5f5;
-    --sub-color: #666;
-    --hovered-button-color: #296132;
-    --text-color: #333;
-    --sidebar-width: 250px;
-}
-
 .dashboard-container {
     padding: 20px;
     padding-top: 0;
@@ -179,8 +169,8 @@ h2{
     border: 1px solid #f5b7b1;
 }
 .status.claimed {
-    background: #d4edda;
-    color: #28a745;
+    background: #a5f4b8;
+    color: #256029;
     padding: 2px 12px;
     border-radius: 20px;
     border: 1px solid #f5b7b1;
@@ -265,11 +255,11 @@ h2{
     transition: background 0.2s;
 }
 .claim-actions .approve-btn {
-    background: #049516;
+    background: var(--primary-color);
     color: #fff;
 }
 .claim-actions .approve-btn:disabled {
-    background: #b7e0c2;
+    background: #b7e0dd;
     color: #fff;
     cursor: not-allowed;
 }
@@ -415,7 +405,7 @@ h2{
 }
 
 .approve-btn:hover {
-    background-color: #1e3d1b;
+    background-color: var(--hovered-button-color);
 }
 
 .approve-btn:disabled {
@@ -613,12 +603,12 @@ h2{
 }
 
 .export-btn {
-    background-color: #009933;
+    background-color: var(--primary-color);
     color: white;
 }
 
 .export-btn:hover {
-    background-color: #008029;
+    background-color: var(--hovered-button-color);
 }
 
 .refresh-btn {
@@ -988,12 +978,12 @@ h2{
 }
 
 .approve-btn {
-    background: #2D5A27;
+    background: var(--primary-color);
     color: white;
 }
 
 .approve-btn:hover {
-    background: #234720;
+    background: var(--hovered-button-color);
 }
 
 .reject-btn {
@@ -1169,7 +1159,7 @@ h2{
 }
 
 .item-tab.active {
-    background: #009933;
+    background: var(--primary-color);
     color: white;
 }
 
