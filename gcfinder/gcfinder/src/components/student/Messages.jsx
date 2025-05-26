@@ -1,87 +1,162 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import profilePic from '../../assets/Profile.png';
+import messageService from '../../services/messageService';
 
 const Messages = () => {
     const [activeConversation, setActiveConversation] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filter, setFilter] = useState('all');
+    const [conversations, setConversations] = useState([]);
+    const [messages, setMessages] = useState([]);
     const [messageInput, setMessageInput] = useState('');
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
     const [showChat, setShowChat] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState(null);
     const chatMessagesRef = useRef(null);
     const messageInputRef = useRef(null);
+    const unsubscribeConversations = useRef(null);
+    const unsubscribeMessages = useRef(null);
 
-    // Sample data for conversations - using useMemo to prevent recreation on every render
-    const conversations = useMemo(() => [
-        {
-            id: 1,
-            name: 'Disciplinary Office',
-            image: profilePic,
-            messages: [
-                {
-                    id: 1,
-                    text: 'Hello, I reported a lost cellphone yesterday.',
-                    sent: true,
-                    time: '8:12 PM'
-                },
-                {
-                    id: 2,
-                    text: 'Yes, I received a report. I will review it shortly.',
-                    sent: false,
-                    time: '8:42 PM'
-                },
-                {
-                    id: 3,
-                    text: 'Your lost item has been approved.',
-                    sent: false,
-                    time: '8:42 PM'
-                }
-            ],
-            unread: true,
-            lastMessage: 'Your lost item has been approved.',
-            lastMessageTime: 'Today',
-            preview: 'Your lost item has been approved.'
-        },
-    ], []);
+    // Get current user from localStorage
+    useEffect(() => {
+        const userData = JSON.parse(localStorage.getItem('userData'));
+        console.log('Student userData from localStorage:', userData);
+        if (userData) {
+            const user = {
+                id: userData.student_id,
+                name: userData.full_name || 'Student',
+                email: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
+                type: 'student'
+            };
+            console.log('Setting student currentUser:', user);
+            setCurrentUser(user);
+        } else {
+            console.log('No userData found in localStorage');
+            setLoading(false); // Stop loading if no user data
+        }
+    }, []);
 
-    // Handle window resize to update sidebar state and mobile view
+    // Handle window resize
     useEffect(() => {
         const handleResize = () => {
             const isMobile = window.innerWidth <= 768;
             setIsMobileView(isMobile);
             
-            // Reset mobile chat view when switching to desktop
             if (!isMobile) {
                 setShowChat(false);
             }
         };
         
-        // Add event listener
         window.addEventListener('resize', handleResize);
-        
-        // Clean up event listener on component unmount
-        return () => {
-            window.removeEventListener('resize', handleResize);
-        };
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Scroll to bottom of chat messages when messages change
+    // Load conversations when user is available
     useEffect(() => {
-        if (chatMessagesRef.current && activeConversation) {
+        if (!currentUser) return;
+
+        setLoading(true);
+        
+        // Set a timeout to ensure loading doesn't get stuck
+        const loadingTimeout = setTimeout(() => {
+            console.log('Loading timeout reached, setting loading to false');
+            setLoading(false);
+        }, 10000); // 10 seconds timeout
+        
+        try {
+            // Subscribe to conversations
+            unsubscribeConversations.current = messageService.getConversations(
+                currentUser.id, 
+                false, // not admin
+                (conversationsData) => {
+                    console.log('Student conversations received:', conversationsData);
+                    clearTimeout(loadingTimeout);
+                    setConversations(conversationsData);
+                    setLoading(false);
+                    
+                    // Auto-select the Disciplinary Office conversation if it exists
+                    if (conversationsData.length > 0 && !activeConversation) {
+                        setActiveConversation(conversationsData[0]);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('Error setting up conversations listener:', error);
+            clearTimeout(loadingTimeout);
+            setLoading(false);
+        }
+
+        return () => {
+            clearTimeout(loadingTimeout);
+            if (unsubscribeConversations.current) {
+                unsubscribeConversations.current();
+            }
+        };
+    }, [currentUser]);
+
+    // Function to create conversation when student wants to send a message
+    const createConversationWithAdmin = useCallback(async () => {
+        if (!currentUser) return null;
+        
+        try {
+            const conversationId = await messageService.getOrCreateConversation(
+                [currentUser.id], 
+                false
+            );
+            
+            // Create a temporary conversation object for immediate use
+            const newConversation = {
+                id: conversationId,
+                participant: {
+                    name: 'Disciplinary Office',
+                    id: 'admin',
+                    type: 'admin'
+                },
+                lastMessage: '',
+                lastMessageTime: new Date(),
+                unread: false
+            };
+            
+            setActiveConversation(newConversation);
+            return conversationId;
+        } catch (error) {
+            console.error('Error creating conversation:', error);
+            return null;
+        }
+    }, [currentUser]);
+
+    // Load messages when active conversation changes
+    useEffect(() => {
+        if (!activeConversation) return;
+
+        // Unsubscribe from previous messages
+        if (unsubscribeMessages.current) {
+            unsubscribeMessages.current();
+        }
+
+        // Subscribe to messages for the active conversation
+        unsubscribeMessages.current = messageService.getMessages(
+            activeConversation.id,
+            (messagesData) => {
+                setMessages(messagesData);
+            }
+        );
+
+        // Mark messages as read
+        messageService.markMessagesAsRead(activeConversation.id, currentUser?.id);
+
+        return () => {
+            if (unsubscribeMessages.current) {
+                unsubscribeMessages.current();
+            }
+        };
+    }, [activeConversation, currentUser]);
+
+    // Scroll to bottom when messages change
+    useEffect(() => {
+        if (chatMessagesRef.current) {
             chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
         }
-    }, [activeConversation]);
-
-    // Filter conversations based on search term and filter
-    const filteredConversations = useMemo(() => {
-        return conversations.filter(conv => {
-            const matchesSearch = conv.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                 conv.preview.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesFilter = filter === 'all' || (filter === 'unread' && conv.unread);
-            
-            return matchesSearch && matchesFilter;
-        });
-    }, [conversations, searchTerm, filter]);
+    }, [messages]);
 
     // Handle conversation click
     const handleConversationClick = useCallback((conversation) => {
@@ -90,61 +165,45 @@ const Messages = () => {
         if (isMobileView) {
             setShowChat(true);
         }
-        
-        // Mark as read (in a real app, this would update the database)
-        if (conversation.unread) {
-            conversation.unread = false;
-        }
     }, [isMobileView]);
 
     // Handle sending a message
-    const sendMessage = useCallback(() => {
-        if (!messageInput.trim() || !activeConversation) return;
+    const sendMessage = useCallback(async () => {
+        if (!messageInput.trim() || !currentUser) return;
         
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let conversationId = activeConversation?.id;
         
-        // Create a new message
-        const newMessage = {
-            id: activeConversation.messages.length + 1,
-            text: messageInput,
-            sent: true,
-            time: time
-        };
-        
-        // Update the conversation with the new message
-        const updatedConversation = {
-            ...activeConversation,
-            messages: [...activeConversation.messages, newMessage],
-            lastMessage: `You: ${messageInput}`,
-            lastMessageTime: 'Just now',
-            preview: `You: ${messageInput}`
-        };
-        
-        // Update the active conversation
-        setActiveConversation(updatedConversation);
-        
-        // Clear the input
-        setMessageInput('');
-        
-        // Focus the input for the next message
-        if (messageInputRef.current) {
-            messageInputRef.current.focus();
+        // If no active conversation, create one
+        if (!conversationId) {
+            conversationId = await createConversationWithAdmin();
+            if (!conversationId) {
+                console.error('Failed to create conversation');
+                return;
+            }
         }
-    }, [messageInput, activeConversation]);
+        
+        try {
+            await messageService.sendMessage(
+                conversationId,
+                currentUser.id,
+                currentUser.name,
+                messageInput,
+                false // not admin
+            );
+            
+            setMessageInput('');
+            
+            if (messageInputRef.current) {
+                messageInputRef.current.focus();
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
+    }, [messageInput, activeConversation, currentUser, createConversationWithAdmin]);
 
     // Handle back button click in mobile view
     const handleBackClick = useCallback(() => {
         setShowChat(false);
-    }, []);
-
-    // Handle search input change
-    const handleSearchChange = useCallback((e) => {
-        setSearchTerm(e.target.value);
-    }, []);
-
-    // Handle filter change
-    const handleFilterChange = useCallback((newFilter) => {
-        setFilter(newFilter);
     }, []);
 
     // Handle message input change
@@ -159,39 +218,84 @@ const Messages = () => {
         }
     }, [sendMessage]);
 
+    // Format timestamp
+    const formatTime = (timestamp) => {
+        if (!timestamp) return '';
+        
+        const now = new Date();
+        const messageDate = new Date(timestamp);
+        const isToday = now.toDateString() === messageDate.toDateString();
+        
+        if (isToday) {
+            return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } else {
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const isYesterday = yesterday.toDateString() === messageDate.toDateString();
+            
+            if (isYesterday) {
+                return 'Yesterday';
+            } else {
+                return messageDate.toLocaleDateString();
+            }
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="messages-section loading">
+                <div className="loading-spinner">
+                    <i className="fas fa-spinner fa-spin"></i>
+                    <p>Loading messages...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
                 <div className="messages-section">
                     {/* Conversations Panel */}
                     <div className={`conversations-panel ${isMobileView && showChat ? 'hidden' : ''}`}>
                         <div className="message-search-bar">
-                            <div className="message-search-input">
-                                <i className="fas fa-search"></i>
-                                <input 
-                                    type="text" 
-                                    placeholder="Search conversations..." 
-                                    value={searchTerm}
-                                    onChange={handleSearchChange}
-                                />
+                    <div className="student-conversations-header">
+                        <h3>Messages</h3>
+                        <p>Chat with Disciplinary Office</p>
                             </div>
                         </div>
                         <div className="conversations-list">
-                            {filteredConversations.map(conv => (
+                    {conversations.map(conv => (
                                 <div 
                                     key={conv.id} 
                                     className={`conversation-item ${activeConversation?.id === conv.id ? 'active' : ''}`}
                                     onClick={() => handleConversationClick(conv)}
                                 >
-                                    <img src={conv.image} alt="Profile" className="profile-pic" />
+                            <img src={profilePic} alt="Profile" className="profile-pic" />
                                     <div className="conversation-content">
                                         <div className="conversation-header">
-                                            <h4>{conv.name}</h4>
-                                            <span className="time">{conv.lastMessageTime}</span>
+                                    <h4>{conv.participant.name}</h4>
+                                    <span className="time">
+                                        {formatTime(conv.lastMessageTime?.toDate())}
+                                    </span>
                                         </div>
-                                        <p className="preview-message">{conv.preview}</p>
+                                <p className="preview-message">
+                                    {conv.lastMessage ? (
+                                        conv.lastSenderId === currentUser?.id 
+                                            ? `You: ${conv.lastMessage}`
+                                            : conv.lastMessage
+                                    ) : 'Start a conversation'}
+                                </p>
                                         {conv.unread && <span className="unread-badge">1 new</span>}
                                     </div>
                                 </div>
                             ))}
+                    
+                    {conversations.length === 0 && (
+                        <div className="no-conversations">
+                            <i className="fas fa-comments"></i>
+                            <p>No conversations yet</p>
+                            <small>Start a conversation with the Disciplinary Office by typing a message below</small>
+                        </div>
+                    )}
                         </div>
                     </div>
 
@@ -205,24 +309,33 @@ const Messages = () => {
                                             <i className="fas fa-arrow-left"></i>
                                         </button>
                                     )}
-                                    <img src={activeConversation.image} alt="Profile" className="profile-pic" />
+                            <img src={profilePic} alt="Profile" className="profile-pic" />
                                     <div className="chat-header-info">
-                                        <h3>{activeConversation.name}</h3>
+                                <h3>{activeConversation.participant.name}</h3>
+                                <span className="status">Available</span>
                                     </div>
                                 </div>
                                 <div className="chat-messages" ref={chatMessagesRef}>
-                                    {activeConversation.messages.map(msg => (
+                            {messages.map(msg => (
                                         <div 
                                             key={msg.id} 
-                                            className={`message ${msg.sent ? 'sent' : 'received'}`}
+                                    className={`message ${msg.senderId === currentUser?.id ? 'sent' : 'received'}`}
                                         >                                            
                                             <p>{msg.text}</p>
-                                            <span className="time">{msg.time}</span>
+                                    <span className="time">{formatTime(msg.timestamp)}</span>
                                         </div>
                                     ))}
+                            
+                            {messages.length === 0 && (
+                                <div className="no-messages">
+                                    <i className="fas fa-comments"></i>
+                                    <p>No messages yet</p>
+                                    <small>Start the conversation by sending a message below</small>
+                                </div>
+                            )}
                                 </div>
                                 <div className="chat-input-area">
-                                    <button className="attach-btn">
+                            <button className="attach-btn" disabled>
                                         <i className="fas fa-paperclip"></i>
                                     </button>
                                     <input 
@@ -236,16 +349,40 @@ const Messages = () => {
                                     <button 
                                         className="send-btn"
                                         onClick={sendMessage}
+                                disabled={!messageInput.trim()}
                                     >
                                         <i className="fas fa-paper-plane"></i>
                                     </button>
                                 </div>
                             </>
                         ) : (
-                            <div className="no-conversation-selected">
-                                <i className="fas fa-comments"></i>
-                                <h3>Select a conversation to start messaging</h3>
-                            </div>
+                            <>
+                                <div className="no-conversation-selected">
+                                    <i className="fas fa-comments"></i>
+                                    <h3>Chat with Disciplinary Office</h3>
+                                    <p>Type a message below to start a conversation</p>
+                                </div>
+                                <div className="chat-input-area">
+                                    <button className="attach-btn" disabled>
+                                        <i className="fas fa-paperclip"></i>
+                                    </button>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Type your first message..." 
+                                        value={messageInput}
+                                        onChange={handleMessageInputChange}
+                                        onKeyPress={handleKeyPress}
+                                        ref={messageInputRef}
+                                    />
+                                    <button 
+                                        className="send-btn"
+                                        onClick={sendMessage}
+                                        disabled={!messageInput.trim()}
+                                    >
+                                        <i className="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>

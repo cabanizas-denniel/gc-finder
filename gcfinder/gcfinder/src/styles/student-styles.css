@@ -350,6 +350,23 @@
     font-size: 14px;
 }
 
+.student-conversations-header{
+    display: flex;
+    flex-direction: column;
+}
+
+.student-conversations-header h3 {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+.student-conversations-header p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
 .conversations-list {
     flex: 1;
     overflow-y: auto;
@@ -522,14 +539,6 @@
     margin-top: 5px;
 }
 
-.chat-input-area {
-    display: flex;
-    align-items: center;
-    padding: 10px 15px;
-    border-top: 1px solid #e0e0e0;
-    background-color: #f9f9f9;
-}
-
 .attach-btn, .send-btn {
     background: none;
     border: none;
@@ -545,18 +554,6 @@
     background-color: #e0e0e0;
 }
 
-.chat-input-area input {
-    flex: 1;
-    border: none;
-    background-color: white;
-    padding: 10px 15px;
-    border-radius: 20px;
-    margin: 0 10px;
-    font-size: 14px;
-    outline: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
 .no-conversation-selected {
     display: flex;
     flex-direction: column;
@@ -565,7 +562,6 @@
     height: 100%;
     color: #888;
     text-align: center;
-    padding: 20px;
 }
 
 .no-conversation-selected i {
