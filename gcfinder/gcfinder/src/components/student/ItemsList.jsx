@@ -456,7 +456,7 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                                 )}
                             </div>
                             <div className={`status-badge ${item.status ? item.status.toLowerCase() : 'unknown'}`}>
-                                {item.status || 'N/A'}
+                                {item.status === 'Claiming' ? 'Being Claimed' : (item.status || 'N/A')}
                             </div>
                             <h3>{item.name}</h3>
                             <p><i className="fas fa-tag"> </i> {item.category}</p>

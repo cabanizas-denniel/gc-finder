@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 import { getStorage } from 'firebase/storage';
 
@@ -233,8 +233,14 @@ export const deleteItemFromDb = async (itemId) => {
 export const archiveItemInDb = async (itemId) => {
   try {
     const itemRef = doc(db, 'items', itemId);
+    
+    // First, get the current item to store its previous status
+    const itemDoc = await getDoc(itemRef);
+    const currentStatus = itemDoc.data()?.status;
+    
     await updateDoc(itemRef, {
       status: 'archived',
+      previousStatus: currentStatus, // Store the previous status
       updatedAt: serverTimestamp()
     });
 
@@ -253,6 +259,28 @@ export const archiveItemInDb = async (itemId) => {
     console.log('Pending claims for archived item deleted successfully.');
   } catch (error) {
     console.error('Error archiving item in Firestore:', error);
+    throw error;
+  }
+};
+
+export const unarchiveItemInDb = async (itemId) => {
+  try {
+    const itemRef = doc(db, 'items', itemId);
+    
+    // Get the current item to retrieve its previous status
+    const itemDoc = await getDoc(itemRef);
+    const itemData = itemDoc.data();
+    const previousStatus = itemData?.previousStatus || 'Unclaimed'; // Default to 'Unclaimed' if no previous status
+    
+    await updateDoc(itemRef, {
+      status: previousStatus,
+      previousStatus: null, // Clear the previous status field
+      updatedAt: serverTimestamp()
+    });
+
+    console.log(`Item unarchived successfully in Firestore with ID: ${itemId}, restored to status: ${previousStatus}`);
+  } catch (error) {
+    console.error('Error unarchiving item in Firestore:', error);
     throw error;
   }
 }; 

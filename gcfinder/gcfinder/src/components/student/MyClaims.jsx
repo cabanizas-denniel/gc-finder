@@ -115,10 +115,25 @@ const MyClaims = () => {
         setSelectedClaimForDetail(null);
     }, []);
 
+    // Count approved claims for the notification message
+    const approvedClaimsCount = allUserClaims.filter(
+        claim => claim.claimStatus && claim.claimStatus.toLowerCase() === 'approved'
+    ).length;
+
     return (
         <section className="claims-section">
             <h1>My Claims</h1>
             <p className="subtitle">Track the status of your item claims</p>
+
+            {/* Show notification for approved items */}
+            {approvedClaimsCount > 0 && (
+                <div className="approved-items-notification">
+                    <i className="fas fa-info-circle"></i>
+                    <span>
+                        You have {approvedClaimsCount} item{approvedClaimsCount > 1 ? 's' : ''} available for claiming at the Disciplinary Office.
+                    </span>
+                </div>
+            )}
 
             <div className="claims-tabs">
                 <button
@@ -145,6 +160,12 @@ const MyClaims = () => {
                     onClick={() => handleTabClick('rejected')}
                 >
                     Rejected
+                </button>
+                <button
+                    className={`tab-btn ${activeStatus === 'claimed' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('claimed')}
+                >
+                    Claimed
                 </button>
             </div>
 

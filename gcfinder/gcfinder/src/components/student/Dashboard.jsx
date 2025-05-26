@@ -4,6 +4,8 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import ItemsList from './ItemsList';
 
+
+
 const Dashboard = () => {
     console.log("Dashboard component is rendering");
     const navigate = useNavigate();
@@ -64,8 +66,8 @@ const Dashboard = () => {
                         isVisible = data.adminApproval === true || isSubmitter;
                     }
 
-                    // Finally, combine with the claimed check
-                    if (!claimedItemIds.has(item_id) && isVisible) {
+                    // Finally, combine with the claimed check and 7-day filter
+                    if (!claimedItemIds.has(item_id) && isVisible && data.createdAt && (data.createdAt.toDate?.() || new Date(data.createdAt.seconds * 1000)) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
                         itemsData.push({
                             id: item_id,
                             name: data.name || 'Unnamed Item',

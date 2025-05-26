@@ -19,6 +19,12 @@ const ClaimVerification = () => {
     const [claimToApproveWithProof, setClaimToApproveWithProof] = useState(null);
     const proofFileInputRef = useRef(null); // For triggering file input
 
+    // New state for rejection modal
+    const [showRejectionModal, setShowRejectionModal] = useState(false);
+    const [claimToReject, setClaimToReject] = useState(null);
+    const [selectedRejectionReason, setSelectedRejectionReason] = useState('');
+    const [customRejectionReason, setCustomRejectionReason] = useState('');
+
     useEffect(() => {
         fetchClaims();
     }, []);
@@ -58,20 +64,33 @@ const ClaimVerification = () => {
         setSelectedClaim(claim);
     };
 
-    const handleClaimAction = async (claimId, itemId, approve) => {
+    const handleClaimAction = async (claimId, itemId, approve, rejectionReason = null) => {
         try {
             const claimRef = doc(db, 'claims', claimId);
             const updateData = {
                 claimStatus: approve ? 'Approved' : 'Rejected',
                 updatedAt: serverTimestamp()
             };
+            
+            // Add rejection reason if rejecting
+            if (!approve && rejectionReason) {
+                updateData.rejectionReason = rejectionReason;
+            }
+            
             await updateDoc(claimRef, updateData);
 
-            // If approved, update item status to "Claiming"
+            // Update item status based on approval/rejection
+            const itemRef = doc(db, 'items', itemId);
             if (approve) {
-                const itemRef = doc(db, 'items', itemId);
+                // If approved, update item status to "Claiming"
                 await updateDoc(itemRef, {
                     status: 'Claiming',
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                // If rejected, update item status to "Unclaimed"
+                await updateDoc(itemRef, {
+                    status: 'Unclaimed',
                     updatedAt: serverTimestamp()
                 });
             }
@@ -82,6 +101,11 @@ const ClaimVerification = () => {
                 ...prev,
                 status: approve ? 'approved' : 'rejected'
             }));
+
+            // Show notification message for approved claims
+            if (approve) {
+                alert("The student has been notified of this change");
+            }
 
         } catch (error) {
             console.error('Error updating claim:', error);
@@ -125,6 +149,41 @@ const ClaimVerification = () => {
         setShowProofModal(false);
         setProofOfReturnImage(null);
         setClaimToApproveWithProof(null);
+    };
+
+    const openRejectionModal = (claim) => {
+        setClaimToReject(claim);
+        setSelectedRejectionReason('');
+        setCustomRejectionReason('');
+        setShowRejectionModal(true);
+    };
+
+    const closeRejectionModal = () => {
+        setShowRejectionModal(false);
+        setClaimToReject(null);
+        setSelectedRejectionReason('');
+        setCustomRejectionReason('');
+    };
+
+    const handleConfirmRejection = async () => {
+        if (!selectedRejectionReason && !customRejectionReason.trim()) {
+            alert("Please select a reason or provide a custom reason for rejection.");
+            return;
+        }
+
+        const finalReason = selectedRejectionReason === 'other' 
+            ? customRejectionReason.trim() 
+            : selectedRejectionReason;
+
+        if (claimToReject) {
+            await handleClaimAction(
+                claimToReject.id,
+                claimToReject.itemId,
+                false, // reject
+                finalReason
+            );
+            closeRejectionModal();
+        }
     };
 
     const handleProofImageChange = (event) => {
@@ -294,7 +353,7 @@ const ClaimVerification = () => {
                                 </button>
                                 <button 
                                     className="reject-btn"
-                                    onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, false)}
+                                    onClick={() => openRejectionModal(selectedClaim)}
                                 >
                                     Reject Claim
                                 </button>
@@ -310,7 +369,7 @@ const ClaimVerification = () => {
                             </button>
                             <button 
                                 className="reject-btn"
-                                onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, false)}
+                                onClick={() => openRejectionModal(selectedClaim)}
                             >
                                 Reject Claim
                             </button>
@@ -332,7 +391,7 @@ const ClaimVerification = () => {
                             <p className="status-message">This item has been claimed and returned to owner.</p>
                             <button 
                                 className="reject-btn"
-                                onClick={() => handleClaimAction(selectedClaim.id, selectedClaim.itemId, false)}
+                                onClick={() => openRejectionModal(selectedClaim)}
                             >
                                 Reject Claim
                             </button>
@@ -411,6 +470,110 @@ const ClaimVerification = () => {
                                 disabled={!proofOfReturnImage}
                             >
                                 Confirm Return
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rejection Modal */}
+            {showRejectionModal && claimToReject && (
+                <div className="modal-overlay" onClick={closeRejectionModal}>
+                    <div className="modal-content rejection-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Reject Claim</h2>
+                            <button className="close-button" onClick={closeRejectionModal}>&times;</button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ marginBottom: '20px', textAlign: 'center' }}>Please select a reason for rejecting this claim:</p>
+                            
+                            <div className="rejection-reasons">
+                                <label className="reason-option">
+                                    <input 
+                                        type="radio" 
+                                        name="rejectionReason" 
+                                        value="Insufficient proof of ownership"
+                                        checked={selectedRejectionReason === 'Insufficient proof of ownership'}
+                                        onChange={(e) => setSelectedRejectionReason(e.target.value)}
+                                    />
+                                    <span>Insufficient proof of ownership</span>
+                                </label>
+                                
+                                <label className="reason-option">
+                                    <input 
+                                        type="radio" 
+                                        name="rejectionReason" 
+                                        value="Item description does not match"
+                                        checked={selectedRejectionReason === 'Item description does not match'}
+                                        onChange={(e) => setSelectedRejectionReason(e.target.value)}
+                                    />
+                                    <span>Item description does not match</span>
+                                </label>
+                                
+                                <label className="reason-option">
+                                    <input 
+                                        type="radio" 
+                                        name="rejectionReason" 
+                                        value="Fraudulent claim"
+                                        checked={selectedRejectionReason === 'Fraudulent claim'}
+                                        onChange={(e) => setSelectedRejectionReason(e.target.value)}
+                                    />
+                                    <span>Fraudulent claim</span>
+                                </label>
+                                
+                                <label className="reason-option">
+                                    <input 
+                                        type="radio" 
+                                        name="rejectionReason" 
+                                        value="Item already claimed by rightful owner"
+                                        checked={selectedRejectionReason === 'Item already claimed by rightful owner'}
+                                        onChange={(e) => setSelectedRejectionReason(e.target.value)}
+                                    />
+                                    <span>Item already claimed by rightful owner</span>
+                                </label>
+                                
+                                <label className="reason-option">
+                                    <input 
+                                        type="radio" 
+                                        name="rejectionReason" 
+                                        value="other"
+                                        checked={selectedRejectionReason === 'other'}
+                                        onChange={(e) => setSelectedRejectionReason(e.target.value)}
+                                    />
+                                    <span>Other (please specify)</span>
+                                </label>
+                            </div>
+                            
+                            {selectedRejectionReason === 'other' && (
+                                <div style={{ marginTop: '15px' }}>
+                                    <textarea
+                                        placeholder="Please provide a specific reason for rejection..."
+                                        value={customRejectionReason}
+                                        onChange={(e) => setCustomRejectionReason(e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            minHeight: '80px',
+                                            padding: '10px',
+                                            border: '1px solid #ddd',
+                                            borderRadius: '4px',
+                                            resize: 'vertical',
+                                            fontFamily: 'inherit'
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-footer" style={{ justifyContent: 'center' }}>
+                            <button type="button" className="btn btn-secondary" onClick={closeRejectionModal} style={{ marginRight: '10px' }}>
+                                Cancel
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-danger" 
+                                onClick={handleConfirmRejection}
+                                disabled={!selectedRejectionReason && !customRejectionReason.trim()}
+                            >
+                                Confirm Rejection
                             </button>
                         </div>
                     </div>

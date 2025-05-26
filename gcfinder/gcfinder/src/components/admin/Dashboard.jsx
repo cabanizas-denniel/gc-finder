@@ -108,7 +108,7 @@ const Dashboard = () => {
                 allItemsSnapshot.forEach(doc => {
                     const itemData = doc.data();
                     const status = itemData.status;
-                    if ((status !== 'Archived' && status === 'Claimed') || (status === 'Archived' && status === 'Claimed')) {
+                    if ((status !== 'Archived' && status === 'Claimed') || (status === 'Archived' && status === 'Claimed') || status === 'Claiming') {
                         resolvedCount++;
                     } else if ((status !== 'Archived' && status === 'Unclaimed') || (status === 'Pending' && itemData.adminApproval === true) || (status === 'Archived' && status !== 'Claimed')) {
                         unresolvedCount++;

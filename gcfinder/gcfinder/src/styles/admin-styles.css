@@ -178,6 +178,13 @@ h2{
     border-radius: 20px;
     border: 1px solid #f5b7b1;
 }
+.status.claimed {
+    background: #d4edda;
+    color: #28a745;
+    padding: 2px 12px;
+    border-radius: 20px;
+    border: 1px solid #f5b7b1;
+}
 .claim-item {
     font-size: 0.92rem;
     color: #555;
@@ -295,6 +302,85 @@ h2{
     cursor: pointer;
     padding: 10px 22px;
     border-radius: 10px;
+}
+
+/* Rejection Modal Styles */
+.rejection-modal {
+    max-width: 500px;
+    width: 90%;
+}
+
+.rejection-reasons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.reason-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reason-option:hover {
+    background-color: #f8f9fa;
+    border-color: #c0c0c0;
+}
+
+.reason-option input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.reason-option span {
+    font-size: 0.9rem;
+    color: #333;
+    cursor: pointer;
+}
+
+.reason-option input[type="radio"]:checked + span {
+    font-weight: 500;
+    color: var(--primary-color);
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+.btn-danger:disabled {
+    background-color: #f8d7da;
+    color: #721c24;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
 }
 
 /*Review Reports*/
@@ -831,6 +917,11 @@ h2{
 .item-action-btn.archive:hover:not(:disabled) {
     color: #6c757d;
     background-color: rgba(108, 117, 125, 0.1);
+}
+
+.item-action-btn.unarchive:hover:not(:disabled) {
+    color: #28a745;
+    background-color: rgba(40, 167, 69, 0.1);
 }
 
 .item-action-btn:disabled {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllItems, deleteItemFromDb, archiveItemInDb } from '../../admin-firebase';
+import { getAllItems, deleteItemFromDb, archiveItemInDb, unarchiveItemInDb } from '../../admin-firebase';
 import { AdminViewItemDetailsModal } from './ItemsLIst'; // Import the shared modal
 
 const ItemManagement = () => {
@@ -168,6 +168,19 @@ const ItemManagement = () => {
             } catch (error) {
                 console.error("Error archiving item: ", error);
                 alert('Failed to archive item. See console for details.');
+            }
+        }
+    };
+
+    const handleUnarchiveItem = async (itemId) => {
+        if (window.confirm('Are you sure you want to unarchive this item?')) {
+            try {
+                await unarchiveItemInDb(itemId);
+                alert('Item unarchived successfully!');
+                fetchItems(); // Refresh the list after unarchiving
+            } catch (error) {
+                console.error("Error unarchiving item: ", error);
+                alert('Failed to unarchive item. See console for details.');
             }
         }
     };
@@ -497,15 +510,25 @@ const ItemManagement = () => {
                                             >
                                                 <i className="fas fa-trash-alt"></i>
                                             </button>
-                                            <button 
-                                                className="item-action-btn archive" 
-                                                aria-label="Archive"
-                                                onClick={() => handleArchiveItem(item.id)}
-                                                title="Archive Item"
-                                                disabled={item.status === 'archived'}
-                                            >
-                                                <i className="fas fa-archive"></i>
-                                            </button>
+                                            {item.status === 'archived' ? (
+                                                <button 
+                                                    className="item-action-btn unarchive" 
+                                                    aria-label="Unarchive"
+                                                    onClick={() => handleUnarchiveItem(item.id)}
+                                                    title="Unarchive Item"
+                                                >
+                                                    <i className="fas fa-box-open"></i>
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    className="item-action-btn archive" 
+                                                    aria-label="Archive"
+                                                    onClick={() => handleArchiveItem(item.id)}
+                                                    title="Archive Item"
+                                                >
+                                                    <i className="fas fa-archive"></i>
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
