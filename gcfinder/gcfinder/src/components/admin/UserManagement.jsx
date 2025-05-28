@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAllUsers } from '../../admin-firebase';
+import Toast, { useToast } from '../Toast';
 
 const UserManagement = () => {
     const [activeTab, setActiveTab] = useState('active');
@@ -24,7 +25,10 @@ const UserManagement = () => {
     
     // Show Export Modal State
     const [showExportModal, setShowExportModal] = useState(false);
-    
+
+    // Toast notification
+    const { toast, showToast, hideToast } = useToast();
+
     // Fetch users from Firestore
     useEffect(() => {
         const fetchUsers = async () => {
@@ -100,12 +104,12 @@ const UserManagement = () => {
 
     const handleFlagUser = (user) => {
         // TODO: flagging a user
-        alert(`${user.name} has been flagged`);
+        showToast(`${user.name} has been flagged`, 'success');
     };
 
     const handleBanUser = (user) => {
         // TODO: banning a user
-        alert(`${user.name} has been banned`);
+        showToast(`${user.name} has been banned`, 'success');
     };
 
     // Export Modal Handlers
@@ -124,17 +128,17 @@ const UserManagement = () => {
         const finalEndDate = endDateOverride || exportEndDate;
     
         if (!finalStartDate || !finalEndDate) {
-            alert("Please select both a 'From' and 'To' date.");
+            showToast("Please select both a 'From' and 'To' date.", 'warning');
             return;
         }
         if (new Date(finalStartDate) > new Date(finalEndDate)) {
-            alert("'From' date cannot be after 'To' date.");
+            showToast("'From' date cannot be after 'To' date.", 'error');
             return;
         }
     
         const apiUrl = process.env.REACT_APP_API_URL; // Get the API URL
         if (!apiUrl) {
-            alert("API URL is not configured. Please check environment settings.");
+            showToast("API URL is not configured. Please check environment settings.", 'error');
             console.error("REACT_APP_API_URL is not set");
             return;
         }
@@ -183,7 +187,7 @@ const UserManagement = () => {
     
         } catch (error) {
             console.error('Export error:', error);
-            alert('Failed to export user data: ' + error.message);
+            showToast('Failed to export user data: ' + error.message, 'error');
         }
     };
 
@@ -461,6 +465,14 @@ const UserManagement = () => {
                     }
                     return null; // No pagination needed if only one page or no users
                 })()}
+
+                {/* Toast Notification */}
+                <Toast 
+                    message={toast.message} 
+                    show={toast.show} 
+                    onClose={hideToast} 
+                    type={toast.type} 
+                />
             </div>
     );
 };

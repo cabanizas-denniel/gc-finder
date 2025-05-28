@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitItemClaim, deleteStudentReportedItem } from '../../firebase';
+import Toast, { useToast } from '../Toast';
 
 const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdated }) => {
     const [showModal, setShowModal] = useState(false);
@@ -19,6 +20,9 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
     const dropzoneRef = useRef(null);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const navigate = useNavigate();
+
+    // Toast notification
+    const { toast, showToast, hideToast } = useToast();
 
     const handleContact = useCallback(() => {
         navigate('/messages');
@@ -121,7 +125,7 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                 additionalDetails: '',
                 proofImage: null
             });
-            alert('Claim submitted successfully! You can track its status in My Claims.');
+            showToast('Claim submitted successfully! You can track its status in My Claims.', 'success');
 
             // Call the callback to update parent's state
             if (onItemUpdated && submissionResult.itemNewStatus) {
@@ -209,14 +213,14 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
         if (window.confirm("Are you sure you want to delete this report? This action cannot be undone.")) {
             try {
                 await deleteStudentReportedItem(itemIdToDelete);
-                alert("Report deleted successfully.");
+                showToast('Report deleted successfully.', 'success');
                 if (onItemUpdated) {
                     onItemUpdated(itemIdToDelete, 'deleted'); // Notify parent to remove the item
                 }
                 closeModal(); // Close the modal after successful deletion
             } catch (error) {
                 console.error("Error deleting item:", error);
-                alert("Failed to delete report. Please try again.");
+                showToast('Failed to delete report. Please try again.', 'error');
             }
         }
     };
@@ -478,6 +482,14 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
             ) : (
                 <p>{emptyMessage}</p>
             )}
+
+            {/* Toast Notification */}
+            <Toast 
+                message={toast.message} 
+                show={toast.show} 
+                onClose={hideToast} 
+                type={toast.type} 
+            />
         </section>
     );
 };

@@ -206,7 +206,7 @@
 }
 
 .status-badge.unclaimed {
-    background-color: var(--primary-color);
+    background-color: #049516;
 }
 
 .status-badge.pending {

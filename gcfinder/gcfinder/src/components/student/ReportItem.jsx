@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { submitFoundItem } from '../../firebase'; // Import the submitFoundItem function
+import Toast, { useToast } from '../Toast';
 
 const ReportItem = () => {
     const navigate = useNavigate();
@@ -20,6 +21,9 @@ const ReportItem = () => {
     const [uploadedImages, setUploadedImages] = useState([]);
     const fileInputRef = useRef(null);
     const dropzoneRef = useRef(null);
+
+    // Toast notification
+    const { toast, showToast, hideToast } = useToast();
 
     // Handle file upload - using useCallback to avoid dependency issues
     const handleFiles = useCallback((files) => {
@@ -207,6 +211,12 @@ const ReportItem = () => {
 
     // Handle next button click with validation
     const handleNextStep = useCallback(() => {
+        // Special validation for media upload step
+        if (currentStep === 1 && uploadedImages.length === 0) {
+            showToast('Please upload at least one image before proceeding.', 'warning');
+            return;
+        }
+
         // Get the active form step
         const activeStep = document.querySelector(`.form-step.active`);
         
@@ -226,7 +236,7 @@ const ReportItem = () => {
         if (allFieldsValid && validateStep(currentStep)) {
             goToStep(currentStep + 1);
         }
-    }, [currentStep, goToStep, validateStep]);
+    }, [currentStep, goToStep, validateStep, uploadedImages, showToast]);
 
     // Handle back button click
     const handlePreviousStep = useCallback(() => {
@@ -531,6 +541,14 @@ const ReportItem = () => {
                 </div>
             </form>
             </div>
+
+                {/* Toast Notification */}
+                <Toast 
+                    message={toast.message}
+                    show={toast.show}
+                    onClose={hideToast}
+                    type={toast.type}
+                />
         </div>
     );
 };

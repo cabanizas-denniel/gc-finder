@@ -4,6 +4,7 @@ import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { collection, getDocs, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../../admin-firebase';
 import { AdminViewItemDetailsModal } from './ItemsLIst';
+import Toast, { useToast } from '../Toast';
 
 const ClaimVerification = () => {
     const [claims, setClaims] = useState([]);
@@ -24,6 +25,9 @@ const ClaimVerification = () => {
     const [claimToReject, setClaimToReject] = useState(null);
     const [selectedRejectionReason, setSelectedRejectionReason] = useState('');
     const [customRejectionReason, setCustomRejectionReason] = useState('');
+
+    // Toast notification
+    const { toast, showToast, hideToast } = useToast();
 
     useEffect(() => {
         fetchClaims();
@@ -104,7 +108,7 @@ const ClaimVerification = () => {
 
             // Show notification message for approved claims
             if (approve) {
-                alert("The student has been notified of this change");
+                showToast("The student has been notified of this change");
             }
 
         } catch (error) {
@@ -167,7 +171,7 @@ const ClaimVerification = () => {
 
     const handleConfirmRejection = async () => {
         if (!selectedRejectionReason && !customRejectionReason.trim()) {
-            alert("Please select a reason or provide a custom reason for rejection.");
+            showToast("Please select a reason or provide a custom reason for rejection.", "warning");
             return;
         }
 
@@ -199,7 +203,7 @@ const ClaimVerification = () => {
 
     const handleConfirmApproval = async () => {
         if (!proofOfReturnImage) {
-            alert("Please upload an image as proof of return.");
+            showToast("Please upload an image as proof of return.", "warning");
             return;
         }
         if (claimToApproveWithProof) {
@@ -214,7 +218,7 @@ const ClaimVerification = () => {
 
     const handleViewItemDetails = async (itemId) => {
         if (!itemId) {
-            alert("Item ID is missing.");
+            showToast("Item ID is missing.", "error");
             return;
         }
         setLoadingItemDetails(true);
@@ -232,11 +236,11 @@ const ClaimVerification = () => {
             } else {
                 console.error("No such item document!");
                 setSelectedItemForModal(null);
-                alert('Item details not found.');
+                showToast('Item details not found.', "error");
             }
         } catch (error) {
             console.error("Error fetching item details:", error);
-            alert('Error fetching item details.');
+            showToast('Error fetching item details.', "error");
             setSelectedItemForModal(null);
         }
         setLoadingItemDetails(false);
@@ -579,6 +583,14 @@ const ClaimVerification = () => {
                     </div>
                 </div>
             )}
+
+            {/* Toast Notification */}
+            <Toast 
+                message={toast.message}
+                show={toast.show}
+                onClose={hideToast}
+                type={toast.type}
+            />
         </div>
     );
 };

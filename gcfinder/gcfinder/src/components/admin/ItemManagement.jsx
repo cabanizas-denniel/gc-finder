@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllItems, deleteItemFromDb, archiveItemInDb, unarchiveItemInDb } from '../../admin-firebase';
 import { AdminViewItemDetailsModal } from './ItemsLIst'; // Import the shared modal
+import Toast, { useToast } from '../Toast';
 
 const ItemManagement = () => {
     const [activeTab, setActiveTab] = useState('all');
@@ -26,6 +27,9 @@ const ItemManagement = () => {
     const [exportStartDate, setExportStartDate] = useState('');
     const [exportEndDate, setExportEndDate] = useState('');
     
+    // Toast notification
+    const { toast, showToast, hideToast } = useToast();
+
     // Fetch items data from Firebase
     const fetchItems = async () => {
         try {
@@ -150,11 +154,11 @@ const ItemManagement = () => {
         if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
             try {
                 await deleteItemFromDb(itemId);
-                alert('Item deleted successfully!');
+                showToast('Item deleted successfully!', 'success');
                 fetchItems(); // Refresh the list after deletion
             } catch (error) {
                 console.error("Error deleting item: ", error);
-                alert('Failed to delete item. See console for details.');
+                showToast('Failed to delete item. See console for details.', 'error');
             }
         }
     };
@@ -163,11 +167,11 @@ const ItemManagement = () => {
         if (window.confirm('Are you sure you want to archive this item?')) {
             try {
                 await archiveItemInDb(itemId);
-                alert('Item archived successfully!');
+                showToast('Item archived successfully!', 'success');
                 fetchItems(); // Refresh the list after archiving
             } catch (error) {
                 console.error("Error archiving item: ", error);
-                alert('Failed to archive item. See console for details.');
+                showToast('Failed to archive item. See console for details.', 'error');
             }
         }
     };
@@ -176,11 +180,11 @@ const ItemManagement = () => {
         if (window.confirm('Are you sure you want to unarchive this item?')) {
             try {
                 await unarchiveItemInDb(itemId);
-                alert('Item unarchived successfully!');
+                showToast('Item unarchived successfully!', 'success');
                 fetchItems(); // Refresh the list after unarchiving
             } catch (error) {
                 console.error("Error unarchiving item: ", error);
-                alert('Failed to unarchive item. See console for details.');
+                showToast('Failed to unarchive item. See console for details.', 'error');
             }
         }
     };
@@ -205,17 +209,17 @@ const ItemManagement = () => {
         const finalEndDate = endDateOverride || exportEndDate;
 
         if (!finalStartDate || !finalEndDate) {
-            alert("Please select both a 'From' and 'To' date.");
+            showToast("Please select both a 'From' and 'To' date.", 'warning');
             return;
         }
         if (new Date(finalStartDate) > new Date(finalEndDate)) {
-            alert("'From' date cannot be after 'To' date.");
+            showToast("'From' date cannot be after 'To' date.", 'error');
             return;
         }
 
         const apiUrl = process.env.REACT_APP_API_URL; // Get the API URL
         if (!apiUrl) {
-            alert("API URL is not configured. Please check environment settings.");
+            showToast("API URL is not configured. Please check environment settings.", 'error');
             console.error("REACT_APP_API_URL is not set");
             return;
         }
@@ -264,7 +268,7 @@ const ItemManagement = () => {
 
         } catch (error) {
             console.error('Export error:', error);
-            alert('Failed to export data: ' + error.message);
+            showToast('Failed to export data: ' + error.message, 'error');
         }
     };
 
@@ -587,6 +591,14 @@ const ItemManagement = () => {
                     item={selectedItemForModal}
                     onClose={handleCloseItemModal} 
                     // loading prop can be added if ItemManagement has a specific loading state for this modal
+                />
+
+                {/* Toast Notification */}
+                <Toast 
+                    message={toast.message} 
+                    show={toast.show} 
+                    onClose={hideToast} 
+                    type={toast.type} 
                 />
             </div>
     );

@@ -118,7 +118,7 @@ h2{
 }
 
 .claim-item.selected {
-    border: 2px solid #049516;
+    border: 2px solid var(--primary-color);
     background: #f3fff5;
     box-shadow: 0 2px 8px rgba(4,149,22,0.08);
 }
