@@ -630,6 +630,65 @@ h2{
     background-color: #e0e0e0;
 }
 
+/* Batch Add Students Button Styling */
+.batch-add-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.batch-add-btn:hover {
+    background: var(--hovered-button-color);
+}
+
+.batch-add-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(39, 174, 96, 0.2);
+}
+
+.batch-add-btn i {
+    font-size: 16px;
+}
+
+/* Modal quick select buttons active state */
+.export-modal-quick-btn.active {
+    background: #3498db;
+    color: white;
+    border-color: #3498db;
+}
+
+/* Upload mode buttons styling */
+.export-modal-quick-select {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.export-modal-quick-btn {
+    flex: 1;
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    background: white;
+    color: #666;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.export-modal-quick-btn:hover {
+    border-color: #3498db;
+    color: #3498db;
+} 
+
 /* Filter Section */
 .filter-section {
     background: white;

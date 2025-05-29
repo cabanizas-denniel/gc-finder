@@ -1114,3 +1114,50 @@ input:checked + .slider:before {
     max-width: 500px;
     padding: 0;
 }
+
+/* ======= FLAGGED USER STYLES ======= */
+.flagged-user-banner {
+    background: #e74c3c;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 0;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.flagged-user-banner:hover {
+    background: #c0392b;
+}
+
+.sidebar nav ul li.restricted,
+.sidebar .bottom-nav ul li.restricted {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.restricted-lock-icon {
+    margin-left: auto;
+    color: #e74c3c;
+    font-size: 12px;
+}
+
+/* Banned user error message styling */
+.error-message {
+    white-space: pre-line;
+    text-align: left;
+    line-height: 1.4;
+}
+
+.error-message:contains("Account Banned") {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-left: 4px solid #dc3545;
+    color: #721c24;
+    font-weight: 500;
+}

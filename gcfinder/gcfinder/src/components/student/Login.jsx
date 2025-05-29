@@ -53,6 +53,14 @@ const Login = () => {
     try {
       const userData = await loginWithStudentId(studentId, password);
       
+      // Check if user is banned
+      if (userData.status === 'banned') {
+        const banReason = userData.banReason || 'No specific reason provided';
+        setError(`Account Banned\n\nReason: ${banReason}\n\nContact the Disciplinary Office to resolve this issue.`);
+        setLoading(false);
+        return;
+      }
+      
       // Store user data in localStorage with proper shape for our context
       const enhancedUserData = {
         ...userData,

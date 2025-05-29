@@ -15,6 +15,8 @@ const Layout = () => {
         displayName: "Loading...",
         userEmail: "",
         profilePicture: profilePic,
+        status: "active",
+        flagReason: null,
     });
     
     // Handle window resize and sidebar state
@@ -75,10 +77,21 @@ const Layout = () => {
                     
                     if (userSnap.exists()) {
                         const data = userSnap.data();
+                        
+                        // Check if user is banned and redirect to login
+                        if (data.status === 'banned') {
+                            localStorage.removeItem('userData');
+                            localStorage.removeItem('isAuthenticated');
+                            navigate('/');
+                            return;
+                        }
+                        
                         setCurrentUser({
                             displayName: data.full_name || "Unknown User",
                             userEmail: data.email || `${data.student_id}@gordoncollege.edu.ph`,
                             profilePicture: data.profileUrl || profilePic,
+                            status: data.status || "active",
+                            flagReason: data.flagReason || null,
                         });
                     }
                 } else {
@@ -109,12 +122,21 @@ const Layout = () => {
 
     // Navigation handler
     const handleNavigate = useCallback((path) => {
+        // Block restricted features for flagged users
+        if (currentUser.status === 'flagged') {
+            const restrictedPaths = ['report-item', 'my-claims', 'messages'];
+            if (restrictedPaths.includes(path)) {
+                alert(`Access restricted: Your account has been flagged. ${currentUser.flagReason || ''}`);
+                return;
+            }
+        }
+
         if (path === 'logout') {
             setShowLeaveDialog(true);
         } else if (path !== location.pathname.substring(1)) {
             navigate(`/${path}`);
         }
-    }, [navigate, location.pathname]);
+    }, [navigate, location.pathname, currentUser.status, currentUser.flagReason]);
 
     // Logout handler
     const handleLogout = useCallback(() => {
@@ -142,15 +164,23 @@ const Layout = () => {
                 </div>
                 <nav>
                     <ul>
-                        {navigationItems.map((item, index) => (
-                            <li 
-                                key={index}
-                                className={isActivePath(item.path) ? 'active' : ''}
-                                onClick={() => handleNavigate(item.path)}
-                            >
-                                <i className={item.icon}></i> {item.label}
-                            </li>
-                        ))}
+                        {navigationItems.map((item, index) => {
+                            const restrictedPaths = ['report-item', 'my-claims', 'messages'];
+                            const isRestricted = currentUser.status === 'flagged' && restrictedPaths.includes(item.path);
+                            
+                            return (
+                                <li 
+                                    key={index}
+                                    className={`${isActivePath(item.path) ? 'active' : ''} ${isRestricted ? 'restricted' : ''}`}
+                                    onClick={() => handleNavigate(item.path)}
+                                >
+                                    <i className={item.icon}></i> {item.label}
+                                    {isRestricted && (
+                                        <i className="fas fa-lock restricted-lock-icon"></i>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 </nav>
                 <div className="bottom-nav">
@@ -175,11 +205,27 @@ const Layout = () => {
 
             {/* Main Content */}
             <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
-                <header>
+                <header style={{
+                    justifyContent: currentUser.status === 'flagged' ? 'space-between' : 'flex-end'
+                }}>
                     {/* Burger Menu Button */}
                     <button className="burger-menu" onClick={toggleSidebar}>
                         <i className="fas fa-bars"></i>
                     </button>
+                    
+                    {/* Flagged user warning */}
+                    {currentUser.status === 'flagged' && (
+                        <div 
+                            className="flagged-user-banner"
+                            onClick={() => {
+                                const reason = currentUser.flagReason || 'No specific reason provided';
+                                alert(`Account Flagged\n\nReason: ${reason}\n\nContact Disciplinary Office to resolve this issue.`);
+                            }}
+                        >
+                            <i className="fas fa-exclamation-triangle"></i>
+                            Account Flagged
+                        </div>
+                    )}
                     
                     <div className="user-info">
                         <div className="user-details">

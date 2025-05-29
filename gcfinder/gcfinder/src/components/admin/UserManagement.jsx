@@ -26,6 +26,20 @@ const UserManagement = () => {
     // Show Export Modal State
     const [showExportModal, setShowExportModal] = useState(false);
 
+    // Flag/Ban Modal State
+    const [flagModalOpen, setFlagModalOpen] = useState(false);
+    const [banModalOpen, setBanModalOpen] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [actionReason, setActionReason] = useState('');
+
+    // Batch Add Students Modal State
+    const [batchAddModalOpen, setBatchAddModalOpen] = useState(false);
+    const [studentData, setStudentData] = useState('');
+    const [uploadFile, setUploadFile] = useState(null);
+    const [uploadMode, setUploadMode] = useState('manual'); // 'manual' or 'file'
+    const [isProcessing, setIsProcessing] = useState(false);
+
     // Toast notification
     const { toast, showToast, hideToast } = useToast();
 
@@ -103,13 +117,100 @@ const UserManagement = () => {
     // User actions
 
     const handleFlagUser = (user) => {
-        // TODO: flagging a user
-        showToast(`${user.name} has been flagged`, 'success');
+        setSelectedUser(user);
+        setFlagModalOpen(true);
+        setActionReason('');
     };
 
     const handleBanUser = (user) => {
-        // TODO: banning a user
-        showToast(`${user.name} has been banned`, 'success');
+        setSelectedUser(user);
+        setBanModalOpen(true);
+        setActionReason('');
+    };
+
+    const handleConfirmFlag = () => {
+        const isCurrentlyFlagged = selectedUser.status === 'flagged';
+        
+        if (!isCurrentlyFlagged && !actionReason.trim()) {
+            showToast('Please provide a reason for flagging this user', 'warning');
+            return;
+        }
+        
+        // Toggle flag status
+        setUsers(prevUsers => 
+            prevUsers.map(user => 
+                user.id === selectedUser.id 
+                    ? { 
+                        ...user, 
+                        status: isCurrentlyFlagged ? 'active' : 'flagged',
+                        flagReason: isCurrentlyFlagged ? undefined : actionReason
+                    }
+                    : user
+            )
+        );
+        
+        // TODO: Update user status in database
+        showToast(`${selectedUser.name} has been ${isCurrentlyFlagged ? 'unflagged' : 'flagged'}`, 'success');
+        setFlagModalOpen(false);
+        setSelectedUser(null);
+        setActionReason('');
+    };
+
+    const handleConfirmBan = () => {
+        const isCurrentlyBanned = selectedUser.status === 'banned';
+        
+        if (!isCurrentlyBanned && !actionReason.trim()) {
+            showToast('Please provide a reason for banning this user', 'warning');
+            return;
+        }
+        
+        // Toggle ban status
+        setUsers(prevUsers => 
+            prevUsers.map(user => 
+                user.id === selectedUser.id 
+                    ? { 
+                        ...user, 
+                        status: isCurrentlyBanned ? 'active' : 'banned',
+                        banReason: isCurrentlyBanned ? undefined : actionReason
+                    }
+                    : user
+            )
+        );
+        
+        // TODO: Update user status in database
+        showToast(`${selectedUser.name} has been ${isCurrentlyBanned ? 'unbanned' : 'banned'}`, 'success');
+        setBanModalOpen(false);
+        setSelectedUser(null);
+        setActionReason('');
+    };
+
+    const handleCancelAction = () => {
+        setFlagModalOpen(false);
+        setBanModalOpen(false);
+        setDeleteModalOpen(false);
+        setSelectedUser(null);
+        setActionReason('');
+    };
+
+    const handleDeleteUser = (user) => {
+        setSelectedUser(user);
+        setDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = () => {
+        // Remove user and all their associated data from state
+        setUsers(prevUsers => prevUsers.filter(u => u.id !== selectedUser.id));
+        
+        // TODO: Comprehensive deletion from database:
+        // - Delete user account
+        // - Delete all user's items
+        // - Delete all user's claims  
+        // - Delete all user's messages
+        // - Delete any user-related notifications
+        
+        showToast(`${selectedUser.name} and all associated data has been deleted`, 'success');
+        setDeleteModalOpen(false);
+        setSelectedUser(null);
     };
 
     // Export Modal Handlers
@@ -208,6 +309,121 @@ const UserManagement = () => {
         handleTriggerExport(startDate, endDate);
     };
 
+    // Batch Add Students Modal Handlers
+    const handleOpenBatchAddModal = () => {
+        setBatchAddModalOpen(true);
+    };
+
+    const handleCloseBatchAddModal = () => {
+        setBatchAddModalOpen(false);
+        setStudentData('');
+        setUploadFile(null);
+        setUploadMode('manual');
+        setIsProcessing(false);
+    };
+
+    const handleFileUpload = (event) => {
+        const file = event.target.files[0];
+        if (file && (file.type === 'text/csv' || file.type === 'application/vnd.ms-excel' || file.name.endsWith('.csv'))) {
+            setUploadFile(file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setStudentData(e.target.result);
+            };
+            reader.readAsText(file);
+        } else {
+            showToast('Please upload a valid CSV file', 'error');
+        }
+    };
+
+    const generateRandomPassword = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let password = '';
+        for (let i = 0; i < 8; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return password;
+    };
+
+    const parseStudentData = (data) => {
+        const lines = data.trim().split('\n');
+        const students = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const parts = line.split(',');
+            if (parts.length >= 2) {
+                const name = parts[0].trim();
+                const email = parts[1].trim();
+                const password = parts[2] ? parts[2].trim() : generateRandomPassword();
+                
+                students.push({
+                    id: Date.now() + i, // Temporary ID
+                    name,
+                    email,
+                    password,
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    role: 'student'
+                });
+            }
+        }
+        
+        return students;
+    };
+
+    const handleBatchAddStudents = async () => {
+        if (!studentData.trim()) {
+            showToast('Please provide student data', 'warning');
+            return;
+        }
+
+        try {
+            setIsProcessing(true);
+            const newStudents = parseStudentData(studentData);
+            
+            if (newStudents.length === 0) {
+                showToast('No valid student data found. Please check the format.', 'error');
+                return;
+            }
+
+            // TODO: Send to backend API to create students in database
+            const apiUrl = process.env.REACT_APP_API_URL;
+            if (!apiUrl) {
+                showToast("API URL is not configured. Please check environment settings.", 'error');
+                return;
+            }
+
+            const response = await fetch(`${apiUrl}/api/students/batch-create`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ students: newStudents })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create students');
+            }
+
+            const result = await response.json();
+            
+            // Update local state with new students
+            setUsers(prevUsers => [...prevUsers, ...newStudents]);
+            
+            showToast(`Successfully added ${newStudents.length} students`, 'success');
+            handleCloseBatchAddModal();
+            
+        } catch (error) {
+            console.error('Batch add error:', error);
+            showToast('Failed to add students: ' + error.message, 'error');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const getTabCount = (status) => {
         return users.filter(user => user.status === status).length;
     };
@@ -235,6 +451,9 @@ const UserManagement = () => {
                     <div className="action-buttons">
                         <button className="export-btn" onClick={handleOpenExportModal}>
                             <i className="fas fa-download"></i> Export Data
+                        </button>
+                        <button className="batch-add-btn" onClick={handleOpenBatchAddModal}>
+                            <i className="fas fa-user-plus"></i> Batch Add Students
                         </button>
                         <button className="refresh-btn" onClick={() => window.location.reload()}>
                             <i className="fas fa-sync-alt"></i> Refresh
@@ -306,6 +525,251 @@ const UserManagement = () => {
                                     className="export-modal-confirm-btn"
                                 >
                                     Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Flag User Modal */}
+                {flagModalOpen && selectedUser && (
+                    <div className="export-modal-overlay">
+                        <div className="export-modal-content">
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title">
+                                    {selectedUser.status === 'flagged' ? 'Unflag User' : 'Flag User'}
+                                </h2>
+                                <button onClick={handleCancelAction} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="export-modal-description">
+                                You are about to {selectedUser.status === 'flagged' ? 'unflag' : 'flag'} <strong>{selectedUser.name}</strong> ({selectedUser.email}).
+                                {selectedUser.status === 'flagged' 
+                                    ? ' This will restore their account to active status.' 
+                                    : ' Please provide a reason for this action.'
+                                }
+                            </p>
+                            {selectedUser.status !== 'flagged' && (
+                                <div className="export-modal-date-input-group">
+                                    <label htmlFor="flagReason">Reason for flagging:</label>
+                                    <textarea
+                                        id="flagReason"
+                                        value={actionReason}
+                                        onChange={(e) => setActionReason(e.target.value)}
+                                        className="export-modal-date-input"
+                                        placeholder="Enter the reason for flagging this user..."
+                                        rows="4"
+                                        style={{resize: 'vertical', fontFamily: 'inherit'}}
+                                    />
+                                </div>
+                            )}
+                            <div className="export-modal-actions">
+                                <button 
+                                    onClick={handleCancelAction} 
+                                    className="export-modal-cancel-btn"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleConfirmFlag} 
+                                    className="export-modal-confirm-btn"
+                                    style={{backgroundColor: selectedUser.status === 'flagged' ? '#27ae60' : '#f39c12'}}
+                                >
+                                    {selectedUser.status === 'flagged' ? 'Unflag User' : 'Flag User'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Ban User Modal */}
+                {banModalOpen && selectedUser && (
+                    <div className="export-modal-overlay">
+                        <div className="export-modal-content">
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title">
+                                    {selectedUser.status === 'banned' ? 'Unban User' : 'Ban User'}
+                                </h2>
+                                <button onClick={handleCancelAction} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="export-modal-description">
+                                You are about to {selectedUser.status === 'banned' ? 'unban' : 'ban'} <strong>{selectedUser.name}</strong> ({selectedUser.email}).
+                                {selectedUser.status === 'banned' 
+                                    ? ' This will restore their account to active status.' 
+                                    : ' This will prevent them from accessing the system. Please provide a reason for this action.'
+                                }
+                            </p>
+                            {selectedUser.status !== 'banned' && (
+                                <div className="export-modal-date-input-group">
+                                    <label htmlFor="banReason">Reason for banning:</label>
+                                    <textarea
+                                        id="banReason"
+                                        value={actionReason}
+                                        onChange={(e) => setActionReason(e.target.value)}
+                                        className="export-modal-date-input"
+                                        placeholder="Enter the reason for banning this user..."
+                                        rows="4"
+                                        style={{resize: 'vertical', fontFamily: 'inherit'}}
+                                    />
+                                </div>
+                            )}
+                            <div className="export-modal-actions">
+                                <button 
+                                    onClick={handleCancelAction} 
+                                    className="export-modal-cancel-btn"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleConfirmBan} 
+                                    className="export-modal-confirm-btn"
+                                    style={{backgroundColor: selectedUser.status === 'banned' ? '#27ae60' : '#e74c3c'}}
+                                >
+                                    {selectedUser.status === 'banned' ? 'Unban User' : 'Ban User'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete User Modal */}
+                {deleteModalOpen && selectedUser && (
+                    <div className="export-modal-overlay">
+                        <div className="export-modal-content">
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title" style={{color: '#e74c3c'}}>
+                                    <i className="fas fa-exclamation-triangle"></i> Delete User
+                                </h2>
+                                <button onClick={handleCancelAction} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="export-modal-description">
+                                <strong style={{color: '#e74c3c'}}>⚠️ WARNING: This action cannot be undone!</strong>
+                            </p>
+                            <p className="export-modal-description">
+                                You are about to permanently delete <strong>{selectedUser.name}</strong> ({selectedUser.email}) and <strong>all associated data</strong>:
+                            </p>
+                            <ul style={{marginLeft: '20px', marginBottom: '20px', color: '#666'}}>
+                                <li>• User account and profile</li>
+                                <li>• All posted items</li>
+                                <li>• All claims made by this user</li>
+                                <li>• All messages sent/received</li>
+                                <li>• All notifications and activity history</li>
+                            </ul>
+                            <p style={{color: '#e74c3c', fontWeight: 'bold'}}>
+                                This will completely remove the user from the system.
+                            </p>
+                            <div className="export-modal-actions">
+                                <button 
+                                    onClick={handleCancelAction} 
+                                    className="export-modal-cancel-btn"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleConfirmDelete} 
+                                    className="export-modal-confirm-btn"
+                                    style={{backgroundColor: '#e74c3c'}}
+                                >
+                                    <i className="fas fa-trash"></i> Delete Everything
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Batch Add Students Modal */}
+                {batchAddModalOpen && (
+                    <div className="export-modal-overlay">
+                        <div className="export-modal-content" style={{maxWidth: '600px'}}>
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title">
+                                    <i className="fas fa-user-plus"></i> Batch Add Students
+                                </h2>
+                                <button onClick={handleCloseBatchAddModal} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="export-modal-description">
+                                Add multiple students to the system using CSV format or manual entry.
+                            </p>
+                            
+                            {/* Upload Mode Selection */}
+                            <div className="export-modal-quick-select">
+                                <button 
+                                    onClick={() => setUploadMode('manual')} 
+                                    className={`export-modal-quick-btn ${uploadMode === 'manual' ? 'active' : ''}`}
+                                >
+                                    Manual Entry
+                                </button>
+                                <button 
+                                    onClick={() => setUploadMode('file')}
+                                    className={`export-modal-quick-btn ${uploadMode === 'file' ? 'active' : ''}`}
+                                >
+                                    CSV Upload
+                                </button>
+                            </div>
+
+                            {uploadMode === 'file' && (
+                                <div className="export-modal-date-input-group">
+                                    <label htmlFor="csvFile">Upload CSV File:</label>
+                                    <input
+                                        id="csvFile"
+                                        type="file"
+                                        accept=".csv"
+                                        onChange={handleFileUpload}
+                                        className="export-modal-date-input"
+                                    />
+                                    <small style={{color: '#666', fontSize: '12px'}}>
+                                        CSV format: Name, Email, Password (optional)
+                                    </small>
+                                </div>
+                            )}
+
+                            <div className="export-modal-date-input-group">
+                                <label htmlFor="studentDataTextarea">
+                                    {uploadMode === 'manual' ? 'Student Data (one per line):' : 'Preview/Edit Data:'}
+                                </label>
+                                <textarea
+                                    id="studentDataTextarea"
+                                    value={studentData}
+                                    onChange={(e) => setStudentData(e.target.value)}
+                                    className="export-modal-date-input"
+                                    placeholder={uploadMode === 'manual' 
+                                        ? "Enter student data in CSV format:\nJohn Doe, john@example.com\nJane Smith, jane@example.com, mypassword123\n\nPassword is optional - random passwords will be generated if not provided."
+                                        : "CSV data will appear here..."}
+                                    rows="8"
+                                    style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}
+                                />
+                            </div>
+
+                            <div className="export-modal-actions">
+                                <button 
+                                    onClick={handleCloseBatchAddModal} 
+                                    className="export-modal-cancel-btn"
+                                    disabled={isProcessing}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleBatchAddStudents} 
+                                    className="export-modal-confirm-btn"
+                                    disabled={isProcessing || !studentData.trim()}
+                                    style={{backgroundColor: isProcessing ? '#045195' : '#045195'}}
+                                >
+                                    {isProcessing ? (
+                                        <>
+                                            <i className="fas fa-spinner fa-spin"></i> Processing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-user-plus"></i> Add Students
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -399,21 +863,28 @@ const UserManagement = () => {
                                         <td className="actions">
                                             <button 
                                                 className="action-btn flag" 
-                                                aria-label="Flag"
+                                                aria-label={user.status === 'flagged' ? 'Unflag' : 'Flag'}
                                                 onClick={() => handleFlagUser(user)}
-                                                title="Flag User"
-                                                disabled={user.status === 'flagged' || user.status === 'banned'}
+                                                title={user.status === 'flagged' ? 'Unflag User' : 'Flag User'}
+                                                disabled={user.status === 'banned'}
                                             >
                                                 <i className="fas fa-flag"></i>
                                             </button>
                                             <button 
                                                 className="action-btn ban" 
-                                                aria-label="Ban"
+                                                aria-label={user.status === 'banned' ? 'Unban' : 'Ban'}
                                                 onClick={() => handleBanUser(user)}
-                                                title="Ban User"
-                                                disabled={user.status === 'banned'}
+                                                title={user.status === 'banned' ? 'Unban User' : 'Ban User'}
                                             >
                                                 <i className="fas fa-user-slash"></i>
+                                            </button>
+                                            <button 
+                                                className="action-btn delete" 
+                                                aria-label="Delete"
+                                                onClick={() => handleDeleteUser(user)}
+                                                title="Delete User"
+                                            >
+                                                <i className="fas fa-trash"></i>
                                             </button>
                                         </td>
                                     </tr>
