@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { notifications, markAllAsRead, markAsRead } from '../../data/notifications';
 import gcLogo from '../../assets/gc-finder-logo.png';
 import profilePic from '../../assets/Profile.png';
 import { doc, getDoc } from 'firebase/firestore';
@@ -9,7 +8,6 @@ import { db } from '../../firebase';
 const Layout = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [showNotifications, setShowNotifications] = useState(false);
     const [showLeaveDialog, setShowLeaveDialog] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -126,22 +124,6 @@ const Layout = () => {
         navigate('/');
     }, [navigate]);
 
-    // Toggle notifications panel
-    const toggleNotifications = useCallback((e) => {
-        e?.stopPropagation();
-        setShowNotifications(prev => !prev);
-    }, []);
-
-    // Mark all notifications as read
-    const handleMarkAllRead = useCallback(() => {
-        markAllAsRead();
-    }, []);
-
-    // Mark individual notification as read
-    const handleIndividualNotificationClick = useCallback((id) => {
-        markAsRead(id);
-    }, []);
-
     // Toggle sidebar
     const toggleSidebar = useCallback(() => {
         setIsSidebarOpen(prev => !prev);
@@ -205,41 +187,6 @@ const Layout = () => {
                             <span className="student-id">{currentUser.userEmail}</span>
                         </div>
                         <img src={currentUser.profilePicture} alt="Profile" className="profile-pic" />
-                        <div className="notification-wrapper">
-                            <i 
-                                className="fas fa-bell" 
-                                id="notification-bell"
-                                onClick={toggleNotifications}
-                            ></i>
-                            <div className={`notification-panel ${showNotifications ? 'show' : ''}`}>
-                                <div className="notification-header">
-                                    <h3>Notification</h3>
-                                    <button className="mark-all-read" onClick={handleMarkAllRead}>
-                                        Mark all as read
-                                    </button>
-                                </div>
-                                <div className="notification-list">
-                                    {notifications.map(notification => (
-                                        <div 
-                                            key={notification.id}
-                                            className={`notification-item ${notification.read ? 'read' : ''}`}
-                                            onClick={() => handleIndividualNotificationClick(notification.id)}
-                                        >
-                                            <img 
-                                                src={notification.senderProfile} 
-                                                alt="Profile" 
-                                                className="notification-profile"
-                                            />
-                                            <div className="notification-content">
-                                                <p className="notification-name">{notification.senderName}</p>
-                                                <p className="notification-text">{notification.message}</p>
-                                                <p className="notification-time">{notification.timestamp}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </header>
 

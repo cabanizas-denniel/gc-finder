@@ -1,19 +1,18 @@
 import os
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-# import torch # Removed for simplified deployment
-# from PIL import Image
-# from transformers import CLIPProcessor, CLIPModel # Removed for simplified deployment
-# import numpy as np # Removed as it was primarily for CLIP embeddings
 import firebase_admin
 from firebase_admin import credentials, firestore
-# import base64 # Keep if used elsewhere, or remove if only for get_image_embedding
-from io import BytesIO # Keep if used elsewhere, or remove if only for get_image_embedding
+import base64
+from io import BytesIO
 import pandas as pd
 from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 from datetime import datetime
-import json # Added for parsing JSON from environment variable
+import json
+import requests
+from PIL import Image
+import numpy as np
 
 # Initialize Firebase from environment variable
 cred_json_str = os.environ.get('FIREBASE_CREDENTIALS_JSON')
@@ -28,6 +27,71 @@ else:
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 db = firestore.client()
+
+# Hugging Face Inference API configuration
+HF_API_URL = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
+HF_API_TOKEN = os.environ.get('HUGGING_FACE_API_TOKEN')  # Set this in your environment variables
+
+def get_image_embedding_remote(image_input):
+    """
+    Get image embedding using Hugging Face's remote CLIP API
+    """
+    try:
+        # Convert image to base64 if it's not already
+        if isinstance(image_input, str) and image_input.startswith('data:image'):
+            image_data = image_input.split(',')[1]
+            image_bytes = base64.b64decode(image_data)
+        elif isinstance(image_input, Image.Image):
+            buffer = BytesIO()
+            image_input.save(buffer, format='JPEG')
+            image_bytes = buffer.getvalue()
+        else:
+            # Assume it's a file path or file-like object
+            image = Image.open(image_input).convert('RGB')
+            buffer = BytesIO()
+            image.save(buffer, format='JPEG')
+            image_bytes = buffer.getvalue()
+        
+        # Prepare headers for API request
+        headers = {}
+        if HF_API_TOKEN:
+            headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
+        
+        # Make request to Hugging Face Inference API
+        response = requests.post(
+            HF_API_URL,
+            headers=headers,
+            data=image_bytes,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            # The API returns the embedding directly
+            embedding = np.array(response.json())
+            return embedding
+        else:
+            print(f"HF API Error: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"Error getting image embedding: {e}")
+        return None
+
+def compute_similarity(query_embedding, database_embeddings):
+    """
+    Compute cosine similarity between query and database embeddings
+    """
+    try:
+        # Normalize embeddings
+        query_norm = query_embedding / np.linalg.norm(query_embedding)
+        db_norms = database_embeddings / np.linalg.norm(database_embeddings, axis=1, keepdims=True)
+        
+        # Compute cosine similarity
+        similarities = np.dot(db_norms, query_norm.T).flatten()
+        return similarities
+    except Exception as e:
+        print(f"Error computing similarity: {e}")
+        return np.array([])
     
 app = Flask(__name__)
 CORS(app, resources={
@@ -43,93 +107,86 @@ CORS(app, resources={
 def home():
     return jsonify({"status": "ok", "message": "GCFinder API is running!"}), 200
 
-# Initialize CLIP
-# device = "cuda" if torch.cuda.is_available() else "cpu" # Removed for simplified deployment
-# model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device) # Removed for simplified deployment
-# processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32") # Removed for simplified deployment
-
-# def get_image_embedding(image_input): # Removed for simplified deployment
-#     if isinstance(image_input, str) and image_input.startswith('data:image'):
-#         image_data = image_input.split(',')[1]
-#         image_bytes = base64.b64decode(image_data)
-#         image = Image.open(BytesIO(image_bytes)).convert('RGB')
-#     elif isinstance(image_input, Image.Image):
-#         image = image_input
-#     else:
-#         image = Image.open(image_input).convert('RGB')
-#     
-#     inputs = processor(images=image, return_tensors="pt", padding=True)
-#     image_features = model.get_image_features(**{k: v.to(device) for k, v in inputs.items()})
-#     return image_features.cpu().detach().numpy()
-
-# def compute_similarity(query_embedding, database_embeddings): # Removed for simplified deployment
-#     query_embedding = query_embedding / np.linalg.norm(query_embedding)
-#     database_embeddings = database_embeddings / np.linalg.norm(database_embeddings, axis=1, keepdims=True)
-#     return np.dot(database_embeddings, query_embedding.T).flatten()
-
 @app.route('/search', methods=['POST'])
 def search():
-    return jsonify({'message': 'Image search functionality is temporarily disabled.'}), 503
-    # Original search functionality commented out for simplified deployment
-    # if 'file' not in request.files:
-    #     return jsonify({'error': 'No file uploaded'}), 400
-    # 
-    # file = request.files['file']
-    # if file.filename == '':
-    #     return jsonify({'error': 'No file selected'}), 400
+    """
+    Enhanced search endpoint using remote CLIP API
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
 
-    # try:
-    #     # Process query image
-    #     query_image = Image.open(file).convert('RGB')
-    #     query_embedding = get_image_embedding(query_image)
-
-    #     # Fetch and process database items
-    #     items_ref = db.collection('items')
-    #     items = items_ref.stream()
+    try:
+        # Check if HF API token is available
+        if not HF_API_TOKEN:
+            print("WARNING: HUGGING_FACE_API_TOKEN not set. Using public API with rate limits.")
         
-    #     database_items = []
-    #     database_embeddings = []
+        # Process query image
+        query_image = Image.open(file).convert('RGB')
+        query_embedding = get_image_embedding_remote(query_image)
         
-    #     for item in items:
-    #         item_data = item.to_dict()
-    #         if 'imageData' in item_data and item_data['imageData']:
-    #             try:
-    #                 image_data = item_data['imageData'][0]['dataUrl']
-    #                 embedding = get_image_embedding(image_data)
-    #                 database_embeddings.append(embedding.flatten())
-    #                 database_items.append({
-    #                     'id': item.id,
-    #                     'name': item_data.get('name', 'Unnamed Item'),
-    #                     'category': item_data.get('category', 'Uncategorized'),
-    #                     'location': item_data.get('location', 'Unknown location'),
-    #                     'date': item_data.get('date', ''),
-    #                     'description': item_data.get('description', ''),
-    #                     'status': item_data.get('status', 'Unclaimed'),
-    #                     'image': image_data,
-    #                     'submitter': item_data.get('submitter', None)
-    #                 })
-    #             except Exception as e:
-    #                 continue
+        if query_embedding is None:
+            return jsonify({'error': 'Failed to process query image. Please try again later.'}), 503
 
-    #     if not database_items:
-    #         return jsonify({'error': 'No items with images found in database'}), 404
-
-    #     # Compute and sort similarities
-    #     database_embeddings = np.stack(database_embeddings)
-    #     similarities = compute_similarity(query_embedding.flatten(), database_embeddings)
-    #     results = sorted(zip(similarities, database_items), reverse=True)
+        # Fetch and process database items
+        items_ref = db.collection('items')
+        items = items_ref.stream()
         
-    #     return jsonify({
-    #         'results': [
-    #             {
-    #                 'item': item,
-    #                 'similarity': float(score)
-    #             }
-    #             for score, item in results
-    #         ]
-    #     })
-    # except Exception as e:
-    #     return jsonify({'error': str(e)}), 500
+        database_items = []
+        database_embeddings = []
+        
+        for item in items:
+            item_data = item.to_dict()
+            if 'imageData' in item_data and item_data['imageData']:
+                try:
+                    image_data = item_data['imageData'][0]['dataUrl']
+                    embedding = get_image_embedding_remote(image_data)
+                    
+                    if embedding is not None:
+                        database_embeddings.append(embedding.flatten())
+                        database_items.append({
+                            'id': item.id,
+                            'name': item_data.get('name', 'Unnamed Item'),
+                            'category': item_data.get('category', 'Uncategorized'),
+                            'location': item_data.get('location', 'Unknown location'),
+                            'date': item_data.get('date', ''),
+                            'description': item_data.get('description', ''),
+                            'status': item_data.get('status', 'Unclaimed'),
+                            'image': image_data,
+                            'submitter': item_data.get('submitter', None)
+                        })
+                except Exception as e:
+                    print(f"Error processing item {item.id}: {e}")
+                    continue
+
+        if not database_items:
+            return jsonify({'error': 'No items with images found in database'}), 404
+
+        # Compute and sort similarities
+        database_embeddings = np.stack(database_embeddings)
+        similarities = compute_similarity(query_embedding.flatten(), database_embeddings)
+        
+        if len(similarities) == 0:
+            return jsonify({'error': 'Failed to compute similarities'}), 500
+            
+        results = sorted(zip(similarities, database_items), reverse=True)
+        
+        return jsonify({
+            'results': [
+                {
+                    'item': item,
+                    'similarity': float(score)
+                }
+                for score, item in results
+            ]
+        })
+        
+    except Exception as e:
+        print(f"Search error: {e}")
+        return jsonify({'error': f'Search failed: {str(e)}'}), 500
 
 def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
     """

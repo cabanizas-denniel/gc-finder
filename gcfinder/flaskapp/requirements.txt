@@ -4,3 +4,6 @@ gunicorn
 firebase-admin
 pandas
 openpyxl
+requests
+Pillow
+numpy
