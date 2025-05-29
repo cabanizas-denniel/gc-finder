@@ -128,11 +128,19 @@ const BrowseItems = () => {
         setIsSearching(true);
         setError('');
 
+        const apiUrl = process.env.REACT_APP_API_URL;
+        if (!apiUrl) {
+            setError('API URL is not configured. Please check environment settings.');
+            console.error("REACT_APP_API_URL is not set");
+            setIsSearching(false);
+            return;
+        }
+
         try {
             const formData = new FormData();
             formData.append('file', file);
 
-            const response = await fetch('http://localhost:5000/search', {
+            const response = await fetch(`${apiUrl}/search`, {
                 method: 'POST',
                 body: formData,
             });
