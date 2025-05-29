@@ -8,6 +8,8 @@ import Toast, { useToast } from '../Toast';
 
 const ClaimVerification = () => {
     const [claims, setClaims] = useState([]);
+    const [filteredClaims, setFilteredClaims] = useState([]);
+    const [statusFilter, setStatusFilter] = useState('all');
     const [selectedClaim, setSelectedClaim] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showItemDetailsModal, setShowItemDetailsModal] = useState(false);
@@ -33,6 +35,15 @@ const ClaimVerification = () => {
         fetchClaims();
     }, []);
 
+    // Filter claims based on status
+    useEffect(() => {
+        if (statusFilter === 'all') {
+            setFilteredClaims(claims);
+        } else {
+            setFilteredClaims(claims.filter(claim => claim.status === statusFilter));
+        }
+    }, [claims, statusFilter]);
+
     const fetchClaims = async () => {
         try {
             const claimsRef = collection(db, 'claims');
@@ -48,6 +59,7 @@ const ClaimVerification = () => {
                     claimedBy: data.claimerName,
                     student_id: data.claimerId,
                     date: new Date(data.createdAt?.toDate()).toLocaleDateString(),
+                    createdAt: data.createdAt?.toDate() || new Date(0),
                     itemId: data.itemId,
                     lastSeenLocation: data.lastSeenLocation,
                     uniqueIdentifier: data.uniqueIdentifier,
@@ -56,7 +68,11 @@ const ClaimVerification = () => {
                 });
             });
             
+            // Sort by newest first
+            claimsData.sort((a, b) => b.createdAt - a.createdAt);
+            
             setClaims(claimsData);
+            setFilteredClaims(claimsData);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching claims:', error);
@@ -253,16 +269,34 @@ const ClaimVerification = () => {
 
     const ClaimsList = () => (
         <div className="claims-list">
-            <h2>Claims list</h2>
-            <p className="total-claims">Total: {claims.length} claims</p>
+            <div className="claim-filter-status">
+            <div className="claims-list-header">
+                <h2>Claims list</h2>
+                <p className="total-claims">Showing: {filteredClaims.length} claims</p>
+            </div>
+            <div className="claim-filter-section">
+                    <select 
+                        id="statusFilter"
+                        value={statusFilter} 
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="status-filter-dropdown"
+                    >
+                        <option value="all">All ({claims.length})</option>
+                        <option value="pending">Pending ({claims.filter(c => c.status === 'pending').length})</option>
+                        <option value="approved">Approved ({claims.filter(c => c.status === 'approved').length})</option>
+                        <option value="claimed">Claimed ({claims.filter(c => c.status === 'claimed').length})</option>
+                        <option value="rejected">Rejected ({claims.filter(c => c.status === 'rejected').length})</option>
+                    </select>
+                </div>
+            </div>
 
             <div className="claim-items">
                 {loading ? (
                     <p>Loading claims...</p>
-                ) : claims.length === 0 ? (
-                    <p>No claims found</p>
+                ) : filteredClaims.length === 0 ? (
+                    <p>No claims found for selected filter</p>
                 ) : (
-                    claims.map((claim) => (
+                    filteredClaims.map((claim) => (
                         <div 
                             key={claim.id}
                             className={`claim-item ${selectedClaim?.id === claim.id ? 'selected' : ''}`}

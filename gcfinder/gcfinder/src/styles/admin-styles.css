@@ -70,6 +70,22 @@ h2{
     margin-bottom: 2px;
 }
 
+.claim-filter-status {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.claim-filter-status select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.claim-filter-section {
+    text-align: right;
+}
+
 .total-claims {
     font-size: 0.95rem;
     color: #888;
