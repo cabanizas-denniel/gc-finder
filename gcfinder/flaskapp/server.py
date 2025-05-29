@@ -29,12 +29,12 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 # Hugging Face Inference API configuration
-HF_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/clip-ViT-B-32"
+HF_API_URL = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
 HF_API_TOKEN = os.environ.get('HUGGING_FACE_API_TOKEN')  # Set this in your environment variables
 
 def get_image_embedding_remote(image_input):
     """
-    Get image embedding using Hugging Face's remote API with a working image embedding model
+    Get image embedding using HuggingFace's zero-shot image classification as feature extraction
     """
     try:
         # Convert image to bytes
@@ -57,64 +57,74 @@ def get_image_embedding_remote(image_input):
         if HF_API_TOKEN:
             headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
         
-        # Send image directly as bytes to the API
+        # Use zero-shot classification with diverse labels to get feature-rich logits
+        # These logits will serve as our image embeddings
+        candidate_labels = [
+            "electronics", "clothing", "bags", "documents", "jewelry", "books", 
+            "tools", "keys", "phone", "wallet", "glasses", "watch", "headphones",
+            "backpack", "shoes", "water bottle", "umbrella", "laptop", "tablet",
+            "camera", "charger", "notebook", "pen", "card", "ring", "bracelet",
+            "necklace", "earrings", "hat", "scarf", "gloves", "sunglasses"
+        ]
+        
+        # Create the payload for zero-shot classification
+        files = {"inputs": image_bytes}
+        data = {
+            "parameters": {
+                "candidate_labels": candidate_labels
+            },
+            "options": {"wait_for_model": True}
+        }
+        
         response = requests.post(
             HF_API_URL,
             headers=headers,
-            data=image_bytes,
+            files=files,
+            data={"parameters": str(data["parameters"]).replace("'", '"')},
             timeout=30
         )
         
         if response.status_code == 200:
             result = response.json()
-            # Convert to numpy array
+            
+            # Extract scores as our embedding vector
+            if isinstance(result, list) and len(result) > 0:
+                # For zero-shot classification, we get a list with scores
+                scores = []
+                for item in result:
+                    if isinstance(item, dict) and 'score' in item:
+                        scores.append(item['score'])
+                
+                if scores:
+                    # Normalize the scores to create a consistent embedding
+                    embedding = np.array(scores)
+                    # Ensure we have a consistent dimension
+                    if len(embedding) < 32:
+                        # Pad if too short
+                        embedding = np.pad(embedding, (0, 32 - len(embedding)), 'constant')
+                    elif len(embedding) > 512:
+                        # Truncate if too long
+                        embedding = embedding[:512]
+                    
+                    return embedding
+            
+            # Fallback: use the raw result as embedding if it's numeric
             if isinstance(result, list):
-                return np.array(result)
+                try:
+                    embedding = np.array([float(x) if isinstance(x, (int, float)) else 0.5 for x in result])
+                    return embedding[:512] if len(embedding) > 512 else embedding
+                except:
+                    pass
+            
+            print(f"Unexpected response format: {result}")
             return None
+            
         else:
             print(f"HF API Error: {response.status_code} - {response.text}")
             return None
             
     except Exception as e:
         print(f"Error getting image embedding: {e}")
-        return None
-
-def get_image_embedding_fallback(image_bytes, headers):
-    """
-    Fallback method using text-image similarity to extract image features
-    """
-    try:
-        # Use dummy text for comparison to get image features
-        dummy_texts = ["an object", "a thing", "an item"]
-        
-        payload = {
-            "inputs": {
-                "source_sentence": "a photo",
-                "sentences": dummy_texts
-            }
-        }
-        
-        # Try using the sentence similarity endpoint with image
-        files = {"inputs": image_bytes}
-        
-        response = requests.post(
-            "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32",
-            headers=headers,
-            files=files,
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            # Generate a simple feature vector based on the image
-            # This is a simplified approach for demonstration
-            return np.random.rand(512)  # Placeholder - in production, use proper embedding extraction
-        else:
-            print(f"Fallback API Error: {response.status_code} - {response.text}")
-            return None
-            
-    except Exception as e:
-        print(f"Error in fallback embedding: {e}")
         return None
 
 def compute_similarity(query_embedding, database_embeddings):
