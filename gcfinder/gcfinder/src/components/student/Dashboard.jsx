@@ -10,6 +10,12 @@ const Dashboard = () => {
     console.log("Dashboard component is rendering");
     const navigate = useNavigate();
     
+    // Get current user status
+    const userDataString = localStorage.getItem('userData');
+    const currentUser = userDataString ? JSON.parse(userDataString) : null;
+    const isFlagged = currentUser?.status === 'flagged';
+    const isBanned = currentUser?.status === 'banned';
+    
     const [dashboardStats, setDashboardStats] = useState({
         activeReports: "0",
         pendingClaims: "0"
@@ -174,17 +180,31 @@ const Dashboard = () => {
                 </div>
                 <div className="stat-card quick-actions">
                     <h3>Quick Actions</h3>
-                    <ul>
-                        <li onClick={() => navigate('/report-item')}>
-                            <i className="fas fa-file-alt"></i> Report Found Item
-                        </li>
-                        <li onClick={() => navigate('/browse-items')}>
-                            <i className="fas fa-search"></i> Browse Found Items
-                        </li>
-                        <li onClick={() => navigate('/my-claims')}>
-                            <i className="fas fa-check-circle"></i> Check Claim Status
-                        </li>
-                    </ul>
+                    {isBanned ? (
+                        <div style={{color: '#e74c3c', textAlign: 'center', padding: '20px'}}>
+                            <i className="fas fa-ban" style={{fontSize: '24px', marginBottom: '10px'}}></i>
+                            <p><strong>Account Banned</strong></p>
+                            <p>Your account has been banned. Contact support for assistance.</p>
+                        </div>
+                    ) : isFlagged ? (
+                        <div style={{color: '#f39c12', textAlign: 'center', padding: '20px'}}>
+                            <i className="fas fa-flag" style={{fontSize: '24px', marginBottom: '10px'}}></i>
+                            <p><strong>Account Flagged</strong></p>
+                            <p>Your account is under review. Some features are temporarily restricted.</p>
+                        </div>
+                    ) : (
+                        <ul>
+                            <li onClick={() => navigate('/report-item')}>
+                                <i className="fas fa-file-alt"></i> Report Found Item
+                            </li>
+                            <li onClick={() => navigate('/browse-items')}>
+                                <i className="fas fa-search"></i> Browse Found Items
+                            </li>
+                            <li onClick={() => navigate('/my-claims')}>
+                                <i className="fas fa-check-circle"></i> Check Claim Status
+                            </li>
+                        </ul>
+                    )}
                 </div>
             </div>
 

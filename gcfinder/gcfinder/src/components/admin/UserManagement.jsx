@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllUsers } from '../../admin-firebase';
+import { getAllUsers, batchCreateStudents, updateUserStatus } from '../../admin-firebase';
 import Toast, { useToast } from '../Toast';
 
 const UserManagement = () => {
@@ -32,6 +32,8 @@ const UserManagement = () => {
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [actionReason, setActionReason] = useState('');
+    const [banDuration, setBanDuration] = useState('permanent'); // '1day', '3days', '7days', '1month', 'permanent'
+    const [flagDuration, setFlagDuration] = useState('1day'); // '1day', '3days', '7days'
 
     // Batch Add Students Modal State
     const [batchAddModalOpen, setBatchAddModalOpen] = useState(false);
@@ -120,12 +122,14 @@ const UserManagement = () => {
         setSelectedUser(user);
         setFlagModalOpen(true);
         setActionReason('');
+        setFlagDuration('1day');
     };
 
     const handleBanUser = (user) => {
         setSelectedUser(user);
         setBanModalOpen(true);
         setActionReason('');
+        setBanDuration('permanent');
     };
 
     const handleConfirmFlag = () => {
@@ -136,6 +140,22 @@ const UserManagement = () => {
             return;
         }
         
+        let flagExpiresAt = null;
+        if (!isCurrentlyFlagged) {
+            const now = new Date();
+            switch (flagDuration) {
+                case '1day':
+                    flagExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    break;
+                case '3days':
+                    flagExpiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+                    break;
+                case '7days':
+                    flagExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    break;
+            }
+        }
+        
         // Toggle flag status
         setUsers(prevUsers => 
             prevUsers.map(user => 
@@ -143,17 +163,43 @@ const UserManagement = () => {
                     ? { 
                         ...user, 
                         status: isCurrentlyFlagged ? 'active' : 'flagged',
-                        flagReason: isCurrentlyFlagged ? undefined : actionReason
+                        flagReason: isCurrentlyFlagged ? undefined : actionReason,
+                        flagDuration: isCurrentlyFlagged ? undefined : flagDuration,
+                        flagExpiresAt: isCurrentlyFlagged ? undefined : flagExpiresAt
                     }
                     : user
             )
         );
         
-        // TODO: Update user status in database
-        showToast(`${selectedUser.name} has been ${isCurrentlyFlagged ? 'unflagged' : 'flagged'}`, 'success');
+        // Update user status in database
+        const statusData = {
+            status: isCurrentlyFlagged ? 'active' : 'flagged',
+            ...(isCurrentlyFlagged ? {} : {
+                flagReason: actionReason,
+                flagDuration: flagDuration,
+                flagExpiresAt: flagExpiresAt
+            })
+        };
+        updateUserStatus(selectedUser.id, statusData).catch(error => {
+            console.error('Failed to update database:', error);
+            showToast('Failed to update database', 'error');
+        });
+        
+        const getDurationText = (duration) => {
+            switch (duration) {
+                case '1day': return ' for 1 day';
+                case '3days': return ' for 3 days';
+                case '7days': return ' for 7 days';
+                default: return '';
+            }
+        };
+        
+        const durationText = isCurrentlyFlagged ? '' : getDurationText(flagDuration);
+        showToast(`${selectedUser.name} has been ${isCurrentlyFlagged ? 'unflagged' : `flagged${durationText}`}`, 'success');
         setFlagModalOpen(false);
         setSelectedUser(null);
         setActionReason('');
+        setFlagDuration('1day');
     };
 
     const handleConfirmBan = () => {
@@ -164,6 +210,27 @@ const UserManagement = () => {
             return;
         }
         
+        let banExpiresAt = null;
+        if (!isCurrentlyBanned && banDuration !== 'permanent') {
+            const now = new Date();
+            switch (banDuration) {
+                case '1day':
+                    banExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    break;
+                case '3days':
+                    banExpiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+                    break;
+                case '7days':
+                    banExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    break;
+                case '1month':
+                    banExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                    break;
+                default:
+                    banExpiresAt = null; // Permanent
+            }
+        }
+        
         // Toggle ban status
         setUsers(prevUsers => 
             prevUsers.map(user => 
@@ -171,17 +238,45 @@ const UserManagement = () => {
                     ? { 
                         ...user, 
                         status: isCurrentlyBanned ? 'active' : 'banned',
-                        banReason: isCurrentlyBanned ? undefined : actionReason
+                        banReason: isCurrentlyBanned ? undefined : actionReason,
+                        banDuration: isCurrentlyBanned ? undefined : banDuration,
+                        banExpiresAt: isCurrentlyBanned ? undefined : banExpiresAt
                     }
                     : user
             )
         );
         
-        // TODO: Update user status in database
-        showToast(`${selectedUser.name} has been ${isCurrentlyBanned ? 'unbanned' : 'banned'}`, 'success');
+        // Update user status in database
+        const statusData = {
+            status: isCurrentlyBanned ? 'active' : 'banned',
+            ...(isCurrentlyBanned ? {} : {
+                banReason: actionReason,
+                banDuration: banDuration,
+                banExpiresAt: banExpiresAt
+            })
+        };
+        updateUserStatus(selectedUser.id, statusData).catch(error => {
+            console.error('Failed to update database:', error);
+            showToast('Failed to update database', 'error');
+        });
+        
+        const getDurationText = (duration) => {
+            switch (duration) {
+                case '1day': return ' for 1 day';
+                case '3days': return ' for 3 days';
+                case '7days': return ' for 7 days';
+                case '1month': return ' for 1 month';
+                case 'permanent': return ' permanently';
+                default: return ' permanently';
+            }
+        };
+        
+        const durationText = isCurrentlyBanned ? '' : getDurationText(banDuration);
+        showToast(`${selectedUser.name} has been ${isCurrentlyBanned ? 'unbanned' : `banned${durationText}`}`, 'success');
         setBanModalOpen(false);
         setSelectedUser(null);
         setActionReason('');
+        setBanDuration('permanent');
     };
 
     const handleCancelAction = () => {
@@ -190,6 +285,8 @@ const UserManagement = () => {
         setDeleteModalOpen(false);
         setSelectedUser(null);
         setActionReason('');
+        setBanDuration('permanent');
+        setFlagDuration('1day');
     };
 
     const handleDeleteUser = (user) => {
@@ -354,17 +451,20 @@ const UserManagement = () => {
             if (!line) continue;
             
             const parts = line.split(',');
-            if (parts.length >= 2) {
-                const name = parts[0].trim();
-                const email = parts[1].trim();
-                const password = parts[2] ? parts[2].trim() : generateRandomPassword();
+            if (parts.length >= 3) {
+                const studentId = parts[0].trim();
+                const name = parts[1].trim();
+                const email = parts[2].trim();
+                const password = parts[3] ? parts[3].trim() : generateRandomPassword();
+                const status = parts[4] ? parts[4].trim() : 'active';
                 
                 students.push({
-                    id: Date.now() + i, // Temporary ID
+                    id: Date.now() + i,
+                    studentId,
                     name,
                     email,
                     password,
-                    status: 'active',
+                    status,
                     createdAt: new Date().toISOString(),
                     role: 'student'
                 });
@@ -389,31 +489,13 @@ const UserManagement = () => {
                 return;
             }
 
-            // TODO: Send to backend API to create students in database
-            const apiUrl = process.env.REACT_APP_API_URL;
-            if (!apiUrl) {
-                showToast("API URL is not configured. Please check environment settings.", 'error');
-                return;
-            }
-
-            const response = await fetch(`${apiUrl}/api/students/batch-create`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ students: newStudents })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to create students');
-            }
-
-            const result = await response.json();
+            // Save students to database
+            const createdStudents = await batchCreateStudents(newStudents);
             
-            // Update local state with new students
-            setUsers(prevUsers => [...prevUsers, ...newStudents]);
+            // Update local state with created students
+            setUsers(prevUsers => [...prevUsers, ...createdStudents]);
             
-            showToast(`Successfully added ${newStudents.length} students`, 'success');
+            showToast(`Successfully added ${createdStudents.length} students to database`, 'success');
             handleCloseBatchAddModal();
             
         } catch (error) {
@@ -551,18 +633,34 @@ const UserManagement = () => {
                                 }
                             </p>
                             {selectedUser.status !== 'flagged' && (
-                                <div className="export-modal-date-input-group">
-                                    <label htmlFor="flagReason">Reason for flagging:</label>
-                                    <textarea
-                                        id="flagReason"
-                                        value={actionReason}
-                                        onChange={(e) => setActionReason(e.target.value)}
-                                        className="export-modal-date-input"
-                                        placeholder="Enter the reason for flagging this user..."
-                                        rows="4"
-                                        style={{resize: 'vertical', fontFamily: 'inherit'}}
-                                    />
-                                </div>
+                                <>
+                                    <div className="export-modal-date-input-group">
+                                        <label htmlFor="flagDuration">Flag Duration:</label>
+                                        <select
+                                            id="flagDuration"
+                                            value={flagDuration}
+                                            onChange={(e) => setFlagDuration(e.target.value)}
+                                            className="export-modal-date-input"
+                                            style={{padding: '8px'}}
+                                        >
+                                            <option value="1day">1 Day</option>
+                                            <option value="3days">3 Days</option>
+                                            <option value="7days">7 Days</option>
+                                        </select>
+                                    </div>
+                                    <div className="export-modal-date-input-group">
+                                        <label htmlFor="flagReason">Reason for flagging:</label>
+                                        <textarea
+                                            id="flagReason"
+                                            value={actionReason}
+                                            onChange={(e) => setActionReason(e.target.value)}
+                                            className="export-modal-date-input"
+                                            placeholder="Enter the reason for flagging this user..."
+                                            rows="4"
+                                            style={{resize: 'vertical', fontFamily: 'inherit'}}
+                                        />
+                                    </div>
+                                </>
                             )}
                             <div className="export-modal-actions">
                                 <button 
@@ -603,18 +701,36 @@ const UserManagement = () => {
                                 }
                             </p>
                             {selectedUser.status !== 'banned' && (
-                                <div className="export-modal-date-input-group">
-                                    <label htmlFor="banReason">Reason for banning:</label>
-                                    <textarea
-                                        id="banReason"
-                                        value={actionReason}
-                                        onChange={(e) => setActionReason(e.target.value)}
-                                        className="export-modal-date-input"
-                                        placeholder="Enter the reason for banning this user..."
-                                        rows="4"
-                                        style={{resize: 'vertical', fontFamily: 'inherit'}}
-                                    />
-                                </div>
+                                <>
+                                    <div className="export-modal-date-input-group">
+                                        <label htmlFor="banDuration">Ban Duration:</label>
+                                        <select
+                                            id="banDuration"
+                                            value={banDuration}
+                                            onChange={(e) => setBanDuration(e.target.value)}
+                                            className="export-modal-date-input"
+                                            style={{padding: '8px'}}
+                                        >
+                                            <option value="1day">1 Day</option>
+                                            <option value="3days">3 Days</option>
+                                            <option value="7days">7 Days</option>
+                                            <option value="1month">1 Month</option>
+                                            <option value="permanent">Permanent (Forever)</option>
+                                        </select>
+                                    </div>
+                                    <div className="export-modal-date-input-group">
+                                        <label htmlFor="banReason">Reason for banning:</label>
+                                        <textarea
+                                            id="banReason"
+                                            value={actionReason}
+                                            onChange={(e) => setActionReason(e.target.value)}
+                                            className="export-modal-date-input"
+                                            placeholder="Enter the reason for banning this user..."
+                                            rows="4"
+                                            style={{resize: 'vertical', fontFamily: 'inherit'}}
+                                        />
+                                    </div>
+                                </>
                             )}
                             <div className="export-modal-actions">
                                 <button 
@@ -725,7 +841,7 @@ const UserManagement = () => {
                                         className="export-modal-date-input"
                                     />
                                     <small style={{color: '#666', fontSize: '12px'}}>
-                                        CSV format: Name, Email, Password (optional)
+                                        CSV format: ID, Name, Email, Password (optional), Status (optional)
                                     </small>
                                 </div>
                             )}
@@ -740,7 +856,7 @@ const UserManagement = () => {
                                     onChange={(e) => setStudentData(e.target.value)}
                                     className="export-modal-date-input"
                                     placeholder={uploadMode === 'manual' 
-                                        ? "Enter student data in CSV format:\nJohn Doe, john@example.com\nJane Smith, jane@example.com, mypassword123\n\nPassword is optional - random passwords will be generated if not provided."
+                                        ? "Enter student data in CSV format:\n202400001, Bob Wilson, 202400001@example.com, password123\n\nFormat: ID, Name, Email, Password (optional), Status (optional)\nStatus options: active, flagged, banned"
                                         : "CSV data will appear here..."}
                                     rows="8"
                                     style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}

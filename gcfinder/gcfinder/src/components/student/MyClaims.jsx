@@ -130,7 +130,7 @@ const MyClaims = () => {
                 <div className="approved-items-notification">
                     <i className="fas fa-info-circle"></i>
                     <span>
-                        You have {approvedClaimsCount} item{approvedClaimsCount > 1 ? 's' : ''} available for claiming at the Disciplinary Office.
+                        You have {approvedClaimsCount} item{approvedClaimsCount > 1 ? 's' : ''} available for claiming at the Room 122(Disciplinary Office).
                     </span>
                 </div>
             )}

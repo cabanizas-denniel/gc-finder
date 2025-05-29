@@ -124,7 +124,7 @@ const Layout = () => {
     const handleNavigate = useCallback((path) => {
         // Block restricted features for flagged users
         if (currentUser.status === 'flagged') {
-            const restrictedPaths = ['report-item', 'my-claims', 'messages'];
+            const restrictedPaths = ['report-item', 'messages'];
             if (restrictedPaths.includes(path)) {
                 alert(`Access restricted: Your account has been flagged. ${currentUser.flagReason || ''}`);
                 return;
@@ -165,7 +165,7 @@ const Layout = () => {
                 <nav>
                     <ul>
                         {navigationItems.map((item, index) => {
-                            const restrictedPaths = ['report-item', 'my-claims', 'messages'];
+                            const restrictedPaths = ['report-item', 'messages'];
                             const isRestricted = currentUser.status === 'flagged' && restrictedPaths.includes(item.path);
                             
                             return (

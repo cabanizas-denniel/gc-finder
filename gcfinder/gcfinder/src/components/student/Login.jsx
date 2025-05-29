@@ -4,6 +4,7 @@ import { FaIdCard, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaInfoCircle } from
 import gcLogo from '../../assets/gc-finder.png';
 import logo from '../../assets/gc-logo.png';
 import { loginWithStudentId } from '../../firebase';
+import { updateUserStatus } from '../../admin-firebase';
 
 const Login = () => {
   const [studentId, setStudentId] = useState('');
@@ -53,12 +54,61 @@ const Login = () => {
     try {
       const userData = await loginWithStudentId(studentId, password);
       
+      // Check if user is flagged
+      if (userData.status === 'flagged') {
+        const flagExpiresAt = userData.flagExpiresAt;
+        
+        // Check if flag has expired
+        if (flagExpiresAt) {
+          const expiryDate = flagExpiresAt.toDate ? flagExpiresAt.toDate() : new Date(flagExpiresAt);
+          const now = new Date();
+          if (expiryDate <= now) {
+            // Flag has expired, update status to active
+            updateUserStatus(userData.id, { status: 'active' }).catch(error => {
+              console.error('Failed to update expired flag status:', error);
+            });
+          }
+        }
+      }
+      
       // Check if user is banned
       if (userData.status === 'banned') {
-        const banReason = userData.banReason || 'No specific reason provided';
-        setError(`Account Banned\n\nReason: ${banReason}\n\nContact the Disciplinary Office to resolve this issue.`);
-        setLoading(false);
-        return;
+        const banDuration = userData.banDuration || 'permanent';
+        const banExpiresAt = userData.banExpiresAt;
+        
+        // Check if ban has expired
+        if (banDuration !== 'permanent' && banExpiresAt) {
+          const expiryDate = banExpiresAt.toDate ? banExpiresAt.toDate() : new Date(banExpiresAt);
+          const now = new Date();
+          if (expiryDate <= now) {
+            // Ban has expired, allow login to proceed normally
+            // Update user status to 'active' in database
+            updateUserStatus(userData.id, { status: 'active' }).catch(error => {
+              console.error('Failed to update expired ban status:', error);
+            });
+          } else {
+            // Ban is still active
+            const banReason = userData.banReason || 'No specific reason provided';
+            const durationMap = {
+              '1day': '1 day',
+              '3days': '3 days', 
+              '7days': '7 days',
+              '1month': '1 month'
+            };
+            const readableDuration = durationMap[banDuration] || banDuration;
+            const durationText = `Duration: ${readableDuration}\nExpires: ${expiryDate.toLocaleDateString()} at ${expiryDate.toLocaleTimeString()}`;
+            
+            setError(`Account Banned\n\nReason: ${banReason}\n\n${durationText}\n\nContact the Disciplinary Office (Room 122) to resolve this issue.`);
+            setLoading(false);
+            return;
+          }
+        } else {
+          // Permanent ban
+          const banReason = userData.banReason || 'No specific reason provided';
+          setError(`Account Banned\n\nReason: ${banReason}\n\nThis is a permanent ban.\n\nContact the Disciplinary Office (Room 122) to resolve this issue.`);
+          setLoading(false);
+          return;
+        }
       }
       
       // Store user data in localStorage with proper shape for our context

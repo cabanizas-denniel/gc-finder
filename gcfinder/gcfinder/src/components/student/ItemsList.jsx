@@ -4,6 +4,11 @@ import { submitItemClaim, deleteStudentReportedItem } from '../../firebase';
 import Toast, { useToast } from '../Toast';
 
 const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdated }) => {
+    // Get current user status
+    const userDataString = localStorage.getItem('userData');
+    const currentUser = userDataString ? JSON.parse(userDataString) : null;
+    const isFlagged = currentUser?.status === 'flagged';
+    
     const [showModal, setShowModal] = useState(false);
     const [showClaimModal, setShowClaimModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
@@ -131,7 +136,7 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
             if (onItemUpdated && submissionResult.itemNewStatus) {
                 onItemUpdated(selectedItem.id, submissionResult.itemNewStatus);
             }
-            // navigate('/my-claims'); 
+            navigate('/my-claims'); 
 
         } catch (error) {
             console.error("Error submitting claim from component:", error);
@@ -274,7 +279,7 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                                         <h3>Claim Location:</h3>
                                         <span className="location-badge">
                                             <i className="fas fa-map-marker-alt"></i>
-                                            Disciplinary Office
+                                            Room 122 (Disciplinary Office)
                                         </span>
                                     </div>
                                     
@@ -309,7 +314,16 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                             {!isReporter(selectedItem) && (selectedItem.status === "Claimed" || selectedItem.status === "Claiming") && (
                                 <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px'}}>
                                     <p>Believe this item is yours?</p>
-                                    <button className="btn edit" onClick={handleContact}>
+                                    <button 
+                                        className="btn edit" 
+                                        onClick={handleContact}
+                                        disabled={isFlagged}
+                                        style={{
+                                            opacity: isFlagged ? 0.5 : 1,
+                                            cursor: isFlagged ? 'not-allowed' : 'pointer'
+                                        }}
+                                        title={isFlagged ? 'Feature restricted for flagged accounts' : 'Contact Disciplinary Office'}
+                                    >
                                         <i className="fas fa-edit"></i> Contact Disciplinary Office.
                                     </button>
                                 </div>

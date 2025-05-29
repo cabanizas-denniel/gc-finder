@@ -283,4 +283,55 @@ export const unarchiveItemInDb = async (itemId) => {
     console.error('Error unarchiving item in Firestore:', error);
     throw error;
   }
+};
+
+// Batch create students in Firestore
+export const batchCreateStudents = async (students) => {
+  try {
+    const db = getFirestore();
+    const studentsRef = collection(db, 'students');
+    
+    const createdStudents = [];
+    
+    for (const student of students) {
+      const docRef = await addDoc(studentsRef, {
+        studentId: student.studentId,
+        name: student.name,
+        email: student.email,
+        password: student.password,
+        status: student.status || 'active',
+        role: student.role || 'student',
+        createdAt: serverTimestamp()
+      });
+      
+      createdStudents.push({
+        id: docRef.id,
+        ...student
+      });
+    }
+    
+    return createdStudents;
+  } catch (error) {
+    console.error("Error creating students:", error);
+    throw error;
+  }
+};
+
+// Update user status in Firestore
+export const updateUserStatus = async (userId, statusData) => {
+  try {
+    const userRef = doc(db, 'students', userId);
+    await updateDoc(userRef, {
+      status: statusData.status,
+      ...(statusData.flagReason && { flagReason: statusData.flagReason }),
+      ...(statusData.banReason && { banReason: statusData.banReason }),
+      ...(statusData.banDuration && { banDuration: statusData.banDuration }),
+      ...(statusData.banExpiresAt && { banExpiresAt: statusData.banExpiresAt }),
+      updatedAt: serverTimestamp()
+    });
+    return true;
+  } catch (error) {
+    console.error("Error updating user status:", error);
+    throw error;
+  }
 }; 

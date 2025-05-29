@@ -144,17 +144,16 @@ export const submitItemClaim = async (itemData, claimerData, claimDetails) => {
     // 1. Add the new claim document
     const claimDocRef = await addDoc(claimsCollectionRef, newClaim);
 
-    // 2. Update the status of the original item in the 'items' collection
-    const newStatusForItem = 'Pending'; // Or another status like 'Claimed-PendingApproval' if you prefer more detail
-    await updateDoc(itemRef, {
-      status: newStatusForItem,
-      updatedAt: serverTimestamp() // Also update the item's updatedAt timestamp
-    });
+    // 2. Don't update item status - keep it 'Unclaimed' for other students to see
+    // await updateDoc(itemRef, {
+    //   status: newStatusForItem,
+    //   updatedAt: serverTimestamp()
+    // });
     
     return {
       id: claimDocRef.id,
-      ...newClaim,
-      itemNewStatus: newStatusForItem // Return the new status for the item
+      ...newClaim
+      // itemNewStatus: newStatusForItem // Remove since we're not updating status
     };
   } catch (error) {
     console.error('Error submitting item claim and updating item status:', error);
