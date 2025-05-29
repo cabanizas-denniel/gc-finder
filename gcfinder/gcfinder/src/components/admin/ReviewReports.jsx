@@ -207,7 +207,7 @@ const ReviewReports = () => {
                                     )}
                                     <div className="report-actions">
                                         <button 
-                                            className="approve-btn"
+                                            className="report-approve-btn"
                                             onClick={() => handleApproveItem(report.id)}
                                             disabled={loading}
                                         >

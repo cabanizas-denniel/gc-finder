@@ -539,7 +539,7 @@
     margin-top: 5px;
 }
 
-.attach-btn, .send-btn {
+.attach-btn {
     background: none;
     border: none;
     font-size: 18px;
@@ -550,7 +550,7 @@
     transition: background-color 0.3s;
 }
 
-.attach-btn:hover, .send-btn:hover {
+.attach-btn:hover {
     background-color: #e0e0e0;
 }
 

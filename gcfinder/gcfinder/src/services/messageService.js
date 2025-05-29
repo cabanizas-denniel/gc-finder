@@ -68,7 +68,7 @@ class MessageService {
     }
 
     // Send a message
-    async sendMessage(conversationId, senderId, senderName, text, isAdmin = false) {
+    async sendMessage(conversationId, senderId, senderName, text, isAdmin = false, imageData = null) {
         try {
             const messagesRef = collection(db, 'conversations', conversationId, 'messages');
             
@@ -80,6 +80,11 @@ class MessageService {
                 timestamp: serverTimestamp(),
                 read: false
             };
+
+            // Add image data if provided
+            if (imageData) {
+                messageData.imageData = imageData;
+            }
 
             // Add message to subcollection
             await addDoc(messagesRef, messageData);
@@ -100,7 +105,7 @@ class MessageService {
         }
     }
 
-    // Get conversations for a user
+    // Get conversations for a user - SIMPLE VERSION (no extra reads)
     getConversations(userId, isAdmin, callback) {
         console.log(`Getting conversations for ${isAdmin ? 'admin' : 'student'} ${userId}`);
         
@@ -108,7 +113,7 @@ class MessageService {
             let q;
             
             if (isAdmin) {
-                // Admin can see all conversations - start with simple query
+                // Admin can see all conversations
                 console.log('Setting up admin conversations query');
                 q = query(collection(db, 'conversations'));
             } else {
@@ -171,18 +176,18 @@ class MessageService {
                     callback(conversations);
                 } catch (error) {
                     console.error('Error processing conversations snapshot:', error);
-                    callback([]); // Return empty array on error
+                    callback([]);
                 }
             }, (error) => {
                 console.error('Error in conversations listener:', error);
-                callback([]); // Return empty array on error
+                callback([]);
             });
 
             return unsubscribe;
         } catch (error) {
             console.error('Error setting up conversations listener:', error);
-            callback([]); // Return empty array on error
-            return () => {}; // Return empty function instead of throwing
+            callback([]);
+            return () => {};
         }
     }
 
@@ -264,7 +269,7 @@ class MessageService {
                     email.toLowerCase().includes(searchTerm.toLowerCase())
                 ) {
                     users.push({
-                        id: data.student_id, // Use student_id as the identifier
+                        id: data.student_id,
                         name: fullName,
                         email: email,
                         student_id: studentId,
@@ -280,7 +285,7 @@ class MessageService {
         }
     }
 
-    // Mark messages as read
+    // Mark messages as read - SIMPLE VERSION (no extra reads)
     async markMessagesAsRead(conversationId, userId) {
         try {
             const messagesRef = collection(db, 'conversations', conversationId, 'messages');

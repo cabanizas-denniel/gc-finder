@@ -11,8 +11,11 @@ const Messages = () => {
     const [showChat, setShowChat] = useState(false);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState(null);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
     const chatMessagesRef = useRef(null);
     const messageInputRef = useRef(null);
+    const fileInputRef = useRef(null);
     const unsubscribeConversations = useRef(null);
     const unsubscribeMessages = useRef(null);
 
@@ -167,39 +170,44 @@ const Messages = () => {
         }
     }, [isMobileView]);
 
+    // Clear selected image
+    const clearSelectedImage = useCallback(() => {
+        setSelectedImage(null);
+        setImagePreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }, []);
+
     // Handle sending a message
     const sendMessage = useCallback(async () => {
-        if (!messageInput.trim() || !currentUser) return;
+        if ((!messageInput.trim() && !selectedImage) || !currentUser) return;
         
         let conversationId = activeConversation?.id;
-        
-        // If no active conversation, create one
         if (!conversationId) {
             conversationId = await createConversationWithAdmin();
-            if (!conversationId) {
-                console.error('Failed to create conversation');
-                return;
-            }
+            if (!conversationId) return;
         }
         
         try {
-            await messageService.sendMessage(
-                conversationId,
-                currentUser.id,
-                currentUser.name,
-                messageInput,
-                false // not admin
-            );
+            let messageText = messageInput.trim();
+            let imageData = null;
             
-            setMessageInput('');
-            
-            if (messageInputRef.current) {
-                messageInputRef.current.focus();
+            if (selectedImage) {
+                imageData = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(selectedImage);
+                });
+                if (!messageText) messageText = '[Image]';
             }
+            
+            await messageService.sendMessage(conversationId, currentUser.id, currentUser.name, messageText, false, imageData);
+            setMessageInput('');
+            clearSelectedImage();
+            messageInputRef.current?.focus();
         } catch (error) {
             console.error('Error sending message:', error);
         }
-    }, [messageInput, activeConversation, currentUser, createConversationWithAdmin]);
+    }, [messageInput, selectedImage, activeConversation, currentUser, createConversationWithAdmin, clearSelectedImage]);
 
     // Handle back button click in mobile view
     const handleBackClick = useCallback(() => {
@@ -217,6 +225,20 @@ const Messages = () => {
             sendMessage();
         }
     }, [sendMessage]);
+
+    // Handle attach button click
+    const handleAttachClick = useCallback(() => fileInputRef.current?.click(), []);
+
+    // Handle image selection
+    const handleImageSelect = useCallback((e) => {
+        const file = e.target.files[0];
+        if (file?.type.startsWith('image/')) {
+            setSelectedImage(file);
+            const reader = new FileReader();
+            reader.onload = (e) => setImagePreview(e.target.result);
+            reader.readAsDataURL(file);
+        }
+    }, []);
 
     // Format timestamp
     const formatTime = (timestamp) => {
@@ -284,7 +306,7 @@ const Messages = () => {
                                             : conv.lastMessage
                                     ) : 'Start a conversation'}
                                 </p>
-                                        {conv.unread && <span className="unread-badge">1 new</span>}
+                                        {conv.unread && <span className="unread-badge">Reply?</span>}
                                     </div>
                                 </div>
                             ))}
@@ -320,7 +342,12 @@ const Messages = () => {
                                         <div 
                                             key={msg.id} 
                                     className={`message ${msg.senderId === currentUser?.id ? 'sent' : 'received'}`}
-                                        >                                            
+                                        >
+                                            {msg.imageData && (
+                                                <div className="message-image">
+                                                    <img src={msg.imageData} alt="Shared image" />
+                                                </div>
+                                            )}
                                             <p>{msg.text}</p>
                                     <span className="time">{formatTime(msg.timestamp)}</span>
                                         </div>
@@ -335,9 +362,29 @@ const Messages = () => {
                             )}
                                 </div>
                                 <div className="chat-input-area">
-                            <button className="attach-btn" disabled>
+                            <button className="attach-btn" onClick={handleAttachClick}>
                                         <i className="fas fa-paperclip"></i>
                                     </button>
+                                    
+                                    {/* Hidden file input */}
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleImageSelect}
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                    />
+                                    
+                                    {/* Image preview */}
+                                    {imagePreview && (
+                                        <div className="image-preview">
+                                            <img src={imagePreview} alt="Preview" className="preview-image" />
+                                            <button className="remove-image" onClick={clearSelectedImage}>
+                                                <i className="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    )}
+                                    
                                     <input 
                                         type="text" 
                                         placeholder="Type a message..." 
@@ -349,7 +396,7 @@ const Messages = () => {
                                     <button 
                                         className="send-btn"
                                         onClick={sendMessage}
-                                disabled={!messageInput.trim()}
+                                disabled={!messageInput.trim() && !selectedImage}
                                     >
                                         <i className="fas fa-paper-plane"></i>
                                     </button>
@@ -363,9 +410,29 @@ const Messages = () => {
                                     <p>Type a message below to start a conversation</p>
                                 </div>
                                 <div className="chat-input-area">
-                                    <button className="attach-btn" disabled>
+                                    <button className="attach-btn" onClick={handleAttachClick}>
                                         <i className="fas fa-paperclip"></i>
                                     </button>
+                                    
+                                    {/* Hidden file input */}
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleImageSelect}
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                    />
+                                    
+                                    {/* Image preview */}
+                                    {imagePreview && (
+                                        <div className="image-preview">
+                                            <img src={imagePreview} alt="Preview" className="preview-image" />
+                                            <button className="remove-image" onClick={clearSelectedImage}>
+                                                <i className="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    )}
+                                    
                                     <input 
                                         type="text" 
                                         placeholder="Type your first message..." 
