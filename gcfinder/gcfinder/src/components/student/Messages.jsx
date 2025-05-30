@@ -161,6 +161,17 @@ const Messages = () => {
         }
     }, [messages]);
 
+    // Mobile-specific scroll to bottom when chat becomes visible
+    useEffect(() => {
+        if (isMobileView && showChat && activeConversation && chatMessagesRef.current) {
+            setTimeout(() => {
+                if (chatMessagesRef.current) {
+                    chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+                }
+            }, 200);
+        }
+    }, [showChat, activeConversation, isMobileView]);
+
     // Handle conversation click
     const handleConversationClick = useCallback((conversation) => {
         setActiveConversation(conversation);
@@ -322,7 +333,7 @@ const Messages = () => {
                     </div>
 
                     {/* Chat Panel */}
-                    <div className={`chat-panel ${isMobileView && !showChat ? 'hidden' : ''}`}>
+                    <div className={`chat-panel ${isMobileView && !showChat && conversations.length > 0 ? 'hidden' : ''}`}>
                         {activeConversation ? (
                             <>
                                 <div className="chat-header">

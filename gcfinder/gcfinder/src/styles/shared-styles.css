@@ -2105,6 +2105,14 @@ header {
         max-width: 80%;
     }
 
+    .message-image img{
+        max-width: 100%;
+    }
+
+    .chat-input-area input {
+        width: 100%;
+    }
+
     /* ----- Report Item ----- */
     .report-form-container {
         padding: 15px;
@@ -2142,6 +2150,19 @@ header {
     .tab-btn {
         padding: 8px 15px;
         font-size: 13px;
+    }
+
+    /* ----- Messages ----- */
+    .chat-header .profile-pic {
+        margin-right: 10px;
+    }
+
+    .chat-header .back-button{
+        margin-right: 5px;
+    }
+
+    .chat-header-info .status{
+        font-size: 12px;
     }
 
     /* ----- Help Center ----- */
@@ -2188,7 +2209,7 @@ header {
 
 /* Toast Types */
 .toast-success {
-    background: var(--primary-color);
+    background: var(--primary-color-light);
 }
 
 .toast-error {

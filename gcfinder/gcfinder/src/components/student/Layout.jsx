@@ -9,6 +9,8 @@ const Layout = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+    const [showFlaggedModal, setShowFlaggedModal] = useState(false);
+    const [flaggedModalMessage, setFlaggedModalMessage] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [currentUser, setCurrentUser] = useState({
@@ -126,7 +128,8 @@ const Layout = () => {
         if (currentUser.status === 'flagged') {
             const restrictedPaths = ['report-item', 'messages'];
             if (restrictedPaths.includes(path)) {
-                alert(`Access restricted: Your account has been flagged. ${currentUser.flagReason || ''}`);
+                setFlaggedModalMessage(`Access restricted: Your account has been flagged. ${currentUser.flagReason || ''}`);
+                setShowFlaggedModal(true);
                 return;
             }
         }
@@ -206,7 +209,7 @@ const Layout = () => {
             {/* Main Content */}
             <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
                 <header style={{
-                    justifyContent: currentUser.status === 'flagged' ? 'space-between' : 'flex-end'
+                    justifyContent: currentUser.status === 'flagged' && !isMobile ? 'space-between' : 'flex-end'
                 }}>
                     {/* Burger Menu Button */}
                     <button className="burger-menu" onClick={toggleSidebar}>
@@ -219,11 +222,12 @@ const Layout = () => {
                             className="flagged-user-banner"
                             onClick={() => {
                                 const reason = currentUser.flagReason || 'No specific reason provided';
-                                alert(`Account Flagged\n\nReason: ${reason}\n\nContact Disciplinary Office to resolve this issue.`);
+                                setFlaggedModalMessage(`Account Flagged\n\nReason: ${reason}\n\nContact Disciplinary Office to resolve this issue.`);
+                                setShowFlaggedModal(true);
                             }}
                         >
                             <i className="fas fa-exclamation-triangle"></i>
-                            Account Flagged
+                            <p>Account Flagged</p>
                         </div>
                     )}
                     
@@ -253,6 +257,25 @@ const Layout = () => {
                             <button className="btn-yes" onClick={handleLogout}>Yes</button>
                             <button className="btn-cancel" onClick={() => setShowLeaveDialog(false)}>
                                 Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Flagged User Modal */}
+            {showFlaggedModal && (
+                <div className="leave-dialog show" onClick={(e) => {
+                    if (e.target.className === 'leave-dialog show') {
+                        setShowFlaggedModal(false);
+                    }
+                }}>
+                    <div className="leave-dialog-content">
+                        <h2>Access Restricted</h2>
+                        <p style={{ whiteSpace: 'pre-line', marginBottom: '20px' }}>{flaggedModalMessage}</p>
+                        <div className="leave-dialog-buttons">
+                            <button className="btn-cancel" onClick={() => setShowFlaggedModal(false)}>
+                                OK
                             </button>
                         </div>
                     </div>

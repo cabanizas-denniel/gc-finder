@@ -966,6 +966,12 @@ const UserManagement = () => {
                                         )}
                                     </th>
                                     <th>Email</th>
+                                    <th onClick={() => requestSort('year_level')}>
+                                        Year Level
+                                        {sortConfig.key === 'year_level' && (
+                                            <i className={`fas fa-sort-${sortConfig.direction === 'ascending' ? 'up' : 'down'}`}></i>
+                                        )}
+                                    </th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -975,6 +981,7 @@ const UserManagement = () => {
                                     <tr key={user.id || index} className={user.status}>
                                         <td className="user-name">{user.name}</td>
                                         <td>{user.email}</td>
+                                        <td>{user.year_level}</td>
                                         <td className="user-status-badge">{renderStatusBadge(user.status)}</td>
                                         <td className="actions">
                                             <button 

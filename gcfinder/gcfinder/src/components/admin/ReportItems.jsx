@@ -176,9 +176,13 @@ const ReportItem = () => {
                         };
             // Use the submitFoundItem function to send data to Firebase
             await submitFoundItem(formData, uploadedImages);
+        
+            showToast('Report submitted successfully!', 'success');
             
-            alert('Report submitted successfully!');
-            navigate('/admin/dashboard');
+            // Navigate to dashboard after a short delay to allow toast to be seen
+            setTimeout(() => {
+                navigate('/admin/dashboard');
+            }, 2000);
         } catch (error) {
             console.error('Error submitting form:', error);
             alert('An error occurred while submitting the report. Please try again.');

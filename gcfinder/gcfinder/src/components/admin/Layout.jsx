@@ -10,11 +10,34 @@ const Layout = () => {
     const location = useLocation();
     const [showLeaveDialog, setShowLeaveDialog] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [currentUser, setCurrentUser] = useState({
         displayName: "Loading...",
         userEmail: "",
         profilePicture: profilePic,
     });
+
+        // Handle window resize and sidebar state
+        useEffect(() => {
+            const handleResize = () => {
+                const width = window.innerWidth;
+                setIsMobile(width <= 768);
+                if (width <= 768) {
+                    setIsSidebarOpen(false);
+                } else {
+                    setIsSidebarOpen(true);
+                }
+            };
+    
+            // Initial check
+            handleResize();
+    
+            // Add event listener
+            window.addEventListener('resize', handleResize);
+            
+            // Cleanup
+            return () => window.removeEventListener('resize', handleResize);
+        }, []);
 
     const navigationItems = [
         { path: 'admin/dashboard', icon: 'fas fa-home', label: 'Dashboard' },
@@ -116,6 +139,10 @@ const Layout = () => {
                     </ul>
                 </div>
             </aside>
+
+            {isSidebarOpen && isMobile && (
+                <div className="sidebar-overlay" onClick={toggleSidebar} />
+            )}
 
             {/* Main Content */}
             <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>

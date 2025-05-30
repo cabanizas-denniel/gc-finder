@@ -204,7 +204,7 @@ const Dashboard = () => {
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                label={({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                                label={window.innerWidth < 768 ? null : ({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
                                 outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
@@ -219,6 +219,11 @@ const Dashboard = () => {
                                 layout="horizontal"
                                 iconSize={12}
                                 wrapperStyle={{ fontSize: '14px' }}
+                                formatter={(value, entry) => {
+                                    const total = dashboardStats.itemCategoryDistribution.reduce((sum, item) => sum + item.value, 0);
+                                    const percentage = ((entry.payload.value / total) * 100).toFixed(1);
+                                    return `${value}: ${entry.payload.value} (${percentage}%)`;
+                                }}
                             />
                         </PieChart>
                     </ResponsiveContainer>
@@ -245,7 +250,7 @@ const Dashboard = () => {
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                label={({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                                label={window.innerWidth < 768 ? null : ({ name, percent, value }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
                                 outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="value"
@@ -260,6 +265,11 @@ const Dashboard = () => {
                                 layout="horizontal"
                                 iconSize={12}
                                 wrapperStyle={{ fontSize: '14px' }}
+                                formatter={(value, entry) => {
+                                    const total = dashboardStats.reportResolutionData.reduce((sum, item) => sum + item.value, 0);
+                                    const percentage = ((entry.payload.value / total) * 100).toFixed(1);
+                                    return `${value}: ${entry.payload.value} (${percentage}%)`;
+                                }}
                             />
                         </PieChart>
                     </ResponsiveContainer>

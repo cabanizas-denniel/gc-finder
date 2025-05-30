@@ -212,7 +212,6 @@ const BrowseItems = () => {
                         ref={fileInputRef}
                         onChange={handleImageUpload}
                         accept="image/*"
-                        capture="environment"
                         style={{ display: 'none' }}
                     />
                 </div>

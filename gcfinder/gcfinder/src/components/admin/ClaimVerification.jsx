@@ -373,8 +373,8 @@ const ClaimVerification = () => {
                         <label>Proof Image</label>
                         <img 
                             src={selectedClaim.proofImageUrl} 
-                            alt="Proof of ownership" 
-                            style={{ maxWidth: '350px', marginTop: '10px', marginLeft: '10px', marginRight: 'auto', display: 'block' }}
+                            alt="No image provided" 
+                            style={{ maxWidth: '350px', marginTop: '10px', marginRight: 'auto', display: 'block' }}
                         />
                     </div>
 

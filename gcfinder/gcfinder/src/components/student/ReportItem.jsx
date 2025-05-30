@@ -176,9 +176,14 @@ const ReportItem = () => {
             
             // Use the submitFoundItem function to send data to Firebase
             await submitFoundItem(submissionData, uploadedImages);
+        
+            // Show success toast first
+            showToast('Report submitted successfully!', 'success');
             
-            alert('Report submitted successfully!');
-            navigate('/dashboard');
+            // Navigate to dashboard after a short delay to allow toast to be seen
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 2000);
         } catch (error) {
             console.error('Error submitting form:', error);
             alert('An error occurred while submitting the report. Please try again.');
@@ -518,7 +523,7 @@ const ReportItem = () => {
                         </div>
 
                         <div className="disclaimer">
-                        <p>By submitting this report, you confirm that all information provided is accurate and true, and that the item has already been, or will be, submitted to the Disciplinary Office.</p>
+                        <p>By submitting this report, you confirm that all information provided is accurate and true, and that the item has already been, or will be, submitted to <strong>Room 122 (Disciplinary Office)</strong>.</p>
                         </div>
 
                         <div className="form-buttons">

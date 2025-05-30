@@ -67,7 +67,7 @@ h2{
     min-width: 0;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+
     height: 60vh;
 }
 
@@ -125,6 +125,7 @@ h2{
     display: flex;
     flex-direction: column;
     gap: 12px;
+    overflow-y: auto;
 }
 
 .claim-item {
@@ -1099,80 +1100,6 @@ h2{
     left: 30px;
 }
 
-@media (max-width: 768px) {
-
-    /*Main Page*/
-    .burger-menu {
-        display: block;
-    }
-
-    .sidebar {
-        transform: translateX(-100%);
-    }
-
-    .sidebar.open {
-        transform: translateX(0);
-    }
-
-    .main {
-        margin-left: 0;
-    }
-
-    .header {
-        padding: 15px;
-    }
-
-    .dashboard-container {
-        padding: 15px;
-    }
-
-    .stats-cards {
-        grid-template-columns: 1fr;
-    }
-
-    .dashboard-chart {
-        gap: 20px;
-    }
-
-    .claims-container {
-        grid-template-columns: 1fr;
-    }
-
-    .claims-list {
-        border-right: none;
-        border-bottom: 1px solid #eee;
-    }
-
-    .claim-actions {
-        flex-direction: column;
-    }
-
-    .approve-btn,
-    .reject-btn {
-        width: 100%;
-    }
-
-    /*Report Page*/
-    .report-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .search-box {
-        max-width: none;
-    }
-
-    .reports-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .notifications-panel {
-        width: 100%;
-        right: 0;
-        top: 60px;
-    }
-} 
-
 @media (max-width: 1024px) {
     .main {
         margin-left: 200px;
@@ -1921,14 +1848,6 @@ h2{
     background: #e8f5e8;
 }
 
-.chat-header .profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    margin-right: 12px;
-    object-fit: cover;
-}
-
 .chat-header-info h3 {
     margin: 0 0 2px 0;
     font-size: 1rem;
@@ -2217,6 +2136,98 @@ h2{
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+    
+    /*Main Page*/
+    .burger-menu {
+        display: block;
+    }
+
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .main {
+        margin-left: 0;
+    }
+
+    .header {
+        padding: 15px;
+    }
+
+    /*Dashboard*/
+    .stats-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-chart {
+        gap: 20px;
+    }
+
+    .claims-container {
+        grid-template-columns: 1fr;
+    }
+
+    .claims-list {
+        border-right: none;
+        border-bottom: 1px solid #eee;
+    }
+
+    .claim-actions {
+        flex-direction: column;
+    }
+
+    .approve-btn,
+    .reject-btn {
+        width: 100%;
+    }
+
+    /*Report Page*/
+    .report-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .search-box {
+        max-width: none;
+    }
+
+    .reports-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /*User Management*/
+    .user-management-container{
+        margin-top: 0px;
+        padding: 0px;
+    }
+
+    .page-header{
+        flex-direction: column;
+    }
+
+    .action-buttons{
+        margin-top: 10px;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .batch-add-btn{
+        padding: 8px 16px;
+    }
+
+    /*Item Management*/
+    .item-management-container{
+        margin-top: 0px;
+        padding: 0px;
+    }
+
+    /*Messages*/
+    
     .messages-section {
         grid-template-columns: 1fr;
         margin: 10px;
@@ -2268,4 +2279,43 @@ h2{
         font-size: 0.8rem;
         padding: 6px 10px;
     }
+}
+
+@media (max-width: 480px) {
+    .dashboard-charts-container {
+        flex-direction: column;
+    }
+
+    .dashboard-pie-chart-container{
+        
+    }
+
+    .dashboard-resolution-chart-container{
+
+    }
+
+    /*Verify Claims*/
+    .claim-content-header{
+        flex-direction: column;
+    }
+
+    .claim-content-header img{
+        width: 100%;
+    }
+
+    /*User Management*/
+    .search-bar input{
+        padding: 8px 30px;
+    }
+
+    .users-table-container{
+        overflow-x: auto;
+    }
+
+    /*Item Management*/
+    .items-table-container{
+        overflow-x: auto;
+    }
+    
+
 }

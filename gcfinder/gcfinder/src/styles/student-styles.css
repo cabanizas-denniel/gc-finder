@@ -470,13 +470,6 @@
     display: none;
 }
 
-.chat-header .profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    margin-right: 15px;
-}
-
 .chat-header-info {
     flex: 1;
 }
@@ -941,6 +934,16 @@ input:checked + .slider:before {
     .claims-grid {
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     }
+
+    /* ----- Flagged User ----- */
+    header {
+        gap: 20px;
+    }
+
+    .flagged-user-banner{
+        gap: 0px;
+    }
+
 }
 
 @media (max-width: 480px) {
@@ -961,6 +964,12 @@ input:checked + .slider:before {
     .claims-section h1 {
         font-size: 24px;
     }  
+
+    /* ----- Flagged User ----- */
+    .flagged-user-banner p{
+        font-size: 0px;
+    }
+
 }
 
 .location-badge {

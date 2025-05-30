@@ -63,6 +63,7 @@ export const getAllUsers = async () => {
         id: doc.id,
         name: userData.name || `${userData.full_name}`,
         email: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
+        year_level: userData.year_level || 'N/A',
         status: userData.status || 'active'
       });
     });
@@ -136,6 +137,7 @@ export const getPendingItems = async () => {
         status: 'pending',
         date: itemData.date,
         image: itemData.imageData?.[0]?.dataUrl || 'https://via.placeholder.com/150',
+        images: itemData.imageData?.map(img => img.dataUrl) || [],
         description: itemData.description,
         location: itemData.location,
         exactLocation: itemData.exactLocation,

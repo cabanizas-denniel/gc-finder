@@ -13,6 +13,7 @@ const ReviewReports = () => {
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [currentImageIndex, setCurrentImageIndex] = useState({});
 
     // Fetch pending items on component mount
     useEffect(() => {
@@ -136,6 +137,195 @@ const ReviewReports = () => {
         }
     };
 
+    // Image navigation functions
+    const nextImage = (reportId, totalImages) => {
+        setCurrentImageIndex(prev => ({
+            ...prev,
+            [reportId]: ((prev[reportId] || 0) + 1) % totalImages
+        }));
+    };
+
+    const prevImage = (reportId, totalImages) => {
+        setCurrentImageIndex(prev => ({
+            ...prev,
+            [reportId]: prev[reportId] > 0 ? prev[reportId] - 1 : totalImages - 1
+        }));
+    };
+
+    const goToImage = (reportId, index) => {
+        setCurrentImageIndex(prev => ({
+            ...prev,
+            [reportId]: index
+        }));
+    };
+
+    // Enhanced Image Gallery Component
+    const ImageGallery = ({ report }) => {
+        const images = report.images && report.images.length > 0 ? report.images : [report.image];
+        const currentIndex = currentImageIndex[report.id] || 0;
+        const hasMultipleImages = images.length > 1;
+
+        const galleryStyles = {
+            container: {
+                position: 'relative',
+                width: '100%',
+                height: '200px',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                backgroundColor: '#f5f5f5'
+            },
+            image: {
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                transition: 'opacity 0.3s ease'
+            },
+            navButton: {
+                position: 'absolute',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '40px',
+                height: '40px',
+                border: 'none',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                fontSize: '18px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                zIndex: 2
+            },  
+            prevButton: {
+                left: '10px'
+            },
+            nextButton: {
+                right: '10px'
+            },
+            dotsContainer: {
+                position: 'absolute',
+                bottom: '12px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                gap: '6px',
+                zIndex: 2
+            },
+            dot: {
+                width: '8px',
+                height: '8px',
+                border: 'none',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+            },
+            activeDot: {
+                backgroundColor: 'white',
+                boxShadow: '0 0 4px rgba(0,0,0,0.3)'
+            },
+            inactiveDot: {
+                backgroundColor: 'rgba(255, 255, 255, 0.6)'
+            },
+            counter: {
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '500',
+                zIndex: 2
+            },
+            imagesBadge: {
+                position: 'absolute',
+                top: '12px',
+                left: '12px',
+                backgroundColor: 'rgba(37, 99, 235, 0.9)',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '11px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                zIndex: 2
+            }
+        };
+
+        return (
+            <div style={galleryStyles.container}>
+                <img 
+                    src={images[currentIndex]} 
+                    alt={`${report.title} - Image ${currentIndex + 1}`}
+                    style={galleryStyles.image}
+                />
+                
+                {hasMultipleImages && (
+                    <>
+                        {/* Images badge */}
+                        <div style={galleryStyles.imagesBadge}>
+                            <i className="fas fa-images"></i>
+                            {images.length}
+                        </div>
+
+                        {/* Navigation buttons */}
+                        <button
+                            style={{...galleryStyles.navButton, ...galleryStyles.prevButton}}
+                            onClick={() => prevImage(report.id, images.length)}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+                        >
+                            <i className="fas fa-chevron-left"></i>
+                        </button>
+                        
+                        <button
+                            style={{...galleryStyles.navButton, ...galleryStyles.nextButton}}
+                            onClick={() => nextImage(report.id, images.length)}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+                        >
+                            <i className="fas fa-chevron-right"></i>
+                        </button>
+
+                        {/* Dot indicators */}
+                        <div style={galleryStyles.dotsContainer}>
+                            {images.map((_, index) => (
+                                <button
+                                    key={index}
+                                    style={{
+                                        ...galleryStyles.dot,
+                                        ...(currentIndex === index ? galleryStyles.activeDot : galleryStyles.inactiveDot)
+                                    }}
+                                    onClick={() => goToImage(report.id, index)}
+                                    onMouseEnter={(e) => {
+                                        if (currentIndex !== index) {
+                                            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (currentIndex !== index) {
+                                            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.6)';
+                                        }
+                                    }}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Counter */}
+                        <div style={galleryStyles.counter}>
+                            {currentIndex + 1} / {images.length}
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
+
     return (
             <div className="review-reports-container">
                 <div className="report-actions">
@@ -182,7 +372,7 @@ const ReviewReports = () => {
                                     {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
                                 </div>
                                 <div className="report-image">
-                                    <img src={report.image} alt={report.title} />
+                                    <ImageGallery report={report} />
                                 </div>
                                 <div className="report-info">
                                     <h3>{report.title}</h3>
