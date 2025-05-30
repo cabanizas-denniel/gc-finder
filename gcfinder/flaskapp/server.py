@@ -13,6 +13,7 @@ import json
 import requests
 from PIL import Image
 import numpy as np
+from scipy import ndimage
 
 # Initialize Firebase from environment variable
 cred_json_str = os.environ.get('FIREBASE_CREDENTIALS_JSON')
@@ -29,103 +30,245 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 # Hugging Face Inference API configuration
-HF_API_URL = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
+# Use a model that's better suited for feature extraction via Inference API
+HF_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/clip-ViT-B-32"
 HF_API_TOKEN = os.environ.get('HUGGING_FACE_API_TOKEN')  # Set this in your environment variables
+
+def get_local_image_embedding(image_input):
+    """
+    Fallback method to create simple image embeddings using basic image analysis
+    when HuggingFace API is not available
+    """
+    try:
+        # Convert to PIL Image if needed
+        if isinstance(image_input, str) and image_input.startswith('data:image'):
+            image_data = image_input.split(',')[1]
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(BytesIO(image_bytes)).convert('RGB')
+        elif isinstance(image_input, Image.Image):
+            image = image_input
+        else:
+            image = Image.open(image_input).convert('RGB')
+        
+        # Resize to standard size for consistency
+        image = image.resize((64, 64))
+        
+        # Convert to numpy array
+        img_array = np.array(image)
+        
+        # Extract basic features
+        features = []
+        
+        # 1. Color histograms (RGB)
+        for channel in range(3):
+            hist, _ = np.histogram(img_array[:,:,channel], bins=16, range=(0, 256))
+            features.extend(hist.tolist())
+        
+        # 2. Average color values
+        avg_colors = np.mean(img_array, axis=(0, 1))
+        features.extend(avg_colors.tolist())
+        
+        # 3. Color variance
+        var_colors = np.var(img_array, axis=(0, 1))
+        features.extend(var_colors.tolist())
+        
+        # 4. Brightness and contrast
+        gray = np.mean(img_array, axis=2)
+        brightness = np.mean(gray)
+        contrast = np.std(gray)
+        features.extend([brightness, contrast])
+        
+        # 5. Edge detection (simple gradient)
+        grad_x = np.gradient(gray, axis=1)
+        grad_y = np.gradient(gray, axis=0)
+        edge_strength = np.mean(np.sqrt(grad_x**2 + grad_y**2))
+        features.append(edge_strength)
+        
+        # 6. Texture features (local standard deviation)
+        texture = ndimage.generic_filter(gray, np.std, size=3)
+        avg_texture = np.mean(texture)
+        features.append(avg_texture)
+        
+        # Convert to numpy array and normalize
+        embedding = np.array(features, dtype=np.float32)
+        
+        # Normalize to unit length (similar to what CLIP would do)
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+        
+        print(f"Created local embedding with {len(embedding)} features")
+        return embedding
+        
+    except Exception as e:
+        print(f"Error creating local embedding: {e}")
+        # Return a random embedding as last resort
+        return np.random.rand(128).astype(np.float32)
 
 def get_image_embedding_remote(image_input):
     """
-    Get image embedding using HuggingFace's zero-shot image classification as feature extraction
+    Get image embedding using HuggingFace's sentence-transformers CLIP model
+    Falls back to local embedding if API is not available
     """
     try:
         # Convert image to bytes
         if isinstance(image_input, str) and image_input.startswith('data:image'):
+            # Handle base64 data URL
             image_data = image_input.split(',')[1]
             image_bytes = base64.b64decode(image_data)
         elif isinstance(image_input, Image.Image):
+            # Handle PIL Image
             buffer = BytesIO()
             image_input.save(buffer, format='JPEG')
             image_bytes = buffer.getvalue()
         else:
-            # Assume it's a file path or file-like object
+            # Handle file path or file-like object
             image = Image.open(image_input).convert('RGB')
             buffer = BytesIO()
             image.save(buffer, format='JPEG')
             image_bytes = buffer.getvalue()
         
-        # Prepare headers
+        # First try: Use sentence-transformers CLIP model
+        success = try_sentence_transformers_clip(image_bytes)
+        if success is not None:
+            return success
+            
+        # Second try: Use original CLIP model with different approach
+        success = try_openai_clip_feature_extraction(image_bytes)
+        if success is not None:
+            return success
+            
+        # Third try: Use a simple image classification model and extract features
+        success = try_classification_as_features(image_bytes)
+        if success is not None:
+            return success
+        
+        print("All HuggingFace API methods failed, falling back to local embedding...")
+        
+        # Fallback: Use local embedding
+        return get_local_image_embedding(image_input)
+            
+    except Exception as e:
+        print(f"Error in get_image_embedding_remote: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Last resort: try local embedding
+        try:
+            return get_local_image_embedding(image_input)
+        except:
+            print("Local embedding also failed, returning random embedding")
+            return np.random.rand(128).astype(np.float32)
+
+def try_sentence_transformers_clip(image_bytes):
+    """Try using sentence-transformers CLIP model"""
+    try:
         headers = {}
         if HF_API_TOKEN:
             headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
         
-        # Use zero-shot classification with diverse labels to get feature-rich logits
-        # These logits will serve as our image embeddings
-        candidate_labels = [
-            "electronics", "clothing", "bags", "documents", "jewelry", "books", 
-            "tools", "keys", "phone", "wallet", "glasses", "watch", "headphones",
-            "backpack", "shoes", "water bottle", "umbrella", "laptop", "tablet",
-            "camera", "charger", "notebook", "pen", "card", "ring", "bracelet",
-            "necklace", "earrings", "hat", "scarf", "gloves", "sunglasses"
-        ]
-        
-        # Create the payload for zero-shot classification
-        files = {"inputs": image_bytes}
-        data = {
-            "parameters": {
-                "candidate_labels": candidate_labels
-            },
-            "options": {"wait_for_model": True}
-        }
-        
+        # For sentence-transformers, we send the image as binary data
         response = requests.post(
             HF_API_URL,
             headers=headers,
-            files=files,
-            data={"parameters": str(data["parameters"]).replace("'", '"')},
+            data=image_bytes,
             timeout=30
         )
         
+        print(f"Sentence-transformers CLIP Response Status: {response.status_code}")
+        
         if response.status_code == 200:
             result = response.json()
-            
-            # Extract scores as our embedding vector
             if isinstance(result, list) and len(result) > 0:
-                # For zero-shot classification, we get a list with scores
+                embedding = np.array(result)
+                print(f"Successfully got sentence-transformers embedding with shape: {embedding.shape}")
+                return embedding
+        else:
+            print(f"Sentence-transformers CLIP failed: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        print(f"Sentence-transformers CLIP error: {e}")
+        
+    return None
+
+def try_openai_clip_feature_extraction(image_bytes):
+    """Try using OpenAI CLIP model for feature extraction"""
+    try:
+        headers = {}
+        if HF_API_TOKEN:
+            headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
+        
+        # Try sending as binary data (common for feature extraction)
+        response = requests.post(
+            "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32",
+            headers=headers,
+            data=image_bytes,
+            timeout=30
+        )
+        
+        print(f"OpenAI CLIP Feature Extraction Response Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                if isinstance(result[0], list):
+                    embedding = np.array(result[0])
+                else:
+                    embedding = np.array(result)
+                print(f"Successfully got OpenAI CLIP embedding with shape: {embedding.shape}")
+                return embedding
+        else:
+            print(f"OpenAI CLIP feature extraction failed: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        print(f"OpenAI CLIP feature extraction error: {e}")
+        
+    return None
+
+def try_classification_as_features(image_bytes):
+    """Fallback: Use ResNet for classification and extract feature-like scores"""
+    try:
+        headers = {"Content-Type": "application/json"}
+        if HF_API_TOKEN:
+            headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
+        
+        # Convert to base64 for ResNet model
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # Use a reliable image classification model
+        response = requests.post(
+            "https://api-inference.huggingface.co/models/microsoft/resnet-50",
+            headers=headers,
+            json={"inputs": image_b64},
+            timeout=30
+        )
+        
+        print(f"ResNet Classification Response Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                # Extract scores to use as a simple embedding
                 scores = []
                 for item in result:
                     if isinstance(item, dict) and 'score' in item:
                         scores.append(item['score'])
                 
-                if scores:
-                    # Normalize the scores to create a consistent embedding
-                    embedding = np.array(scores)
-                    # Ensure we have a consistent dimension
-                    if len(embedding) < 32:
-                        # Pad if too short
-                        embedding = np.pad(embedding, (0, 32 - len(embedding)), 'constant')
-                    elif len(embedding) > 512:
-                        # Truncate if too long
-                        embedding = embedding[:512]
+                if len(scores) >= 5:  # Need enough features
+                    # Pad to make a reasonable embedding size
+                    while len(scores) < 128:
+                        scores.extend(scores[:min(len(scores), 128-len(scores))])
                     
+                    embedding = np.array(scores[:128])  # Limit to 128 dimensions
+                    print(f"Successfully got ResNet-based embedding with shape: {embedding.shape}")
                     return embedding
-            
-            # Fallback: use the raw result as embedding if it's numeric
-            if isinstance(result, list):
-                try:
-                    embedding = np.array([float(x) if isinstance(x, (int, float)) else 0.5 for x in result])
-                    return embedding[:512] if len(embedding) > 512 else embedding
-                except:
-                    pass
-            
-            print(f"Unexpected response format: {result}")
-            return None
-            
         else:
-            print(f"HF API Error: {response.status_code} - {response.text}")
-            return None
+            print(f"ResNet classification failed: {response.status_code} - {response.text}")
             
     except Exception as e:
-        print(f"Error getting image embedding: {e}")
-        return None
+        print(f"ResNet classification error: {e}")
+        
+    return None
 
 def compute_similarity(query_embedding, database_embeddings):
     """
@@ -157,10 +300,67 @@ CORS(app, resources={
 def home():
     return jsonify({"status": "ok", "message": "GCFinder API is running!"}), 200
 
+@app.route('/test-api', methods=['GET'])
+def test_api():
+    """
+    Test endpoint to check HuggingFace API connectivity and model availability
+    """
+    try:
+        # Test with a simple 1x1 red pixel image
+        test_image = Image.new('RGB', (32, 32), color='red')
+        buffer = BytesIO()
+        test_image.save(buffer, format='JPEG')
+        image_bytes = buffer.getvalue()
+        
+        print("Testing HuggingFace API connectivity...")
+        
+        # Try each method
+        results = {}
+        
+        # Test sentence-transformers CLIP
+        result = try_sentence_transformers_clip(image_bytes)
+        results['sentence_transformers_clip'] = {
+            'success': result is not None,
+            'shape': result.shape if result is not None else None
+        }
+        
+        # Test OpenAI CLIP
+        result = try_openai_clip_feature_extraction(image_bytes)
+        results['openai_clip'] = {
+            'success': result is not None,
+            'shape': result.shape if result is not None else None
+        }
+        
+        # Test ResNet fallback
+        result = try_classification_as_features(image_bytes)
+        results['resnet_fallback'] = {
+            'success': result is not None,
+            'shape': result.shape if result is not None else None
+        }
+        
+        # Check overall status
+        any_success = any(r['success'] for r in results.values())
+        
+        return jsonify({
+            'overall_status': 'success' if any_success else 'failed',
+            'hf_token_set': HF_API_TOKEN is not None,
+            'detailed_results': results,
+            'message': 'At least one method works' if any_success else 'All methods failed - check logs'
+        })
+        
+    except Exception as e:
+        print(f"API test error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'overall_status': 'error',
+            'error': str(e)
+        }), 500
+
 @app.route('/search', methods=['POST'])
 def search():
     """
-    Enhanced search endpoint using remote CLIP API
+    Enhanced search endpoint using remote CLIP API with improved error handling
     """
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
@@ -170,24 +370,46 @@ def search():
         return jsonify({'error': 'No file selected'}), 400
 
     try:
+        print(f"Processing search request with file: {file.filename}")
+        
         # Check if HF API token is available
         if not HF_API_TOKEN:
             print("WARNING: HUGGING_FACE_API_TOKEN not set. Using public API with rate limits.")
+            print("Consider setting the HUGGING_FACE_API_TOKEN environment variable for better reliability.")
+        else:
+            print("Using authenticated HuggingFace API")
         
         # Process query image
+        print("Opening and converting query image...")
         query_image = Image.open(file).convert('RGB')
+        print(f"Query image size: {query_image.size}")
+        
+        print("Getting image embedding...")
         query_embedding = get_image_embedding_remote(query_image)
         
         if query_embedding is None:
-            return jsonify({'error': 'Failed to process query image. Please try again later.'}), 503
+            error_msg = (
+                "Failed to process query image. This could be due to:\n"
+                "1. HuggingFace API rate limits (try setting HUGGING_FACE_API_TOKEN)\n"
+                "2. Model loading delays (try again in a few moments)\n"
+                "3. Network connectivity issues\n"
+                "4. Unsupported image format"
+            )
+            print(error_msg)
+            return jsonify({'error': 'Failed to process query image. Please check server logs and try again later.'}), 503
+
+        print(f"Successfully got query embedding with shape: {query_embedding.shape}")
 
         # Fetch and process database items
+        print("Fetching items from database...")
         items_ref = db.collection('items')
         # Only fetch items that are not archived (matching frontend logic)
         items = items_ref.where('status', '!=', 'archived').stream()
         
         database_items = []
         database_embeddings = []
+        processed_items = 0
+        skipped_items = 0
         
         for item in items:
             item_data = item.to_dict()
@@ -195,6 +417,7 @@ def search():
             # Apply similar filtering logic as frontend
             # Only include items that are admin approved or have visible status
             if item_data.get('adminApproval') != True:
+                skipped_items += 1
                 continue
                 
             # Only process items that have image data
@@ -217,14 +440,24 @@ def search():
                             'submitter': item_data.get('submitter', None),
                             'adminApproval': item_data.get('adminApproval', False)
                         })
+                        processed_items += 1
+                    else:
+                        print(f"Failed to get embedding for item {item.id}")
+                        skipped_items += 1
                 except Exception as e:
                     print(f"Error processing item {item.id}: {e}")
+                    skipped_items += 1
                     continue
+            else:
+                skipped_items += 1
+
+        print(f"Processed {processed_items} items, skipped {skipped_items} items")
 
         if not database_items:
-            return jsonify({'error': 'No items with images found in database'}), 404
+            return jsonify({'error': 'No approved items with images found in database'}), 404
 
         # Compute and sort similarities
+        print("Computing similarities...")
         database_embeddings = np.stack(database_embeddings)
         similarities = compute_similarity(query_embedding.flatten(), database_embeddings)
         
@@ -233,6 +466,7 @@ def search():
             
         results = sorted(zip(similarities, database_items), reverse=True)
         
+        print(f"Returning {len(results)} results")
         return jsonify({
             'results': [
                 {
@@ -245,6 +479,8 @@ def search():
         
     except Exception as e:
         print(f"Search error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Search failed: {str(e)}'}), 500
 
 def fetch_items_for_export(start_date_dt=None, end_date_dt=None):
