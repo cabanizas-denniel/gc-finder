@@ -3,6 +3,12 @@
     padding-top: 0;
 }
 
+.dashboard-charts-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
 .dashboard-chart{
     background-color: #FFFFFF;
     padding: 20px;
@@ -1634,25 +1640,23 @@ h2{
 .dashboard-chart h3 {
     font-size: 0.95rem; /* Smaller for subtitle */
     color: var(--sub-color);
-    margin-top: 15px; /* Space above subtitle, after chart */
     font-weight: 400;
 }
 
 /* Styling for the new Pie Chart container */
 .dashboard-pie-chart-container {
     background-color: #FFFFFF;
+    width: 100%;
     padding: 25px;
     border-radius: 15px;
     border: 2px solid var(--primary-color);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    margin-top: 25px; /* Space from elements above */
     text-align: center; /* Center align title and subtitle */
 }
 
 .dashboard-pie-chart-container h2 {
     font-size: 1.5rem;
     color: var(--text-color);
-    margin-bottom: 20px;
     font-weight: 600;
 }
 
@@ -1666,17 +1670,16 @@ h2{
 .dashboard-resolution-chart-container {
     background-color: #FFFFFF;
     padding: 25px;
+    width: 100%;
     border-radius: 15px;
     border: 2px solid var(--primary-color);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    margin-top: 25px; /* Space from elements above */
     text-align: center; /* Center align title and subtitle */
 }
 
 .dashboard-resolution-chart-container h2 {
     font-size: 1.5rem;
     color: var(--text-color);
-    margin-bottom: 20px;
     font-weight: 600;
 }
 

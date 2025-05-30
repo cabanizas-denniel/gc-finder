@@ -192,6 +192,7 @@ const Dashboard = () => {
 
             {/* Main Content */}
             {/* Pie Chart Section */}
+            <div className="dashboard-charts-container">
             <div className="dashboard-pie-chart-container"> {/* New container for Pie Chart */}
                 <h2>Distribution of Item Categories Lost</h2>
                 {errorStats && <p style={{color: 'red'}}>{errorStats}</p>} {/* Show general error if any */}
@@ -215,11 +216,9 @@ const Dashboard = () => {
                             </Pie>
                             <Tooltip />
                             <Legend 
-                                verticalAlign="middle" 
-                                align="right" 
-                                layout="vertical"
+                                layout="horizontal"
                                 iconSize={12}
-                                wrapperStyle={{ paddingLeft: '20px', fontSize: '14px' }}
+                                wrapperStyle={{ fontSize: '14px' }}
                             />
                         </PieChart>
                     </ResponsiveContainer>
@@ -258,11 +257,9 @@ const Dashboard = () => {
                             </Pie>
                             <Tooltip formatter={(value, name, props) => [`${value} (${(props.payload.percent * 100).toFixed(0)}%)`, name]} />
                             <Legend 
-                                verticalAlign="middle" 
-                                align="right" 
-                                layout="vertical"
+                                layout="horizontal"
                                 iconSize={12}
-                                wrapperStyle={{ paddingLeft: '20px', fontSize: '14px' }}
+                                wrapperStyle={{ fontSize: '14px' }}
                             />
                         </PieChart>
                     </ResponsiveContainer>
@@ -275,6 +272,7 @@ const Dashboard = () => {
                         Percentage of cases successfully closed.
                     </h3>
                 )}
+            </div>
             </div>
         </div>
     );
