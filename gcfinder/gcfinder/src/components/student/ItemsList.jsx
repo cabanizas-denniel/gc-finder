@@ -351,7 +351,10 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                             <button className="close-button" onClick={closeClaimModal}>×</button>
                         </div>
                         <div className="modal-body">
-                            <p className="claim-subtitle">Please answer the security questions to verify ownership.</p>
+                            <p className="claim-subtitle">
+                            Please be advised that spamming or submitting claims for items you do not own may result in a <strong>flag</strong> or <strong>ban</strong>.<br />
+                            To proceed, please answer the security questions to verify item ownership.
+                            </p>
                             {claimError && <p className="error-message" style={{textAlign: 'center'}}>{claimError}</p>}
                             <form onSubmit={handleSubmitClaim} className="claim-form">
                                 <div className="form-group">

@@ -1060,6 +1060,11 @@ const UserManagement = () => {
                     return null; // No pagination needed if only one page or no users
                 })()}
 
+                <div className="disclaimer">
+                    <p><strong>Flagging:</strong> Prevents the user from sending reports or messages to the Disciplinary Office, but still allows them to claim items.</p>
+                    <p><strong>Banning:</strong> Completely restricts the user from accessing the platform.</p>
+                </div>
+
                 {/* Toast Notification */}
                 <Toast 
                     message={toast.message} 

@@ -1048,6 +1048,10 @@ header {
     margin: 20px 0;
 }
 
+.disclaimer p {
+    margin: 5px;
+}
+
 /* ======= MESSAGES STYLES ======= */
 .messages-section {
     border: 2px solid var(--primary-color);
