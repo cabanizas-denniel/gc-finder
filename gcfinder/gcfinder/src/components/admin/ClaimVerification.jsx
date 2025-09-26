@@ -31,6 +31,29 @@ const ClaimVerification = () => {
     // Toast notification
     const { toast, showToast, hideToast } = useToast();
 
+    const formatDateMDY = (input) => {
+        if (!input) return 'N/A';
+        let dateObj = null;
+        if (typeof input === 'string' || typeof input === 'number') {
+            dateObj = new Date(input);
+        } else if (input && typeof input.toDate === 'function') {
+            dateObj = input.toDate();
+        } else if (input && typeof input.seconds === 'number') {
+            dateObj = new Date(input.seconds * 1000);
+        } else {
+            try {
+                dateObj = new Date(input);
+            } catch (_) {
+                return 'N/A';
+            }
+        }
+        if (isNaN(dateObj)) return 'N/A';
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const yyyy = dateObj.getFullYear();
+        return `${mm} - ${dd} - ${yyyy}`;
+    };
+
     useEffect(() => {
         fetchClaims();
     }, []);
@@ -58,7 +81,7 @@ const ClaimVerification = () => {
                     status: data.claimStatus.toLowerCase(),
                     claimedBy: data.claimerName,
                     student_id: data.claimerId,
-                    date: new Date(data.createdAt?.toDate()).toLocaleDateString(),
+                    date: formatDateMDY(data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt),
                     createdAt: data.createdAt?.toDate() || new Date(0),
                     itemId: data.itemId,
                     lastSeenLocation: data.lastSeenLocation,
@@ -247,7 +270,7 @@ const ClaimVerification = () => {
                 setSelectedItemForModal({
                      id: itemSnap.id, 
                      ...itemData,
-                     date: itemData.date?.toDate ? itemData.date.toDate().toLocaleDateString() : itemData.date
+                     date: itemData.date?.toDate ? formatDateMDY(itemData.date.toDate()) : formatDateMDY(itemData.date)
                     });
             } else {
                 console.error("No such item document!");

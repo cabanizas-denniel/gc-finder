@@ -22,6 +22,30 @@ const ItemManagement = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10); // Items per page for all tabs
 
+    // Helper: format date as MM - DD - YYYY
+    const formatDateMDY = (input) => {
+        if (!input) return 'N/A';
+        let dateObj = null;
+        if (typeof input === 'string' || typeof input === 'number') {
+            dateObj = new Date(input);
+        } else if (input && typeof input.toDate === 'function') {
+            dateObj = input.toDate();
+        } else if (input && typeof input.seconds === 'number') {
+            dateObj = new Date(input.seconds * 1000);
+        } else {
+            try {
+                dateObj = new Date(input);
+            } catch (_) {
+                return 'N/A';
+            }
+        }
+        if (isNaN(dateObj)) return 'N/A';
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const yyyy = dateObj.getFullYear();
+        return `${mm} - ${dd} - ${yyyy}`;
+    };
+
     // Export Modal State
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [exportStartDate, setExportStartDate] = useState('');
@@ -41,7 +65,7 @@ const ItemManagement = () => {
                 location: item.location || 'N/A',
                 category: item.category || 'N/A',
                 reportedBy: item.submitter?.full_name || item.reportedBy || item.full_name || item.submitted_by_name || 'N/A', 
-                date: item.date ? (typeof item.date === 'string' ? new Date(item.date).toLocaleDateString() : (item.date.toDate ? item.date.toDate().toLocaleDateString() : new Date(item.date).toLocaleDateString()) ) : 'N/A', 
+                date: item.date ? formatDateMDY(item.date) : 'N/A', 
                 status: item.status ? item.status.toLowerCase() : 'unknown',
                 originalItemName: item.originalItemName || item.name,
                 description: item.description,

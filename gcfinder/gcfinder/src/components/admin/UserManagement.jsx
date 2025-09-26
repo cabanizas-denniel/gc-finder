@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllUsers, batchCreateStudents, updateUserStatus } from '../../admin-firebase';
+import { getAllUsers, batchCreateStudents, updateUserStatus, deleteUser } from '../../admin-firebase';
 import Toast, { useToast } from '../Toast';
 
 const UserManagement = () => {
@@ -78,8 +78,8 @@ const UserManagement = () => {
         // Then, filter by search term
         if (searchTerm) {
             processedUsers = processedUsers.filter(user => 
-                user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
             );
         }
         
@@ -195,7 +195,7 @@ const UserManagement = () => {
         };
         
         const durationText = isCurrentlyFlagged ? '' : getDurationText(flagDuration);
-        showToast(`${selectedUser.name} has been ${isCurrentlyFlagged ? 'unflagged' : `flagged${durationText}`}`, 'success');
+        showToast(`${selectedUser.full_name} has been ${isCurrentlyFlagged ? 'unflagged' : `flagged${durationText}`}`, 'success');
         setFlagModalOpen(false);
         setSelectedUser(null);
         setActionReason('');
@@ -272,7 +272,7 @@ const UserManagement = () => {
         };
         
         const durationText = isCurrentlyBanned ? '' : getDurationText(banDuration);
-        showToast(`${selectedUser.name} has been ${isCurrentlyBanned ? 'unbanned' : `banned${durationText}`}`, 'success');
+        showToast(`${selectedUser.full_name} has been ${isCurrentlyBanned ? 'unbanned' : `banned${durationText}`}`, 'success');
         setBanModalOpen(false);
         setSelectedUser(null);
         setActionReason('');
@@ -294,20 +294,23 @@ const UserManagement = () => {
         setDeleteModalOpen(true);
     };
 
-    const handleConfirmDelete = () => {
-        // Remove user and all their associated data from state
-        setUsers(prevUsers => prevUsers.filter(u => u.id !== selectedUser.id));
-        
-        // TODO: Comprehensive deletion from database:
-        // - Delete user account
-        // - Delete all user's items
-        // - Delete all user's claims  
-        // - Delete all user's messages
-        // - Delete any user-related notifications
-        
-        showToast(`${selectedUser.name} and all associated data has been deleted`, 'success');
-        setDeleteModalOpen(false);
-        setSelectedUser(null);
+    const handleConfirmDelete = async () => {
+        if (!selectedUser) return;
+
+        try {
+            await deleteUser(selectedUser.id);
+            // Remove user and all their associated data from state
+            setUsers(prevUsers => prevUsers.filter(u => u.id !== selectedUser.id));
+            
+            showToast(`${selectedUser.full_name} and all associated data has been deleted`, 'success');
+            setDeleteModalOpen(false);
+            setSelectedUser(null);
+        } catch (error) {
+            console.error("Failed to delete user:", error);
+            showToast('Failed to delete user.', 'error');
+            setDeleteModalOpen(false);
+            setSelectedUser(null);
+        }
     };
 
     // Export Modal Handlers
@@ -433,15 +436,6 @@ const UserManagement = () => {
         }
     };
 
-    const generateRandomPassword = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        let password = '';
-        for (let i = 0; i < 8; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return password;
-    };
-
     const parseStudentData = (data) => {
         const lines = data.trim().split('\n');
         const students = [];
@@ -451,23 +445,46 @@ const UserManagement = () => {
             if (!line) continue;
             
             const parts = line.split(',');
-            if (parts.length >= 3) {
-                const studentId = parts[0].trim();
-                const name = parts[1].trim();
+            if (parts.length >= 6) {
+                const student_id = parts[0].trim();
+                const full_name = parts[1].trim();
                 const email = parts[2].trim();
-                const password = parts[3] ? parts[3].trim() : generateRandomPassword();
-                const status = parts[4] ? parts[4].trim() : 'active';
+                const year_level_raw = parts[3].trim();
+                const password = parts[4].trim();
+                const status = parts[5].trim().toLowerCase();
+
+                const year_level = year_level_raw ? parseInt(year_level_raw, 10) : null;
+                const allowedStatuses = new Set(['active', 'flagged', 'banned']);
+
+                if (!student_id || !full_name || !email) {
+                    console.warn(`Skipping row ${i + 1}: missing required identity fields.`);
+                    continue;
+                }
+                if (year_level === null || isNaN(year_level)) {
+                    console.warn(`Skipping row ${i + 1}: invalid year level for student: ${full_name}`);
+                    continue;
+                }
+                if (!password) {
+                    console.warn(`Skipping row ${i + 1}: missing password for student: ${full_name}`);
+                    continue;
+                }
+                if (!status || !allowedStatuses.has(status)) {
+                    console.warn(`Skipping row ${i + 1}: invalid status '${status}' for student: ${full_name}`);
+                    continue;
+                }
                 
                 students.push({
                     id: Date.now() + i,
-                    studentId,
-                    name,
+                    student_id,
+                    full_name,
                     email,
                     password,
                     status,
-                    createdAt: new Date().toISOString(),
-                    role: 'student'
+                    year_level,
+                    createdAt: new Date().toISOString()
                 });
+            } else {
+                console.warn(`Skipping row ${i + 1}: not enough columns. Expected 6, got ${parts.length}`);
             }
         }
         
@@ -626,7 +643,7 @@ const UserManagement = () => {
                                 </button>
                             </div>
                             <p className="export-modal-description">
-                                You are about to {selectedUser.status === 'flagged' ? 'unflag' : 'flag'} <strong>{selectedUser.name}</strong> ({selectedUser.email}).
+                                You are about to {selectedUser.status === 'flagged' ? 'unflag' : 'flag'} <strong>{selectedUser.full_name}</strong> ({selectedUser.email}).
                                 {selectedUser.status === 'flagged' 
                                     ? ' This will restore their account to active status.' 
                                     : ' Please provide a reason for this action.'
@@ -694,7 +711,7 @@ const UserManagement = () => {
                                 </button>
                             </div>
                             <p className="export-modal-description">
-                                You are about to {selectedUser.status === 'banned' ? 'unban' : 'ban'} <strong>{selectedUser.name}</strong> ({selectedUser.email}).
+                                You are about to {selectedUser.status === 'banned' ? 'unban' : 'ban'} <strong>{selectedUser.full_name}</strong> ({selectedUser.email}).
                                 {selectedUser.status === 'banned' 
                                     ? ' This will restore their account to active status.' 
                                     : ' This will prevent them from accessing the system. Please provide a reason for this action.'
@@ -767,7 +784,7 @@ const UserManagement = () => {
                                 <strong style={{color: '#e74c3c'}}>⚠️ WARNING: This action cannot be undone!</strong>
                             </p>
                             <p className="export-modal-description">
-                                You are about to permanently delete <strong>{selectedUser.name}</strong> ({selectedUser.email}) and <strong>all associated data</strong>:
+                                You are about to permanently delete <strong>{selectedUser.full_name}</strong> ({selectedUser.email}) and <strong>all associated data</strong>:
                             </p>
                             <ul style={{marginLeft: '20px', marginBottom: '20px', color: '#666'}}>
                                 <li>• User account and profile</li>
@@ -841,7 +858,7 @@ const UserManagement = () => {
                                         className="export-modal-date-input"
                                     />
                                     <small style={{color: '#666', fontSize: '12px'}}>
-                                        CSV format: ID, Name, Email, Password (optional), Status (optional)
+                                        CSV format: ID, Name, Email, Year Level, Password, Status
                                     </small>
                                 </div>
                             )}
@@ -856,7 +873,7 @@ const UserManagement = () => {
                                     onChange={(e) => setStudentData(e.target.value)}
                                     className="export-modal-date-input"
                                     placeholder={uploadMode === 'manual' 
-                                        ? "Enter student data in CSV format:\n202400001, Bob Wilson, 202400001@example.com, password123\n\nFormat: ID, Name, Email, Password (optional), Status (optional)\nStatus options: active, flagged, banned"
+                                        ? "Enter student data in CSV format:\n202400001,Bob Wilson,202400001@example.com,1,password123,active\n\nFormat: ID, Name, Email, Year Level, Password, Status\nStatus options: active, flagged, banned"
                                         : "CSV data will appear here..."}
                                     rows="8"
                                     style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}
@@ -959,9 +976,9 @@ const UserManagement = () => {
                         <table className="users-table">
                         <thead>
                             <tr>
-                                    <th onClick={() => requestSort('name')}>
+                                    <th onClick={() => requestSort('full_name')}>
                                         Name 
-                                        {sortConfig.key === 'name' && (
+                                        {sortConfig.key === 'full_name' && (
                                             <i className={`fas fa-sort-${sortConfig.direction === 'ascending' ? 'up' : 'down'}`}></i>
                                         )}
                                     </th>
@@ -979,7 +996,7 @@ const UserManagement = () => {
                             <tbody>
                                 {filteredUsers.map((user, index) => (
                                     <tr key={user.id || index} className={user.status}>
-                                        <td className="user-name">{user.name}</td>
+                                        <td className="user-name">{user.full_name}</td>
                                         <td>{user.email}</td>
                                         <td>{user.year_level}</td>
                                         <td className="user-status-badge">{renderStatusBadge(user.status)}</td>
@@ -1032,8 +1049,8 @@ const UserManagement = () => {
                     }
                     if (searchTerm) {
                         usersForPaginationCount = usersForPaginationCount.filter(user =>
-                            user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                            (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                            (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
                         );
                     }
                     const totalPages = Math.ceil(usersForPaginationCount.length / itemsPerPage);

@@ -294,8 +294,24 @@ const Messages = () => {
     const formatTime = (timestamp) => {
         if (!timestamp) return '';
         
+        const toDateObj = (ts) => {
+            if (!ts) return null;
+            if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts);
+            if (ts && typeof ts.toDate === 'function') return ts.toDate();
+            if (ts && typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
+            try { return new Date(ts); } catch { return null; }
+        };
+        const formatDateMDY = (dateObj) => {
+            if (!dateObj || isNaN(dateObj)) return '';
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            const yyyy = dateObj.getFullYear();
+            return `${mm} - ${dd} - ${yyyy}`;
+        };
+        
         const now = new Date();
-        const messageDate = new Date(timestamp);
+        const messageDate = toDateObj(timestamp);
+        if (!messageDate || isNaN(messageDate)) return '';
         const isToday = now.toDateString() === messageDate.toDateString();
         
         if (isToday) {
@@ -308,7 +324,7 @@ const Messages = () => {
             if (isYesterday) {
                 return 'Yesterday';
             } else {
-                return messageDate.toLocaleDateString();
+                return formatDateMDY(messageDate);
             }
         }
     };

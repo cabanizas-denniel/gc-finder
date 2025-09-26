@@ -61,7 +61,8 @@ export const getAllUsers = async () => {
       const userData = doc.data();
       users.push({
         id: doc.id,
-        name: userData.name || `${userData.full_name}`,
+        full_name: userData.full_name || userData.name,
+        student_id: userData.student_id,
         email: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
         year_level: userData.year_level || 'N/A',
         status: userData.status || 'active'
@@ -297,12 +298,12 @@ export const batchCreateStudents = async (students) => {
     
     for (const student of students) {
       const docRef = await addDoc(studentsRef, {
-        studentId: student.studentId,
-        name: student.name,
+        student_id: student.student_id,
+        full_name: student.full_name,
         email: student.email,
         password: student.password,
-        status: student.status || 'active',
-        role: student.role || 'student',
+        year_level: student.year_level,
+        status: student.status,
         createdAt: serverTimestamp()
       });
       
@@ -334,6 +335,16 @@ export const updateUserStatus = async (userId, statusData) => {
     return true;
   } catch (error) {
     console.error("Error updating user status:", error);
+    throw error;
+  }
+};
+
+export const deleteUser = async (userId) => {
+  try {
+    const userRef = doc(db, 'students', userId);
+    await deleteDoc(userRef);
+  } catch (error) {
+    console.error("Error deleting user:", error);
     throw error;
   }
 }; 

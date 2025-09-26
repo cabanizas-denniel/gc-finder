@@ -125,13 +125,7 @@ const Login = () => {
       navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
-      if (error.message === 'Student ID not found') {
-        setError('Incorrect Student ID or Password');
-      } else if (error.message === 'Incorrect password') {
-        setError('Incorrect Student ID or Password');
-      } else {
-        setError('An error occurred during login. Please try again.');
-      }
+      setError(error.message || 'An error occurred during login. Please try again.');
       // Clear error message after 3 seconds
       setTimeout(() => {
         setError('');
