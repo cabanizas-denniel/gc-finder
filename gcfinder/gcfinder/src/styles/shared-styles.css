@@ -469,6 +469,12 @@ header {
     width: 250px;
 }
 
+.gcfinder-login-logo {
+    margin-top: 10px;
+    width: 225px;
+    height: 225px;
+}
+
 .login-left-section h2 {
     font-size: 28px;
 }
@@ -2001,6 +2007,11 @@ header {
     /* ----- Login ----- */
     .login-logo {
         width: 120px;
+    }
+    .gcfinder-login-logo {
+        margin-top: 0px;
+        width: 110px;
+        height: 110px;
     }
 
     .login-container h1 {

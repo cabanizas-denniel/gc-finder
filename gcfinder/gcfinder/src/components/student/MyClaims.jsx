@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase'; 
 import { ClaimDetailModalDisplay, ClaimsGridDisplay } from './ItemsList'; // Import both display components
-import noItem from '../../assets/NoItemPlaceholder.png'; // Re-import noItem for claim card images
 
 const MyClaims = () => {
     const [activeStatus, setActiveStatus] = useState('all');
@@ -182,7 +181,6 @@ const MyClaims = () => {
                 <ClaimsGridDisplay 
                     claims={filteredClaims} 
                     onViewDetails={viewClaimDetails}
-                    noItemPlaceholder={noItem} // Pass the imported noItem as a prop
                 />
             )}
 

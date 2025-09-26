@@ -210,7 +210,7 @@ const Login = () => {
       <div className="login-left-section">
         <div className="login-logo-container">
           <img src={logo} alt="GC Finder Logo" className="login-logo" />
-          <img src={gcLogo} alt="GC Finder Logo" className="login-logo" />
+          <img src={gcLogo} alt="GC Finder Logo" className="gcfinder-login-logo" />
         </div>
         <h1>Gordon College</h1>
         <h2>Lost & Found System</h2>
