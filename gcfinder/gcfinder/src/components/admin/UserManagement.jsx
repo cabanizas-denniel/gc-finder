@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getAllUsers, batchCreateStudents, updateUserStatus, deleteUser } from '../../admin-firebase';
+import { getAllUsers, updateUserStatus } from '../../admin-firebase';
+import { auth } from '../../admin-firebase'; // Import auth
 import Toast, { useToast } from '../Toast';
 
 const UserManagement = () => {
@@ -298,16 +299,29 @@ const UserManagement = () => {
         if (!selectedUser) return;
 
         try {
-            await deleteUser(selectedUser.id);
+            const token = await auth.currentUser.getIdToken();
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/delete-user`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ uid: selectedUser.id })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to delete user.');
+            }
+
             // Remove user and all their associated data from state
             setUsers(prevUsers => prevUsers.filter(u => u.id !== selectedUser.id));
             
             showToast(`${selectedUser.full_name} and all associated data has been deleted`, 'success');
-            setDeleteModalOpen(false);
-            setSelectedUser(null);
         } catch (error) {
             console.error("Failed to delete user:", error);
-            showToast('Failed to delete user.', 'error');
+            showToast(error.message, 'error');
+        } finally {
             setDeleteModalOpen(false);
             setSelectedUser(null);
         }
@@ -444,48 +458,52 @@ const UserManagement = () => {
             const line = lines[i].trim();
             if (!line) continue;
             
-            const parts = line.split(',');
-            if (parts.length >= 6) {
-                const student_id = parts[0].trim();
-                const full_name = parts[1].trim();
-                const email = parts[2].trim();
-                const year_level_raw = parts[3].trim();
-                const password = parts[4].trim();
-                const status = parts[5].trim().toLowerCase();
+            const parts = line.split(',').map(part => part.trim());
+            
+            let student_id, full_name, year_level_raw, password, status, email;
 
-                const year_level = year_level_raw ? parseInt(year_level_raw, 10) : null;
-                const allowedStatuses = new Set(['active', 'flagged', 'banned']);
-
-                if (!student_id || !full_name || !email) {
-                    console.warn(`Skipping row ${i + 1}: missing required identity fields.`);
-                    continue;
-                }
-                if (year_level === null || isNaN(year_level)) {
-                    console.warn(`Skipping row ${i + 1}: invalid year level for student: ${full_name}`);
-                    continue;
-                }
-                if (!password) {
-                    console.warn(`Skipping row ${i + 1}: missing password for student: ${full_name}`);
-                    continue;
-                }
-                if (!status || !allowedStatuses.has(status)) {
-                    console.warn(`Skipping row ${i + 1}: invalid status '${status}' for student: ${full_name}`);
-                    continue;
-                }
-                
-                students.push({
-                    id: Date.now() + i,
-                    student_id,
-                    full_name,
-                    email,
-                    password,
-                    status,
-                    year_level,
-                    createdAt: new Date().toISOString()
-                });
+            if (parts.length === 6) {
+                [student_id, full_name, email, year_level_raw, password, status] = parts;
+            } else if (parts.length === 5) {
+                [student_id, full_name, year_level_raw, password, status] = parts;
+                email = `${student_id}@gordoncollege.edu.ph`; // Construct email if not provided
             } else {
-                console.warn(`Skipping row ${i + 1}: not enough columns. Expected 6, got ${parts.length}`);
+                console.warn(`Skipping row ${i + 1}: incorrect number of columns. Expected 5 or 6, got ${parts.length}`);
+                continue;
             }
+
+            if (status) {
+                status = status.toLowerCase();
+            }
+
+            const year_level = year_level_raw ? parseInt(year_level_raw, 10) : null;
+            const allowedStatuses = new Set(['active', 'flagged', 'banned']);
+
+            if (!student_id || !full_name) {
+                console.warn(`Skipping row ${i + 1}: missing required identity fields.`);
+                continue;
+            }
+            if (year_level === null || isNaN(year_level)) {
+                console.warn(`Skipping row ${i + 1}: invalid year level for student: ${full_name}`);
+                continue;
+            }
+            if (!password) {
+                console.warn(`Skipping row ${i + 1}: missing password for student: ${full_name}`);
+                continue;
+            }
+            if (!status || !allowedStatuses.has(status)) {
+                console.warn(`Skipping row ${i + 1}: invalid status '${status}' for student: ${full_name}`);
+                continue;
+            }
+            
+            students.push({
+                student_id,
+                full_name,
+                email,
+                password,
+                status,
+                year_level
+            });
         }
         
         return students;
@@ -499,20 +517,45 @@ const UserManagement = () => {
 
         try {
             setIsProcessing(true);
-            const newStudents = parseStudentData(studentData);
+            const parsedStudents = parseStudentData(studentData);
             
-            if (newStudents.length === 0) {
+            if (parsedStudents.length === 0) {
                 showToast('No valid student data found. Please check the format.', 'error');
+                setIsProcessing(false);
                 return;
             }
 
-            // Save students to database
-            const createdStudents = await batchCreateStudents(newStudents);
+            // Create a clean payload for the backend, removing client-side only fields
+            const studentsToCreate = parsedStudents.map(({ student_id, full_name, email, password, status, year_level }) => ({
+                student_id,
+                full_name,
+                email,
+                password,
+                status,
+                year_level
+            }));
+
+            const token = await auth.currentUser.getIdToken();
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/batch-create-students`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ students: studentsToCreate })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to add students.');
+            }
+
+            // Fetch the updated list of users to get the new UIDs and data
+            const usersDataFromFirebase = await getAllUsers();
+            setUsers(usersDataFromFirebase);
             
-            // Update local state with created students
-            setUsers(prevUsers => [...prevUsers, ...createdStudents]);
-            
-            showToast(`Successfully added ${createdStudents.length} students to database`, 'success');
+            showToast(`Successfully added ${result.success_count} students. Failures: ${result.failure_count}.`, 'success');
             handleCloseBatchAddModal();
             
         } catch (error) {
@@ -873,7 +916,7 @@ const UserManagement = () => {
                                     onChange={(e) => setStudentData(e.target.value)}
                                     className="export-modal-date-input"
                                     placeholder={uploadMode === 'manual' 
-                                        ? "Enter student data in CSV format:\n202400001,Bob Wilson,202400001@example.com,1,password123,active\n\nFormat: ID, Name, Email, Year Level, Password, Status\nStatus options: active, flagged, banned"
+                                        ? "Enter student data in CSV format:\n202400001,Bob Wilson,1,password123,active\n\nFormat: ID, Name, [Email], Year Level, Password, Status\nStatus options: active, flagged, banned"
                                         : "CSV data will appear here..."}
                                     rows="8"
                                     style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}

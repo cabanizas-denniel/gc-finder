@@ -16,6 +16,8 @@ from PIL import Image
 import numpy as np
 import traceback
 import logging
+from firebase_admin import auth
+from functools import wraps
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -364,11 +366,64 @@ CORS(app, resources={
             "http://localhost:3000",
             "https://localhost:3000"
         ],
-        "methods": ["GET", "POST", "OPTIONS"],
+        "methods": ["GET", "POST", "OPTIONS", "DELETE"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": False
     }
 })
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        id_token = request.headers.get('Authorization')
+        if not id_token or not id_token.startswith('Bearer '):
+            return jsonify({'error': 'Authorization token is missing or invalid'}), 401
+
+        id_token = id_token.split('Bearer ')[1]
+
+        try:
+            # Verify the token against the Firebase Auth API.
+            decoded_token = auth.verify_id_token(id_token)
+            uid = decoded_token['uid']
+
+            # Check if the user is an admin by looking them up in the 'admin' collection.
+            admin_ref = db.collection('admin').document(uid)
+            admin_doc = admin_ref.get()
+            if not admin_doc.exists:
+                return jsonify({'error': 'User is not an admin'}), 403
+            
+            # Add user to request context
+            request.user = decoded_token
+
+        except auth.InvalidIdTokenError:
+            return jsonify({'error': 'Invalid ID token'}), 401
+        except Exception as e:
+            logger.error(f"Token verification error: {e}")
+            return jsonify({'error': 'An internal error occurred during authentication'}), 500
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        id_token = request.headers.get('Authorization')
+        if not id_token or not id_token.startswith('Bearer '):
+            return jsonify({'error': 'Authorization token is missing or invalid'}), 401
+
+        id_token = id_token.split('Bearer ')[1]
+
+        try:
+            decoded_token = auth.verify_id_token(id_token)
+            request.user = decoded_token
+        except auth.InvalidIdTokenError:
+            return jsonify({'error': 'Invalid ID token'}), 401
+        except Exception as e:
+            logger.error(f"Token verification error: {e}")
+            return jsonify({'error': 'An internal error occurred during authentication'}), 500
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Health check endpoint
 @app.route("/")
@@ -452,6 +507,126 @@ def test_api():
             'overall_status': 'error',
             'error': str(e)
         }), 500
+
+@app.route('/api/batch-create-students', methods=['POST'])
+@admin_required
+def batch_create_students():
+    """
+    Creates student users in Firebase Auth and corresponding documents in Firestore.
+    """
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    students_data = request.get_json().get('students')
+    if not students_data or not isinstance(students_data, list):
+        return jsonify({"error": "Missing or invalid 'students' array in request body"}), 400
+    
+    success_count = 0
+    failure_count = 0
+    results = []
+
+    for student in students_data:
+        email = student.get('email')
+        password = student.get('password')
+        full_name = student.get('full_name')
+        student_id = student.get('student_id')
+        year_level = student.get('year_level')
+        status = student.get('status', 'active')
+
+        if not all([email, password, full_name, student_id, year_level]):
+            failure_count += 1
+            results.append({'email': email, 'status': 'failed', 'reason': 'Missing required fields.'})
+            continue
+
+        try:
+            # Create user in Firebase Authentication with student_id as UID
+            user_record = auth.create_user(
+                uid=student_id,  # Use student_id as UID for consistency
+                email=email,
+                password=password,
+                display_name=full_name,
+                email_verified=True
+            )
+            
+            # Create user document in Firestore with the same UID (student_id)
+            student_doc_ref = db.collection('students').document(student_id)
+            student_doc_ref.set({
+                'full_name': full_name,
+                'student_id': student_id,
+                'email': email,
+                'year_level': year_level,
+                'status': status,
+                'createdAt': firestore.SERVER_TIMESTAMP
+            })
+            
+            success_count += 1
+            results.append({'email': email, 'status': 'success', 'uid': user_record.uid})
+
+        except Exception as e:
+            failure_count += 1
+            error_reason = str(e)
+            results.append({'email': email, 'status': 'failed', 'reason': error_reason})
+
+    return jsonify({
+        "message": "Batch creation process completed.",
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "results": results
+    }), 200
+
+@app.route('/api/delete-user', methods=['DELETE'])
+@admin_required
+def delete_user():
+    """
+    Deletes a user from Firebase Auth and their corresponding document from Firestore.
+    """
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    uid = request.get_json().get('uid')
+    if not uid:
+        return jsonify({"error": "Missing 'uid' in request body"}), 400
+
+    try:
+        # Delete user from Firebase Authentication
+        auth.delete_user(uid)
+        
+        # Delete user document from Firestore
+        student_doc_ref = db.collection('students').document(uid)
+        student_doc_ref.delete()
+        
+        return jsonify({"message": f"Successfully deleted user {uid}"}), 200
+
+    except auth.UserNotFoundError:
+        return jsonify({"error": f"User with UID {uid} not found in Firebase Authentication."}), 404
+    except Exception as e:
+        logger.error(f"Error deleting user {uid}: {e}")
+        return jsonify({"error": "An internal error occurred while deleting the user."}), 500
+
+@app.route('/api/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """
+    Changes the user's password in Firebase Authentication.
+    Note: This endpoint does not verify the user's current password.
+    For security, re-authentication should be handled on the client-side
+    before calling this endpoint.
+    """
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    new_password = request.get_json().get('newPassword')
+    if not new_password or len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters long"}), 400
+
+    uid = request.user['uid']
+
+    try:
+        auth.update_user(uid, password=new_password)
+        return jsonify({"message": "Password updated successfully"}), 200
+    except Exception as e:
+        logger.error(f"Error changing password for user {uid}: {e}")
+        return jsonify({"error": "An internal error occurred while changing the password."}), 500
 
 @app.route('/search', methods=['POST'])
 def search():

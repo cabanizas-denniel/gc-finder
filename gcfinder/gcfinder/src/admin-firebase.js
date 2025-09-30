@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 import { getStorage } from 'firebase/storage';
@@ -18,35 +19,39 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 export const analytics = getAnalytics(app);
 export const storage = getStorage(app);
 
 // Admin login function
 export const loginWithAdminEmail = async (email, password) => {
   try {
-    // Query Firestore for the admin
-    const adminsRef = collection(db, 'admin');
-    const q = query(adminsRef, where('email', '==', email));
-    const querySnapshot = await getDocs(q);
+    // Authenticate the admin using Firebase Auth
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // After successful authentication, get the admin's data from Firestore using their UID.
+    const adminDocRef = doc(db, 'admin', user.uid);
+    const adminDoc = await getDoc(adminDocRef);
     
-    if (querySnapshot.empty) {
-      throw new Error('Admin email not found');
+    if (!adminDoc.exists()) {
+      throw new Error('Admin data not found in Firestore. Please ensure the admin document ID matches the Firebase Auth UID.');
     }
     
-    const adminDoc = querySnapshot.docs[0];
     const adminData = adminDoc.data();
-    
-    // Check if password matches
-    if (adminData.password !== password) {
-      throw new Error('Incorrect password');
-    }
     
     return {
       id: adminDoc.id,
+      uid: user.uid, // Include Firebase Auth UID
       ...adminData
     };
   } catch (error) {
-    throw error;
+    // Handle specific auth errors
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      throw new Error('Invalid admin email or password.');
+    }
+    console.error("Admin login error:", error);
+    throw new Error('An unexpected error occurred during admin login.');
   }
 };
 
@@ -288,38 +293,6 @@ export const unarchiveItemInDb = async (itemId) => {
   }
 };
 
-// Batch create students in Firestore
-export const batchCreateStudents = async (students) => {
-  try {
-    const db = getFirestore();
-    const studentsRef = collection(db, 'students');
-    
-    const createdStudents = [];
-    
-    for (const student of students) {
-      const docRef = await addDoc(studentsRef, {
-        student_id: student.student_id,
-        full_name: student.full_name,
-        email: student.email,
-        password: student.password,
-        year_level: student.year_level,
-        status: student.status,
-        createdAt: serverTimestamp()
-      });
-      
-      createdStudents.push({
-        id: docRef.id,
-        ...student
-      });
-    }
-    
-    return createdStudents;
-  } catch (error) {
-    console.error("Error creating students:", error);
-    throw error;
-  }
-};
-
 // Update user status in Firestore
 export const updateUserStatus = async (userId, statusData) => {
   try {
@@ -335,16 +308,6 @@ export const updateUserStatus = async (userId, statusData) => {
     return true;
   } catch (error) {
     console.error("Error updating user status:", error);
-    throw error;
-  }
-};
-
-export const deleteUser = async (userId) => {
-  try {
-    const userRef = doc(db, 'students', userId);
-    await deleteDoc(userRef);
-  } catch (error) {
-    console.error("Error deleting user:", error);
     throw error;
   }
 }; 

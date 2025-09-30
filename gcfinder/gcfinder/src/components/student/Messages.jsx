@@ -25,7 +25,7 @@ const Messages = () => {
         console.log('Student userData from localStorage:', userData);
         if (userData) {
             const user = {
-                id: userData.student_id,
+                id: userData.id, // Use the Auth UID (document ID from Firestore)
                 name: userData.full_name || 'Student',
                 email: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
                 type: 'student'
@@ -407,7 +407,7 @@ const Messages = () => {
                                     <button 
                                         className="send-btn"
                                         onClick={sendMessage}
-                                disabled={!messageInput.trim() && !selectedImage}
+                                        disabled={!messageInput.trim() && !selectedImage}
                                     >
                                         <i className="fas fa-paper-plane"></i>
                                     </button>

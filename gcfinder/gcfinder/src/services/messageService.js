@@ -37,13 +37,25 @@ class MessageService {
     // Create or get existing conversation
     async getOrCreateConversation(participants, isAdmin = false) {
         try {
-            // For students, always create conversation with admin
-            if (!isAdmin) {
-                participants = ['admin', participants[0]]; // Ensure admin is always included
+            // Always ensure conversation is between admin and a student
+            // participants array should contain one student ID
+            let studentId;
+            
+            if (isAdmin) {
+                // Admin is creating conversation with a student
+                // participants = [studentId]
+                studentId = participants[0];
+            } else {
+                // Student is creating conversation with admin
+                // participants = [studentId]
+                studentId = participants[0];
             }
 
+            // Create participants array with both admin and student
+            const conversationParticipants = ['admin', studentId];
+            
             // Sort participants to ensure consistent conversation ID
-            const sortedParticipants = [...participants].sort();
+            const sortedParticipants = [...conversationParticipants].sort();
             const conversationId = sortedParticipants.join('_');
 
             const conversationRef = doc(db, 'conversations', conversationId);
@@ -58,6 +70,9 @@ class MessageService {
                     lastMessageTime: serverTimestamp(),
                     unreadCount: {}
                 });
+                console.log('Created new conversation:', conversationId);
+            } else {
+                console.log('Found existing conversation:', conversationId);
             }
 
             return conversationId;
@@ -269,7 +284,7 @@ class MessageService {
                     email.toLowerCase().includes(searchTerm.toLowerCase())
                 ) {
                     users.push({
-                        id: data.student_id,
+                        id: doc.id, // Use document ID (Auth UID) instead of student_id
                         name: fullName,
                         email: email,
                         student_id: studentId,

@@ -4,6 +4,8 @@ import gcLogo from '../../assets/gc-finder-logo.png';
 import profilePic from '../../assets/Profile.png';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../admin-firebase';
+import ChangePasswordModal from '../ChangePasswordModal';
+import Toast, { useToast } from '../Toast';
 
 const Layout = () => {
     const navigate = useNavigate();
@@ -11,6 +13,9 @@ const Layout = () => {
     const [showLeaveDialog, setShowLeaveDialog] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+    const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+    const { toast, showToast, hideToast } = useToast();
     const [currentUser, setCurrentUser] = useState({
         displayName: "Loading...",
         userEmail: "",
@@ -38,6 +43,23 @@ const Layout = () => {
             // Cleanup
             return () => window.removeEventListener('resize', handleResize);
         }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isProfileDropdownOpen) {
+                const dropdown = document.querySelector('.profile-dropdown');
+                const userInfo = document.querySelector('.user-info');
+                if (dropdown && userInfo && !dropdown.contains(event.target) && !userInfo.contains(event.target)) {
+                    setIsProfileDropdownOpen(false);
+                }
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isProfileDropdownOpen]);
 
     const navigationItems = [
         { path: 'admin/dashboard', icon: 'fas fa-home', label: 'Dashboard' },
@@ -73,6 +95,15 @@ const Layout = () => {
         setIsSidebarOpen(prev => !prev);
     }, []);
 
+    const toggleProfileDropdown = () => {
+        setIsProfileDropdownOpen(prev => !prev);
+    };
+
+    const openChangePasswordModal = () => {
+        setIsChangePasswordModalOpen(true);
+        setIsProfileDropdownOpen(false);
+    };
+
     const isActivePath = (path) => location.pathname === `/${path}`;
 
     useEffect(() => {
@@ -106,6 +137,12 @@ const Layout = () => {
 
     return (
         <div className="layout">
+            <Toast
+                message={toast.message}
+                show={toast.show}
+                onClose={hideToast}
+                type={toast.type}
+            />
             {/* Sidebar */}
             <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
                 <div className="logo">
@@ -152,12 +189,22 @@ const Layout = () => {
                         <i className="fas fa-bars"></i>
                     </button>
                     
-                    <div className="user-info">
+                    <div className="user-info" onClick={toggleProfileDropdown} style={{ cursor: 'pointer' }}>
                         <div className="user-details">
                             <span className="display-name">{currentUser.displayName}</span>
                             <span className="email">{currentUser.userEmail}</span>
                         </div>
                         <img src={currentUser.profilePicture} alt="Profile" className="profile-pic" />
+                        {isProfileDropdownOpen && (
+                            <div className="profile-dropdown">
+                                <button onClick={openChangePasswordModal}>
+                                    <i className="fas fa-key"></i> Change Password
+                                </button>
+                                <button onClick={() => setShowLeaveDialog(true)}>
+                                    <i className="fas fa-sign-out-alt"></i> Log Out
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </header>
 
@@ -184,6 +231,11 @@ const Layout = () => {
                     </div>
                 </div>
             )}
+            <ChangePasswordModal
+                isOpen={isChangePasswordModalOpen}
+                onClose={() => setIsChangePasswordModalOpen(false)}
+                showToast={showToast}
+            />
         </div>
     );
 };

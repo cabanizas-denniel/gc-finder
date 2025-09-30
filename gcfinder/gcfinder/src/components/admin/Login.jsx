@@ -57,13 +57,7 @@ const Login = () => {
       navigate('/admin/dashboard');
     } catch (error) {
       console.error('Login error:', error);
-      if (error.message === 'Admin email not found') {
-        setError('Incorrect email or password');
-      } else if (error.message === 'Incorrect password') {
-        setError('Incorrect email or password');
-      } else {
-        setError('An error occurred during login. Please try again.');
-      }
+      setError(error.message || 'An error occurred during login. Please try again.');
       // Clear error message after 3 seconds
       setTimeout(() => {
         setError('');
@@ -132,7 +126,7 @@ const Login = () => {
       <div className="login-left-section">
         <div className="login-logo-container">
           <img src={logo} alt="GC Finder Logo" className="login-logo" />
-          <img src={gcLogo} alt="GC Finder Logo" className="login-logo" />
+          <img src={gcLogo} alt="GC Finder Logo" className="gcfinder-login-logo" />
         </div>
         <h1>Gordon College</h1>
         <h2>Lost & Found System</h2>

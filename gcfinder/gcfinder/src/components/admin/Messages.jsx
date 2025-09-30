@@ -30,7 +30,7 @@ const Messages = () => {
         console.log('Admin userData from localStorage:', userData);
         if (userData) {
             const user = {
-                id: 'admin', // Use 'admin' as identifier
+                id: userData.id, // Use the Auth UID from userData
                 name: userData.position || 'Admin',
                 email: userData.email,
                 type: 'admin'

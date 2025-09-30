@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Admins can read/write their own documents.
+    match /admin/{adminId} {
+        allow read, write: if request.auth.uid == adminId;
+    }
+    
+    // Students can read/write their own documents. Admins can read all student data.
+    match /students/{studentId} {
+        allow get: if request.auth != null; // Any authenticated user can get a student doc.
+        allow list: if isAdmin(); // Only admins can list all students.
+        allow create: if isAdmin(); // Only admins can create students.
+        allow update, delete: if isAdmin() || request.auth.uid == studentId; // Admins or the student themselves.
+    }
+
+    // Items can be created by authenticated users. Only admins can delete/update.
+    match /items/{itemId} {
+        allow read: if request.auth != null; // Any authenticated user can view items.
+        allow create: if request.auth != null; // Any authenticated user can report an item.
+        allow update, delete: if isAdmin(); // Only admins can manage items.
+    }
+
+    // Claims can be created by authenticated users. Only admins can update them.
+    match /claims/{claimId} {
+        allow read: if request.auth != null; // Any authenticated user can read claims.
+        allow create: if request.auth.uid == request.resource.data.claimerId; // User can only create a claim for themselves.
+        allow update: if isAdmin(); // Only admins can approve/reject claims.
+        allow delete: if false; // Claims should probably not be deleted by clients.
+    }
+
+    // Participants of a conversation can read/write messages.
+    match /conversations/{conversationId} {
+        allow read, update: if isAdmin() || request.auth.uid in resource.data.participants;
+        // Students can create conversations (participants will include 'admin' and student UID)
+        // Admins can create conversations (participants will include 'admin' and student UID)
+        allow create: if request.auth != null && 
+                         (isAdmin() || 
+                          (request.auth.uid in request.resource.data.participants && 
+                           'admin' in request.resource.data.participants));
+    }
+
+    match /conversations/{conversationId}/messages/{messageId} {
+        // Authenticated users who are participants can create messages
+        allow create: if request.auth != null && request.auth.uid == request.resource.data.senderId;
+        // Participants can read messages (check if user is in conversation participants array)
+        allow read: if isAdmin() || 
+                       request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+        allow update, delete: if false; // Don't allow message edits/deletes from client.
+    }
+
+    // Helper function to check for admin role
+    function isAdmin() {
+      // Check for a custom claim OR existence in the 'admin' collection.
+      // Using a custom claim is the recommended and more secure approach.
+      return request.auth.token.isAdmin == true || exists(/databases/$(database)/documents/admin/$(request.auth.uid));
+    }
+  }
+}

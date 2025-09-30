@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 import { getStorage } from 'firebase/storage';
 
@@ -18,35 +19,40 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 export const analytics = getAnalytics(app);
 export const storage = getStorage(app);
 
 // Login function
 export const loginWithStudentId = async (studentId, password) => {
   try {
-    // Query Firestore for the student
-    const studentsRef = collection(db, 'students');
-    const q = query(studentsRef, where('student_id', '==', studentId));
-    const querySnapshot = await getDocs(q);
+    // Student IDs are not emails, so we need to construct the email.
+    const email = `${studentId}@gordoncollege.edu.ph`;
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
     
-    if (querySnapshot.empty) {
-      throw new Error('Student ID not found');
+    // After successful authentication, get the user's data from Firestore using their UID.
+    const studentDocRef = doc(db, 'students', user.uid);
+    const studentDoc = await getDoc(studentDocRef);
+
+    if (!studentDoc.exists()) {
+      // This case should be rare if auth succeeded, but good for data consistency.
+      throw new Error('Student data not found in Firestore.');
     }
     
-    const studentDoc = querySnapshot.docs[0];
     const studentData = studentDoc.data();
-    
-    // Check if password matches
-    if (studentData.password !== password) {
-      throw new Error('Incorrect password');
-    }
     
     return {
       id: studentDoc.id,
       ...studentData
     };
   } catch (error) {
-    throw error;
+    // Handle specific auth errors
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      throw new Error('Invalid student ID or password.');
+    }
+    console.error("Login error:", error);
+    throw new Error('An unexpected error occurred. Please try again.');
   }
 };
 
