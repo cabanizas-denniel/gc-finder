@@ -485,9 +485,11 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                                     </div>
                                 )}
                             </div>
-                            <div className={`status-badge ${item.status ? item.status.toLowerCase() : 'unknown'}`}>
-                                {item.status === 'Claiming' ? 'Being Claimed' : (item.status || 'N/A')}
-                            </div>
+                            {item.status !== 'Disapproved' && (
+                                <div className={`status-badge ${item.status ? item.status.toLowerCase() : 'unknown'}`}>
+                                    {item.status === 'Claiming' ? 'Being Claimed' : (item.status || 'N/A')}
+                                </div>
+                            )}
                             <h3>{item.name}</h3>
                             <p><i className="fas fa-tag"> </i> {item.category}</p>
                             <p><i className="fas fa-map-marker-alt"> </i> {item.location}</p>
@@ -587,7 +589,22 @@ export const ClaimsGridDisplay = ({ claims, onViewDetails }) => {
                     <div className={`claim-status status-${claim.claimStatus ? claim.claimStatus.toLowerCase() : 'unknown'}`}>
                         {claim.claimStatus || 'N/A'}
                     </div>
-                    <img src={claim.itemImage || ''} alt={claim.itemImage ? claim.itemName : 'No image available'} />
+                    {claim.itemImage ? (
+                        <img src={claim.itemImage} alt={claim.itemName} />
+                    ) : (
+                        <div style={{
+                            width: '100%',
+                            height: '200px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#f0f0f0',
+                            color: '#999',
+                            fontSize: '14px'
+                        }}>
+                            No image available
+                        </div>
+                    )}
                     <div className="student-claim-info">
                         <h3>{claim.itemName || 'Item Name N/A'}</h3>
                         <p><i className="fas fa-calendar"></i> Claimed on: {claim.displayDate}</p>

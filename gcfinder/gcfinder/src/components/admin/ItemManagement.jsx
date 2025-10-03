@@ -43,13 +43,23 @@ const ItemManagement = () => {
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const dd = String(dateObj.getDate()).padStart(2, '0');
         const yyyy = dateObj.getFullYear();
-        return `${mm} - ${dd} - ${yyyy}`;
+        return `${mm}-${dd}-${yyyy}`;
     };
 
     // Export Modal State
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [exportStartDate, setExportStartDate] = useState('');
     const [exportEndDate, setExportEndDate] = useState('');
+    
+    // Confirmation Modal State
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [confirmModalConfig, setConfirmModalConfig] = useState({
+        title: '',
+        message: '',
+        confirmText: '',
+        confirmAction: null,
+        type: 'danger' // 'danger', 'warning', 'info'
+    });
     
     // Toast notification
     const { toast, showToast, hideToast } = useToast();
@@ -93,7 +103,7 @@ const ItemManagement = () => {
 
     // Filter items based on active tab and search term, and paginate for all tabs
     useEffect(() => {
-        // Start with all items and then filter by adminApproval
+        // Start with approved items only (exclude pending reports)
         let processedItems = items.filter(item => item.adminApproval === true);
 
         // Filter by active tab if not 'all'
@@ -174,47 +184,89 @@ const ItemManagement = () => {
         setSelectedItemForModal(null);
     };
 
-    const handleDeleteItem = async (itemId) => {
-        if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
-            try {
-                await deleteItemFromDb(itemId);
-                showToast('Item deleted successfully!', 'success');
-                fetchItems(); // Refresh the list after deletion
-            } catch (error) {
-                console.error("Error deleting item: ", error);
-                showToast('Failed to delete item. See console for details.', 'error');
-            }
+    // Confirmation Modal Handlers
+    const openConfirmModal = (config) => {
+        setConfirmModalConfig(config);
+        setConfirmModalOpen(true);
+    };
+
+    const handleCloseConfirmModal = () => {
+        setConfirmModalOpen(false);
+        setConfirmModalConfig({
+            title: '',
+            message: '',
+            confirmText: '',
+            confirmAction: null,
+            type: 'danger'
+        });
+    };
+
+    const handleConfirmAction = async () => {
+        if (confirmModalConfig.confirmAction) {
+            await confirmModalConfig.confirmAction();
         }
+        handleCloseConfirmModal();
+    };
+
+    const handleDeleteItem = async (itemId) => {
+        openConfirmModal({
+            title: 'Delete Item',
+            message: 'Are you sure you want to delete this item? This action cannot be undone.',
+            confirmText: 'Delete',
+            type: 'danger',
+            confirmAction: async () => {
+                try {
+                    await deleteItemFromDb(itemId);
+                    showToast('Item deleted successfully!', 'success');
+                    fetchItems();
+                } catch (error) {
+                    console.error("Error deleting item: ", error);
+                    showToast('Failed to delete item. See console for details.', 'error');
+                }
+            }
+        });
     };
 
     const handleArchiveItem = async (itemId) => {
-        if (window.confirm('Are you sure you want to archive this item?')) {
-            try {
-                await archiveItemInDb(itemId);
-                showToast('Item archived successfully!', 'success');
-                fetchItems(); // Refresh the list after archiving
-            } catch (error) {
-                console.error("Error archiving item: ", error);
-                showToast('Failed to archive item. See console for details.', 'error');
+        openConfirmModal({
+            title: 'Archive Item',
+            message: 'Are you sure you want to archive this item? Archived items can be unarchived later.',
+            confirmText: 'Archive',
+            type: 'warning',
+            confirmAction: async () => {
+                try {
+                    await archiveItemInDb(itemId);
+                    showToast('Item archived successfully!', 'success');
+                    fetchItems();
+                } catch (error) {
+                    console.error("Error archiving item: ", error);
+                    showToast('Failed to archive item. See console for details.', 'error');
+                }
             }
-        }
+        });
     };
 
     const handleUnarchiveItem = async (itemId) => {
-        if (window.confirm('Are you sure you want to unarchive this item?')) {
-            try {
-                await unarchiveItemInDb(itemId);
-                showToast('Item unarchived successfully!', 'success');
-                fetchItems(); // Refresh the list after unarchiving
-            } catch (error) {
-                console.error("Error unarchiving item: ", error);
-                showToast('Failed to unarchive item. See console for details.', 'error');
+        openConfirmModal({
+            title: 'Unarchive Item',
+            message: 'Are you sure you want to unarchive this item? It will be restored to its previous status.',
+            confirmText: 'Unarchive',
+            type: 'info',
+            confirmAction: async () => {
+                try {
+                    await unarchiveItemInDb(itemId);
+                    showToast('Item unarchived successfully!', 'success');
+                    fetchItems();
+                } catch (error) {
+                    console.error("Error unarchiving item: ", error);
+                    showToast('Failed to unarchive item. See console for details.', 'error');
+                }
             }
-        }
+        });
     };
 
     const getTabCount = (status) => {
-        return items.filter(item => item.status === status).length;
+        return items.filter(item => item.status === status && item.adminApproval === true).length;
     };
 
     // Export Modal Handlers
@@ -330,6 +382,48 @@ const ItemManagement = () => {
                     </div>
                 </div>
 
+                {/* Confirmation Modal */}
+                {confirmModalOpen && (
+                    <div className="confirm-modal-overlay">
+                        <div className="confirm-modal-content">
+                            <div className="confirm-modal-header">
+                                <div className={`confirm-modal-icon confirm-modal-icon-${confirmModalConfig.type}`}>
+                                    {confirmModalConfig.type === 'danger' && <i className="fas fa-exclamation-triangle"></i>}
+                                    {confirmModalConfig.type === 'warning' && <i className="fas fa-exclamation-circle"></i>}
+                                    {confirmModalConfig.type === 'info' && <i className="fas fa-info-circle"></i>}
+                                </div>
+                                <h2 className="confirm-modal-title">
+                                    {confirmModalConfig.title}
+                                </h2>
+                                <button 
+                                    onClick={handleCloseConfirmModal} 
+                                    className="confirm-modal-close-btn" 
+                                    aria-label="Close"
+                                >
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="confirm-modal-message">
+                                {confirmModalConfig.message}
+                            </p>
+                            <div className="confirm-modal-actions">
+                                <button 
+                                    onClick={handleCloseConfirmModal} 
+                                    className="confirm-modal-cancel-btn"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleConfirmAction} 
+                                    className={`confirm-modal-confirm-btn confirm-modal-confirm-btn-${confirmModalConfig.type}`}
+                                >
+                                    {confirmModalConfig.confirmText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Export Modal */}
                 {exportModalOpen && (
                     <div className="export-modal-overlay">
@@ -404,7 +498,7 @@ const ItemManagement = () => {
                             onClick={() => setActiveTab('all')}
                         >
                             <i className="fas fa-th-list"></i> All Items
-                            <span className="item-count">{items.length}</span>
+                            <span className="item-count">{items.filter(item => item.adminApproval === true).length}</span>
                         </button>
                         <button 
                             className={`item-tab ${activeTab === 'unclaimed' ? 'active' : ''}`}
@@ -433,13 +527,6 @@ const ItemManagement = () => {
                         >
                             <i className="fas fa-times-circle"></i> Disapproved
                             <span className="item-count">{getTabCount('disapproved')}</span>
-                        </button>
-                        <button 
-                            className={`item-tab ${activeTab === 'pending' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('pending')}
-                        >
-                            <i className="fas fa-hourglass-half"></i> Pending
-                            <span className="item-count">{getTabCount('pending')}</span>
                         </button>
                         <button 
                             className={`item-tab ${activeTab === 'archived' ? 'active' : ''}`}
@@ -574,7 +661,7 @@ const ItemManagement = () => {
                 {/* Pagination Controls */}
                 {(() => {
                     // Calculate total items after applying current tab and search filters
-                    let itemsForPaginationCount = items;
+                    let itemsForPaginationCount = items.filter(item => item.adminApproval === true);
                     if (activeTab !== 'all') {
                         itemsForPaginationCount = itemsForPaginationCount.filter(item => item.status === activeTab);
                     }

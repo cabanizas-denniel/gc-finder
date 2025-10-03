@@ -190,12 +190,27 @@ const Messages = () => {
 
     // Handle sending a message
     const sendMessage = useCallback(async () => {
-        if ((!messageInput.trim() && !selectedImage) || !currentUser) return;
+        console.log('sendMessage called', { messageInput, currentUser, activeConversation });
+        
+        if ((!messageInput.trim() && !selectedImage) || !currentUser) {
+            console.log('Message send blocked:', { 
+                hasMessage: !!messageInput.trim(), 
+                hasImage: !!selectedImage, 
+                hasUser: !!currentUser 
+            });
+            return;
+        }
         
         let conversationId = activeConversation?.id;
         if (!conversationId) {
+            console.log('No active conversation, creating one...');
             conversationId = await createConversationWithAdmin();
-            if (!conversationId) return;
+            console.log('Created conversation ID:', conversationId);
+            if (!conversationId) {
+                console.error('Failed to create conversation');
+                alert('Failed to create conversation. Try logging back in again.');
+                return;
+            }
         }
         
         try {
@@ -211,12 +226,15 @@ const Messages = () => {
                 if (!messageText) messageText = '[Image]';
             }
             
+            console.log('Sending message...', { conversationId, senderId: currentUser.id, messageText });
             await messageService.sendMessage(conversationId, currentUser.id, currentUser.name, messageText, false, imageData);
+            console.log('Message sent successfully');
             setMessageInput('');
             clearSelectedImage();
             messageInputRef.current?.focus();
         } catch (error) {
             console.error('Error sending message:', error);
+            alert('Failed to send message: ' + error.message);
         }
     }, [messageInput, selectedImage, activeConversation, currentUser, createConversationWithAdmin, clearSelectedImage]);
 
@@ -255,8 +273,24 @@ const Messages = () => {
     const formatTime = (timestamp) => {
         if (!timestamp) return '';
         
+        const toDateObj = (ts) => {
+            if (!ts) return null;
+            if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts);
+            if (ts && typeof ts.toDate === 'function') return ts.toDate();
+            if (ts && typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
+            try { return new Date(ts); } catch { return null; }
+        };
+        const formatDateMDY = (dateObj) => {
+            if (!dateObj || isNaN(dateObj)) return '';
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            const yyyy = dateObj.getFullYear();
+            return `${mm}-${dd}-${yyyy}`;
+        };
+        
         const now = new Date();
-        const messageDate = new Date(timestamp);
+        const messageDate = toDateObj(timestamp);
+        if (!messageDate || isNaN(messageDate)) return '';
         const isToday = now.toDateString() === messageDate.toDateString();
         
         if (isToday) {
@@ -269,7 +303,7 @@ const Messages = () => {
             if (isYesterday) {
                 return 'Yesterday';
             } else {
-                return messageDate.toLocaleDateString();
+                return formatDateMDY(messageDate);
             }
         }
     };
@@ -455,7 +489,7 @@ const Messages = () => {
                                     <button 
                                         className="send-btn"
                                         onClick={sendMessage}
-                                        disabled={!messageInput.trim()}
+                                        disabled={!messageInput.trim() && !selectedImage}
                                     >
                                         <i className="fas fa-paper-plane"></i>
                                     </button>

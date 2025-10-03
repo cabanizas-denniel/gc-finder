@@ -540,7 +540,15 @@ const ReportItem = () => {
                             type="submit" 
                             className="submit-btn"
                             disabled={isSubmitting}
+                            style={{
+                                opacity: isSubmitting ? 0.7 : 1,
+                                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                position: 'relative'
+                            }}
                         >
+                            {isSubmitting && (
+                                <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>
+                            )}
                             {isSubmitting ? 'Submitting...' : 'Submit Report'}
                         </button>
                     </div>

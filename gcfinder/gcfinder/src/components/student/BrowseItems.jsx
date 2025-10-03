@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { browseItems } from '../../admin-firebase';
 import ItemsList from './ItemsList';
 
 const BrowseItems = () => {
@@ -19,63 +18,14 @@ const BrowseItems = () => {
             setLoading(true);
             setError('');
             try {
-                const userDataString = localStorage.getItem('userData');
-                const currentUserData = userDataString ? JSON.parse(userDataString) : null;
-                const currentUserId = currentUserData?.student_id;
-
-                let claimedItemIds = new Set();
-                if (currentUserId) {
-                    const claimsRef = collection(db, 'claims');
-                    const userClaimsQuery = query(claimsRef, where('claimerId', '==', currentUserId));
-                    const userClaimsSnapshot = await getDocs(userClaimsQuery);
-                    userClaimsSnapshot.forEach(doc => claimedItemIds.add(doc.data().itemId));
-                }
-
-                const itemsRef = collection(db, 'items');
-                // Fetch all items that are NOT archived
-                const q = query(itemsRef, where('status', '!=', 'archived'));
-                const querySnapshot = await getDocs(q);
+                // Fetch items from backend API (already filtered by claims and visibility)
+                const response = await browseItems();
+                const fetchedItems = response.items || [];
                 
-                const fetchedItems = [];
-                querySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const item_id = doc.id;
-                    const isSubmitter = data.submitter && data.submitter.student_id === currentUserId;
-                    const isDisapproved = data.status === "Disapproved";
-
-                    let isVisible;
-                    if (isDisapproved) {
-                        isVisible = isSubmitter;
-                    } else {
-                        // Item is not disapproved (i.e., it's Approved or Pending)
-                        // Visible if admin approved, OR if pending and current user is the submitter
-                        isVisible = data.adminApproval === true || isSubmitter;
-                    }
-
-                    // Finally, combine with the claimed check
-                    if (!claimedItemIds.has(item_id) && isVisible) {
-                        fetchedItems.push({
-                            id: item_id,
-                            name: data.name || 'Unnamed Item',
-                            category: data.category || 'Uncategorized',
-                            location: data.location || 'Unknown location',
-                            date: data.date || new Date().toLocaleDateString(),
-                            status: data.status === 'Available' ? 'Unclaimed' : (data.status || 'Unclaimed'),
-                            description: data.description || 'No description provided',
-                            imageData: data.imageData || [],
-                            image: data.imageData && data.imageData.length > 0 
-                                ? data.imageData[0].dataUrl 
-                                : null,
-                            createdAt: data.createdAt,
-                            submitter: data.submitter || null,
-                            adminApproval: data.adminApproval
-                        });
-                    }
-                });
-                
+                // Sort by newest first
                 fetchedItems.sort((a, b) => {
                     if (a.createdAt && b.createdAt) {
-                        return b.createdAt.seconds - a.createdAt.seconds;
+                        return new Date(b.createdAt) - new Date(a.createdAt);
                     }
                     return new Date(b.date) - new Date(a.date);
                 });

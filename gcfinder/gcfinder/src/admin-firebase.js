@@ -4,6 +4,32 @@ import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestam
 import { getAnalytics } from 'firebase/analytics';
 import { getStorage } from 'firebase/storage';
 
+// Helper function to get Firebase ID token for API requests
+const getAuthToken = async () => {
+  // Wait for auth to be ready
+  return new Promise((resolve, reject) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      unsubscribe();
+      if (!user) {
+        reject(new Error('User not authenticated. Please log in again.'));
+        return;
+      }
+      try {
+        const token = await user.getIdToken();
+        resolve(token);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    
+    // Timeout after 5 seconds
+    setTimeout(() => {
+      unsubscribe();
+      reject(new Error('Authentication timeout. Please refresh and try again.'));
+    }, 5000);
+  });
+};
+
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCyCN4ur2Z0kwZzbc1V1XVMGDnV2kvLNfk",
@@ -55,26 +81,25 @@ export const loginWithAdminEmail = async (email, password) => {
   }
 };
 
-// Get all users from Firestore
+// Get all users from backend API (secure)
 export const getAllUsers = async () => {
   try {
-    const usersRef = collection(db, 'students');
-    const querySnapshot = await getDocs(usersRef);
-    
-    const users = [];
-    querySnapshot.forEach((doc) => {
-      const userData = doc.data();
-      users.push({
-        id: doc.id,
-        full_name: userData.full_name || userData.name,
-        student_id: userData.student_id,
-        email: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
-        year_level: userData.year_level || 'N/A',
-        status: userData.status || 'active'
-      });
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
-    
-    return users;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch users');
+    }
+
+    const data = await response.json();
+    return data.users;
   } catch (error) {
     console.error("Error getting users:", error);
     throw error;
@@ -126,53 +151,50 @@ export const submitFoundItem = async (formData, images) => {
   }
 };
 
-// Get items that need admin approval
+// Get items that need admin approval via backend API (secure)
 export const getPendingItems = async () => {
   try {
-    const itemsRef = collection(db, 'items');
-    const q = query(itemsRef, where('adminApproval', '==', false));
-    const querySnapshot = await getDocs(q);
-    
-    const items = [];
-    querySnapshot.forEach((doc) => {
-      const itemData = doc.data();
-      items.push({
-        id: doc.id,
-        title: itemData.name,
-        category: itemData.category,
-        status: 'pending',
-        date: itemData.date,
-        image: itemData.imageData?.[0]?.dataUrl || 'https://via.placeholder.com/150',
-        images: itemData.imageData?.map(img => img.dataUrl) || [],
-        description: itemData.description,
-        location: itemData.location,
-        exactLocation: itemData.exactLocation,
-        uniqueIdentifier: itemData.uniqueIdentifier,
-        additionalDetails: itemData.additionalDetails,
-        submitter: {
-          full_name: itemData.submitter?.full_name || 'N/A',
-          student_id: itemData.submitter?.student_id || null
-        }
-      });
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/pending`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
-    
-    return items;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to fetch pending items (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data.items;
   } catch (error) {
     console.error("Error getting pending items:", error);
     throw error;
   }
 };
 
-// Approve item function
+// Approve item via backend API (secure)
 export const approveItem = async (itemId) => {
   try {
-    const itemRef = doc(db, 'items', itemId);
-    await updateDoc(itemRef, {
-      adminApproval: true,
-      status: 'Unclaimed',
-      updatedAt: serverTimestamp()
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/${itemId}/approve`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
-    console.log(`Item ${itemId} approved and status set to Unclaimed.`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to approve item');
+    }
+
+    const data = await response.json();
+    console.log(data.message);
     return true;
   } catch (error) {
     console.error("Error approving item:", error);
@@ -180,16 +202,25 @@ export const approveItem = async (itemId) => {
   }
 };
 
-// Disapprove item function
+// Disapprove item via backend API (secure)
 export const disapproveItem = async (itemId) => {
   try {
-    const itemRef = doc(db, 'items', itemId);
-    await updateDoc(itemRef, {
-      status: 'Disapproved',
-      adminApproval: true, // True para di nagpapakita sa pending items
-      updatedAt: serverTimestamp()
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/${itemId}/disapprove`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
-    console.log(`Item ${itemId} has been disapproved and status updated.`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to disapprove item');
+    }
+
+    const data = await response.json();
+    console.log(data.message);
     return true;
   } catch (error) {
     console.error(`Error disapproving item ${itemId}:`, error);
@@ -197,117 +228,225 @@ export const disapproveItem = async (itemId) => {
   }
 };
 
-// Get all items from Firestore /ITEM MANAGEMENT
+// Get all items via backend API (secure) /ITEM MANAGEMENT
 export const getAllItems = async () => {
     try {
-        const itemsCollectionRef = collection(db, "items");
-        const q = query(
-            itemsCollectionRef,
-            where('adminApproval', '==', true)
-        );
-        const itemSnapshot = await getDocs(q);
-        const itemList = itemSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        return itemList;
+        const token = await getAuthToken();
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to fetch items (${response.status})`);
+        }
+
+        const data = await response.json();
+        return data.items;
     } catch (error) {
         console.error("Error fetching all items: ", error);
-        throw error; // Re-throw the error so the calling component can handle it
+        throw error;
     }
 };
 
 export const deleteItemFromDb = async (itemId) => {
     try {
-        const itemRef = doc(db, 'items', itemId);
-        await deleteDoc(itemRef);
-        console.log("Item deleted successfully from Firestore: ", itemId);
-
-        // Delete all claims associated with the deleted item
-        const claimsRef = collection(db, 'claims');
-        const q = query(claimsRef, where('itemId', '==', itemId));
-        const querySnapshot = await getDocs(q);
-
-        const deletePromises = [];
-        querySnapshot.forEach((claimDoc) => {
-            deletePromises.push(deleteDoc(doc(db, 'claims', claimDoc.id)));
+        const token = await getAuthToken();
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/${itemId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
         });
-        await Promise.all(deletePromises);
-        console.log('All claims for deleted item removed successfully.');
 
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete item');
+        }
+
+        const data = await response.json();
+        console.log(data.message);
     } catch (error) {
-        console.error("Error deleting item from Firestore: ", error);
-        throw error; // Re-throw the error so the calling component can handle it
+        console.error("Error deleting item: ", error);
+        throw error;
     }
 };
 
 export const archiveItemInDb = async (itemId) => {
   try {
-    const itemRef = doc(db, 'items', itemId);
-    
-    // First, get the current item to store its previous status
-    const itemDoc = await getDoc(itemRef);
-    const currentStatus = itemDoc.data()?.status;
-    
-    await updateDoc(itemRef, {
-      status: 'archived',
-      previousStatus: currentStatus, // Store the previous status
-      updatedAt: serverTimestamp()
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/${itemId}/archive`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
 
-    // Delete pending claims associated with the archived item
-    const claimsRef = collection(db, 'claims');
-    const q = query(claimsRef, where('itemId', '==', itemId), where('claimStatus', '==', 'Pending'));
-    const querySnapshot = await getDocs(q);
-    
-    const deletePromises = [];
-    querySnapshot.forEach((claimDoc) => {
-      deletePromises.push(deleteDoc(doc(db, 'claims', claimDoc.id)));
-    });
-    await Promise.all(deletePromises);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to archive item');
+    }
 
-    console.log('Item archived successfully in Firestore with ID:', itemId);
-    console.log('Pending claims for archived item deleted successfully.');
+    const data = await response.json();
+    console.log(data.message);
   } catch (error) {
-    console.error('Error archiving item in Firestore:', error);
+    console.error('Error archiving item:', error);
     throw error;
   }
 };
 
 export const unarchiveItemInDb = async (itemId) => {
   try {
-    const itemRef = doc(db, 'items', itemId);
-    
-    // Get the current item to retrieve its previous status
-    const itemDoc = await getDoc(itemRef);
-    const itemData = itemDoc.data();
-    const previousStatus = itemData?.previousStatus || 'Unclaimed'; // Default to 'Unclaimed' if no previous status
-    
-    await updateDoc(itemRef, {
-      status: previousStatus,
-      previousStatus: null, // Clear the previous status field
-      updatedAt: serverTimestamp()
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/${itemId}/unarchive`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
 
-    console.log(`Item unarchived successfully in Firestore with ID: ${itemId}, restored to status: ${previousStatus}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to unarchive item');
+    }
+
+    const data = await response.json();
+    console.log(data.message);
   } catch (error) {
-    console.error('Error unarchiving item in Firestore:', error);
+    console.error('Error unarchiving item:', error);
     throw error;
   }
 };
 
-// Update user status in Firestore
+// Update user status via backend API (secure)
 export const updateUserStatus = async (userId, statusData) => {
   try {
-    const userRef = doc(db, 'students', userId);
-    await updateDoc(userRef, {
-      status: statusData.status,
-      ...(statusData.flagReason && { flagReason: statusData.flagReason }),
-      ...(statusData.banReason && { banReason: statusData.banReason }),
-      ...(statusData.banDuration && { banDuration: statusData.banDuration }),
-      ...(statusData.banExpiresAt && { banExpiresAt: statusData.banExpiresAt }),
-      updatedAt: serverTimestamp()
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(statusData)
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update user status');
+    }
+
     return true;
   } catch (error) {
     console.error("Error updating user status:", error);
+    throw error;
+  }
+};
+
+// Get dashboard statistics via backend API (secure)
+export const getDashboardStats = async () => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/dashboard/stats`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to fetch dashboard stats (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data.stats;
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+    throw error;
+  }
+};
+
+// Get claims via backend API (secure, role-based)
+export const getClaims = async () => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/claims`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to fetch claims (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data.claims;
+  } catch (error) {
+    console.error("Error fetching claims:", error);
+    throw error;
+  }
+};
+
+// Browse items for students via backend API (secure, filters claimed items)
+export const browseItems = async () => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/browse`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to browse items (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data; // Returns { items, userSubmittedCount }
+  } catch (error) {
+    console.error("Error browsing items:", error);
+    throw error;
+  }
+};
+
+// Update claim status via backend API (secure, admin only)
+export const updateClaimStatus = async (claimId, updateData) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/claims/${claimId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updateData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to update claim (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error updating claim ${claimId}:`, error);
     throw error;
   }
 }; 

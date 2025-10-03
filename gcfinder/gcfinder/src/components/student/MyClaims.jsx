@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase'; 
+import { getClaims } from '../../admin-firebase';
 import { ClaimDetailModalDisplay, ClaimsGridDisplay } from './ItemsList'; // Import both display components
 
 const MyClaims = () => {
@@ -12,53 +11,48 @@ const MyClaims = () => {
     const [showClaimDetailModal, setShowClaimDetailModal] = useState(false);
     const [selectedClaimForDetail, setSelectedClaimForDetail] = useState(null);
 
+    // Helper function to format date as MM - DD - YYYY
+    const formatDateMDY = (dateObj) => {
+        if (!dateObj || isNaN(dateObj)) return 'Date not available';
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const yyyy = dateObj.getFullYear();
+        return `${mm}-${dd}-${yyyy}`;
+    };
+
     // Fetch claims from Firestore
     useEffect(() => {
         const fetchUserClaims = async () => {
             setLoading(true);
             setError('');
             try {
-                const userDataString = localStorage.getItem('userData');
-                if (!userDataString) {
-                    setError('User not logged in. Please sign in to view your claims.');
-                    setLoading(false);
-                    setAllUserClaims([]); // Clear any existing claims
-                    return;
-                }
-                const currentUserData = JSON.parse(userDataString);
-                const currentUserId = currentUserData?.student_id;
-
-                if (!currentUserId) {
-                    setError('Could not retrieve your user ID. Cannot fetch claims.');
-                    setLoading(false);
-                    setAllUserClaims([]);
-                    return;
-                }
-
-                const claimsRef = collection(db, 'claims');
-                // Query based on the provided Firestore structure, without ordering for now
-                const q = query(
-                    claimsRef, 
-                    where('claimerId', '==', currentUserId)
-                    // orderBy('createdAt', 'desc') // Temporarily removed to avoid composite index issue
-                    // THIS KEEPS ERRORING
-                );
-                const querySnapshot = await getDocs(q);
+                // Fetch claims from backend API (automatically filtered by user)
+                const claimsDataFromApi = await getClaims();
                 
-                let fetchedClaims = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                    displayDate: doc.data().createdAt?.toDate ? 
-                                 doc.data().createdAt.toDate().toLocaleDateString() : 
-                                 'Date not available',
-                }));
-
-                // Optional: Client-side sorting if needed, after fetching
-                fetchedClaims.sort((a, b) => {
-                    const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
-                    const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-                    return dateB - dateA; // Sorts descending (newest first)
+                let fetchedClaims = claimsDataFromApi.map(data => {
+                    // Parse ISO timestamp string back to Date object
+                    const createdAtDate = data.createdAt ? new Date(data.createdAt) : new Date(0);
+                    
+                    return {
+                        id: data.id,
+                        itemName: data.itemName,
+                        itemId: data.itemId,
+                        itemImage: data.itemImage || null,
+                        claimStatus: data.claimStatus,
+                        claimerId: data.claimerId,
+                        claimerName: data.claimerName,
+                        lastSeenLocation: data.lastSeenLocation,
+                        uniqueIdentifier: data.uniqueIdentifier,
+                        additionalDetails: data.additionalDetails,
+                        proofImageUrl: data.proofImageUrl,
+                        rejectionReason: data.rejectionReason,
+                        createdAt: createdAtDate,
+                        displayDate: formatDateMDY(createdAtDate)
+                    };
                 });
+
+                // Sort by newest first
+                fetchedClaims.sort((a, b) => b.createdAt - a.createdAt);
                 
                 setAllUserClaims(fetchedClaims);
             } catch (err) {

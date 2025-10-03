@@ -364,11 +364,13 @@ CORS(app, resources={
             "https://gc-finder.vercel.app", 
             "https://gcfinder.pages.dev", 
             "http://localhost:3000",
-            "https://localhost:3000"
+            "https://localhost:3000",
+            "http://127.0.0.1:3000"
         ],
-        "methods": ["GET", "POST", "OPTIONS", "DELETE"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": False
+        "supports_credentials": False,
+        "expose_headers": ["Content-Type", "Authorization"]
     }
 })
 
@@ -1083,6 +1085,686 @@ def export_data_route():
     except Exception as e:
         logger.error(f"Unexpected error during report generation: {e}", exc_info=True)
         return jsonify({"error": "An unexpected error occurred. Please check server logs."}), 500
+
+# ============================================================================
+# SECURE API ENDPOINTS - Phase 2 Security Implementation
+# ============================================================================
+
+@app.route('/api/users', methods=['GET'])
+@admin_required
+def get_all_users():
+    """Get all users - Admin only"""
+    try:
+        logger.info("=== Starting user fetch ===")
+        logger.info(f"Database connection: {'Connected' if db else 'Not connected'}")
+        
+        users_ref = db.collection('students')
+        logger.info("Getting students collection reference...")
+        
+        users_snapshot = users_ref.stream()
+        logger.info("Streaming documents...")
+        
+        users = []
+        doc_count = 0
+        
+        for doc in users_snapshot:
+            doc_count += 1
+            logger.info(f"Found document {doc_count}: ID={doc.id}")
+            user_data = doc.to_dict()
+            users.append({
+                'id': doc.id,
+                'full_name': user_data.get('full_name', user_data.get('name', 'N/A')),
+                'student_id': user_data.get('student_id'),
+                'email': user_data.get('email', f"{user_data.get('student_id')}@gordoncollege.edu.ph"),
+                'year_level': user_data.get('year_level', 'N/A'),
+                'status': user_data.get('status', 'active'),
+                'flagReason': user_data.get('flagReason'),
+                'flagDuration': user_data.get('flagDuration'),
+                'flagExpiresAt': user_data.get('flagExpiresAt'),
+                'banReason': user_data.get('banReason'),
+                'banDuration': user_data.get('banDuration'),
+                'banExpiresAt': user_data.get('banExpiresAt'),
+                'profileUrl': user_data.get('profileUrl'),
+                'createdAt': user_data.get('createdAt')
+            })
+        
+        logger.info(f"=== Fetch complete: Found {doc_count} documents, processed {len(users)} users ===")
+        return jsonify({'users': users}), 200
+    except Exception as e:
+        logger.error(f"Error fetching users: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch users'}), 500
+
+@app.route('/api/users/<uid>/status', methods=['PUT'])
+@admin_required
+def update_user_status(uid):
+    """Update user status (flag/ban/unban) - Admin only"""
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    
+    status_data = request.get_json()
+    
+    try:
+        user_ref = db.collection('students').document(uid)
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Build update data
+        update_data = {
+            'status': status_data.get('status'),
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        }
+        
+        # Add flag/ban specific fields
+        if 'flagReason' in status_data:
+            update_data['flagReason'] = status_data['flagReason']
+        if 'flagDuration' in status_data:
+            update_data['flagDuration'] = status_data['flagDuration']
+        if 'flagExpiresAt' in status_data:
+            update_data['flagExpiresAt'] = status_data['flagExpiresAt']
+        if 'banReason' in status_data:
+            update_data['banReason'] = status_data['banReason']
+        if 'banDuration' in status_data:
+            update_data['banDuration'] = status_data['banDuration']
+        if 'banExpiresAt' in status_data:
+            update_data['banExpiresAt'] = status_data['banExpiresAt']
+        
+        user_ref.update(update_data)
+        
+        return jsonify({
+            "message": f"User {uid} status updated successfully",
+            "status": status_data.get('status')
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating user status: {e}")
+        return jsonify({"error": "Failed to update user status"}), 500
+
+@app.route('/api/items', methods=['GET'])
+@login_required
+def get_items():
+    """Get items with role-based filtering"""
+    try:
+        logger.info("=== Fetching items ===")
+        uid = request.user['uid']
+        logger.info(f"User ID: {uid}")
+        
+        # Check if user is admin
+        admin_ref = db.collection('admin').document(uid)
+        is_admin = admin_ref.get().exists
+        logger.info(f"Is admin: {is_admin}")
+        
+        items_ref = db.collection('items')
+        
+        # Admins see all items, students see only approved items
+        if is_admin:
+            logger.info("Fetching ALL items for admin")
+            items_snapshot = items_ref.stream()
+        else:
+            logger.info("Fetching APPROVED items for student")
+            items_snapshot = items_ref.where('adminApproval', '==', True).stream()
+        
+        items = []
+        doc_count = 0
+        for doc in items_snapshot:
+            doc_count += 1
+            logger.info(f"Processing document {doc_count}: {doc.id}")
+            try:
+                item_data = doc.to_dict()
+                
+                # Convert Firestore Timestamps to ISO format strings for JSON serialization
+                created_at = item_data.get('createdAt')
+                updated_at = item_data.get('updatedAt')
+                date_field = item_data.get('date')
+                
+                items.append({
+                    'id': doc.id,
+                    'name': item_data.get('name'),
+                    'category': item_data.get('category'),
+                    'description': item_data.get('description'),
+                    'location': item_data.get('location'),
+                    'exactLocation': item_data.get('exactLocation'),
+                    'date': date_field.isoformat() if hasattr(date_field, 'isoformat') else date_field,
+                    'status': item_data.get('status'),
+                    'adminApproval': item_data.get('adminApproval'),
+                    'imageData': item_data.get('imageData'),
+                    'submitter': item_data.get('submitter'),
+                    'uniqueIdentifier': item_data.get('uniqueIdentifier'),
+                    'additionalDetails': item_data.get('additionalDetails'),
+                    'createdAt': created_at.isoformat() if hasattr(created_at, 'isoformat') else created_at,
+                    'updatedAt': updated_at.isoformat() if hasattr(updated_at, 'isoformat') else updated_at
+                })
+            except Exception as doc_error:
+                logger.error(f"Error processing document {doc.id}: {doc_error}", exc_info=True)
+                continue
+        
+        logger.info(f"=== Successfully fetched {len(items)} items out of {doc_count} documents ===")
+        return jsonify({'items': items}), 200
+    except Exception as e:
+        logger.error(f"Error fetching items: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch items'}), 500
+
+@app.route('/api/items/pending', methods=['GET'])
+@admin_required
+def get_pending_items():
+    """Get items pending admin approval - Admin only"""
+    try:
+        items_ref = db.collection('items')
+        items_snapshot = items_ref.where('adminApproval', '==', False).stream()
+        
+        items = []
+        for doc in items_snapshot:
+            item_data = doc.to_dict()
+            
+            # Convert Firestore Timestamps to ISO format strings for JSON serialization
+            created_at = item_data.get('createdAt')
+            updated_at = item_data.get('updatedAt')
+            date_field = item_data.get('date')
+            
+            items.append({
+                'id': doc.id,
+                'title': item_data.get('name'),
+                'name': item_data.get('name'),
+                'category': item_data.get('category'),
+                'status': 'pending',
+                'date': date_field.isoformat() if hasattr(date_field, 'isoformat') else date_field,
+                'image': item_data.get('imageData', [])[0].get('dataUrl') if item_data.get('imageData') and len(item_data.get('imageData')) > 0 else None,
+                'images': [img.get('dataUrl') for img in item_data.get('imageData', [])] if item_data.get('imageData') else [],
+                'description': item_data.get('description'),
+                'location': item_data.get('location'),
+                'exactLocation': item_data.get('exactLocation'),
+                'uniqueIdentifier': item_data.get('uniqueIdentifier'),
+                'additionalDetails': item_data.get('additionalDetails'),
+                'submitter': {
+                    'full_name': item_data.get('submitter', {}).get('full_name', 'N/A'),
+                    'student_id': item_data.get('submitter', {}).get('student_id')
+                },
+                'createdAt': created_at.isoformat() if hasattr(created_at, 'isoformat') else created_at,
+                'updatedAt': updated_at.isoformat() if hasattr(updated_at, 'isoformat') else updated_at,
+                'adminApproval': item_data.get('adminApproval')
+            })
+        
+        return jsonify({'items': items}), 200
+    except Exception as e:
+        logger.error(f"Error fetching pending items: {e}")
+        return jsonify({'error': 'Failed to fetch pending items'}), 500
+
+@app.route('/api/items/browse', methods=['GET'])
+@login_required
+def browse_items():
+    """Get items for student browsing - excludes claimed items and applies visibility rules"""
+    try:
+        uid = request.user['uid']
+        
+        # Get user's claimed item IDs
+        claims_ref = db.collection('claims')
+        user_claims = claims_ref.where('claimerId', '==', uid).stream()
+        claimed_item_ids = set()
+        for claim_doc in user_claims:
+            claim_data = claim_doc.to_dict()
+            claimed_item_ids.add(claim_data.get('itemId'))
+        
+        # Get all non-archived items
+        items_ref = db.collection('items')
+        items_snapshot = items_ref.where('status', '!=', 'Archived').stream()
+        
+        items = []
+        user_submitted_count = 0
+        
+        for doc in items_snapshot:
+            item_data = doc.to_dict()
+            item_id = doc.id
+            
+            # Check if user is the submitter
+            submitter = item_data.get('submitter', {})
+            is_submitter = submitter.get('student_id') == uid if submitter else False
+            
+            if is_submitter:
+                user_submitted_count += 1
+            
+            # Determine visibility
+            status = item_data.get('status')
+            admin_approval = item_data.get('adminApproval', False)
+            is_disapproved = status == 'Disapproved'
+            
+            if is_disapproved:
+                is_visible = is_submitter
+            else:
+                # Visible if admin approved OR if user is the submitter
+                is_visible = admin_approval or is_submitter
+            
+            # Include if visible and not already claimed by this user
+            if is_visible and item_id not in claimed_item_ids:
+                # Convert timestamps
+                created_at = item_data.get('createdAt')
+                updated_at = item_data.get('updatedAt')
+                date_field = item_data.get('date')
+                
+                items.append({
+                    'id': item_id,
+                    'name': item_data.get('name'),
+                    'category': item_data.get('category'),
+                    'location': item_data.get('location'),
+                    'date': date_field.isoformat() if hasattr(date_field, 'isoformat') else date_field,
+                    'status': item_data.get('status'),
+                    'description': item_data.get('description'),
+                    'imageData': item_data.get('imageData'),
+                    'image': item_data.get('imageData', [])[0].get('dataUrl') if item_data.get('imageData') and len(item_data.get('imageData')) > 0 else None,
+                    'exactLocation': item_data.get('exactLocation'),
+                    'uniqueIdentifier': item_data.get('uniqueIdentifier'),
+                    'additionalDetails': item_data.get('additionalDetails'),
+                    'submitter': item_data.get('submitter'),
+                    'adminApproval': admin_approval,
+                    'createdAt': created_at.isoformat() if hasattr(created_at, 'isoformat') else created_at,
+                    'updatedAt': updated_at.isoformat() if hasattr(updated_at, 'isoformat') else updated_at
+                })
+        
+        return jsonify({
+            'items': items,
+            'userSubmittedCount': user_submitted_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error browsing items: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to browse items'}), 500
+
+@app.route('/api/items/<item_id>', methods=['PUT'])
+@admin_required
+def update_item(item_id):
+    """Update item - Admin only"""
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    
+    update_data = request.get_json()
+    
+    try:
+        item_ref = db.collection('items').document(item_id)
+        item_doc = item_ref.get()
+        
+        if not item_doc.exists:
+            return jsonify({"error": "Item not found"}), 404
+        
+        # Add timestamp
+        update_data['updatedAt'] = firestore.SERVER_TIMESTAMP
+        
+        item_ref.update(update_data)
+        
+        return jsonify({
+            "message": f"Item {item_id} updated successfully"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating item: {e}")
+        return jsonify({"error": "Failed to update item"}), 500
+
+@app.route('/api/items/<item_id>/approve', methods=['POST'])
+@admin_required
+def approve_item(item_id):
+    """Approve a pending item - Admin only"""
+    try:
+        item_ref = db.collection('items').document(item_id)
+        item_doc = item_ref.get()
+        
+        if not item_doc.exists:
+            return jsonify({"error": "Item not found"}), 404
+        
+        item_ref.update({
+            'adminApproval': True,
+            'status': 'Unclaimed',
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        
+        return jsonify({"message": f"Item {item_id} approved successfully"}), 200
+        
+    except Exception as e:
+        logger.error(f"Error approving item: {e}")
+        return jsonify({"error": "Failed to approve item"}), 500
+
+@app.route('/api/items/<item_id>/disapprove', methods=['POST'])
+@admin_required
+def disapprove_item(item_id):
+    """Disapprove a pending item - Admin only"""
+    try:
+        item_ref = db.collection('items').document(item_id)
+        item_doc = item_ref.get()
+        
+        if not item_doc.exists:
+            return jsonify({"error": "Item not found"}), 404
+        
+        item_ref.update({
+            'status': 'Disapproved',
+            'adminApproval': True,  # Set to true so it doesn't show in pending
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        
+        return jsonify({"message": f"Item {item_id} disapproved successfully"}), 200
+        
+    except Exception as e:
+        logger.error(f"Error disapproving item: {e}")
+        return jsonify({"error": "Failed to disapprove item"}), 500
+
+@app.route('/api/items/<item_id>', methods=['DELETE'])
+@admin_required
+def delete_item_endpoint(item_id):
+    """Delete item and associated claims - Admin only"""
+    try:
+        # Delete item
+        item_ref = db.collection('items').document(item_id)
+        item_doc = item_ref.get()
+        
+        if not item_doc.exists:
+            return jsonify({"error": "Item not found"}), 404
+        
+        item_ref.delete()
+        
+        # Delete associated claims
+        claims_ref = db.collection('claims')
+        claims_query = claims_ref.where('itemId', '==', item_id)
+        claims_snapshot = claims_query.stream()
+        
+        deleted_claims = 0
+        for claim_doc in claims_snapshot:
+            claim_doc.reference.delete()
+            deleted_claims += 1
+        
+        return jsonify({
+            "message": f"Item {item_id} and {deleted_claims} associated claims deleted successfully"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error deleting item: {e}")
+        return jsonify({"error": "Failed to delete item"}), 500
+
+@app.route('/api/items/<item_id>/archive', methods=['POST'])
+@admin_required
+def archive_item(item_id):
+    """Archive item - Admin only"""
+    try:
+        item_ref = db.collection('items').document(item_id)
+        item_doc = item_ref.get()
+        
+        if not item_doc.exists:
+            return jsonify({"error": "Item not found"}), 404
+        
+        item_data = item_doc.to_dict()
+        current_status = item_data.get('status')
+        
+        item_ref.update({
+            'status': 'Archived',
+            'previousStatus': current_status,
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        
+        # Delete pending claims for archived item
+        claims_ref = db.collection('claims')
+        pending_claims = claims_ref.where('itemId', '==', item_id).where('claimStatus', '==', 'Pending').stream()
+        
+        deleted_claims = 0
+        for claim_doc in pending_claims:
+            claim_doc.reference.delete()
+            deleted_claims += 1
+        
+        return jsonify({
+            "message": f"Item {item_id} archived successfully",
+            "deleted_pending_claims": deleted_claims
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error archiving item: {e}")
+        return jsonify({"error": "Failed to archive item"}), 500
+
+@app.route('/api/items/<item_id>/unarchive', methods=['POST'])
+@admin_required
+def unarchive_item(item_id):
+    """Unarchive item - Admin only"""
+    try:
+        item_ref = db.collection('items').document(item_id)
+        item_doc = item_ref.get()
+        
+        if not item_doc.exists:
+            return jsonify({"error": "Item not found"}), 404
+        
+        item_data = item_doc.to_dict()
+        previous_status = item_data.get('previousStatus', 'Unclaimed')
+        
+        item_ref.update({
+            'status': previous_status,
+            'previousStatus': firestore.DELETE_FIELD,
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        
+        return jsonify({
+            "message": f"Item {item_id} unarchived successfully",
+            "restored_status": previous_status
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error unarchiving item: {e}")
+        return jsonify({"error": "Failed to unarchive item"}), 500
+
+@app.route('/api/claims', methods=['GET'])
+@login_required
+def get_claims():
+    """Get claims with role-based filtering"""
+    try:
+        uid = request.user['uid']
+        
+        # Check if user is admin
+        admin_ref = db.collection('admin').document(uid)
+        is_admin = admin_ref.get().exists
+        
+        claims_ref = db.collection('claims')
+        
+        # Admins see all claims, students see only their own
+        if is_admin:
+            claims_snapshot = claims_ref.stream()
+        else:
+            claims_snapshot = claims_ref.where('claimerId', '==', uid).stream()
+        
+        claims = []
+        for doc in claims_snapshot:
+            claim_data = doc.to_dict()
+            
+            # Convert Firestore Timestamps to ISO format strings for JSON serialization
+            created_at = claim_data.get('createdAt')
+            updated_at = claim_data.get('updatedAt')
+            
+            # Fetch the item's image from the items collection
+            item_image = None
+            item_id = claim_data.get('itemId')
+            if item_id:
+                try:
+                    item_ref = db.collection('items').document(item_id)
+                    item_doc = item_ref.get()
+                    if item_doc.exists:
+                        item_data = item_doc.to_dict()
+                        image_data = item_data.get('imageData')
+                        if image_data and len(image_data) > 0:
+                            item_image = image_data[0].get('dataUrl')
+                except Exception as item_error:
+                    logger.warning(f"Could not fetch item image for claim {doc.id}: {item_error}")
+            
+            claims.append({
+                'id': doc.id,
+                'itemId': item_id,
+                'itemName': claim_data.get('itemName'),
+                'itemImage': item_image,
+                'claimerId': claim_data.get('claimerId'),
+                'claimerName': claim_data.get('claimerName'),
+                'claimStatus': claim_data.get('claimStatus'),
+                'lastSeenLocation': claim_data.get('lastSeenLocation'),
+                'uniqueIdentifier': claim_data.get('uniqueIdentifier'),
+                'additionalDetails': claim_data.get('additionalDetails'),
+                'proofImageUrl': claim_data.get('proofImageUrl'),
+                'rejectionReason': claim_data.get('rejectionReason'),
+                'ownershipProof': claim_data.get('ownershipProof'),
+                'createdAt': created_at.isoformat() if hasattr(created_at, 'isoformat') else created_at,
+                'updatedAt': updated_at.isoformat() if hasattr(updated_at, 'isoformat') else updated_at
+            })
+        
+        return jsonify({'claims': claims}), 200
+    except Exception as e:
+        logger.error(f"Error fetching claims: {e}")
+        return jsonify({'error': 'Failed to fetch claims'}), 500
+
+@app.route('/api/claims/<claim_id>', methods=['PUT'])
+@admin_required
+def update_claim(claim_id):
+    """Update claim status - Admin only"""
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    
+    update_data = request.get_json()
+    
+    try:
+        claim_ref = db.collection('claims').document(claim_id)
+        claim_doc = claim_ref.get()
+        
+        if not claim_doc.exists:
+            return jsonify({"error": "Claim not found"}), 404
+        
+        # Add timestamp
+        update_data['updatedAt'] = firestore.SERVER_TIMESTAMP
+        
+        claim_ref.update(update_data)
+        
+        # If claim is approved/rejected, update related item status
+        if 'claimStatus' in update_data and 'itemId' in claim_doc.to_dict():
+            item_id = claim_doc.to_dict()['itemId']
+            item_ref = db.collection('items').document(item_id)
+            
+            if update_data['claimStatus'] == 'Approved':
+                item_ref.update({
+                    'status': 'Claiming',
+                    'updatedAt': firestore.SERVER_TIMESTAMP
+                })
+            elif update_data['claimStatus'] == 'Rejected':
+                item_ref.update({
+                    'status': 'Unclaimed',
+                    'updatedAt': firestore.SERVER_TIMESTAMP
+                })
+            elif update_data['claimStatus'] == 'Claimed':
+                item_ref.update({
+                    'status': 'Claimed',
+                    'updatedAt': firestore.SERVER_TIMESTAMP
+                })
+        
+        return jsonify({
+            "message": f"Claim {claim_id} updated successfully"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating claim: {e}")
+        return jsonify({"error": "Failed to update claim"}), 500
+
+@app.route('/api/dashboard/stats', methods=['GET'])
+@admin_required
+def get_dashboard_stats():
+    """Get dashboard statistics - Admin only"""
+    try:
+        from datetime import datetime, timedelta
+        
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday = today - timedelta(days=1)
+        
+        # Get pending items
+        items_ref = db.collection('items')
+        pending_items_snapshot = items_ref.where('adminApproval', '==', False).stream()
+        pending_reports_count = 0
+        pending_reports_today_yesterday = 0
+        
+        for doc in pending_items_snapshot:
+            pending_reports_count += 1
+            item_data = doc.to_dict()
+            created_at = item_data.get('createdAt')
+            if created_at and hasattr(created_at, 'timestamp'):
+                created_date = datetime.fromtimestamp(created_at.timestamp()).replace(hour=0, minute=0, second=0, microsecond=0)
+                if created_date >= yesterday:
+                    pending_reports_today_yesterday += 1
+        
+        # Get pending claims
+        claims_ref = db.collection('claims')
+        pending_claims_snapshot = claims_ref.where('claimStatus', '==', 'Pending').stream()
+        pending_claims_count = 0
+        pending_claims_today_yesterday = 0
+        
+        for doc in pending_claims_snapshot:
+            pending_claims_count += 1
+            claim_data = doc.to_dict()
+            created_at = claim_data.get('createdAt')
+            if created_at and hasattr(created_at, 'timestamp'):
+                created_date = datetime.fromtimestamp(created_at.timestamp()).replace(hour=0, minute=0, second=0, microsecond=0)
+                if created_date >= yesterday:
+                    pending_claims_today_yesterday += 1
+        
+        # Get active items
+        active_items_snapshot = items_ref.where('status', '==', 'Unclaimed').stream()
+        active_items_count = 0
+        active_items_today_yesterday = 0
+        
+        for doc in active_items_snapshot:
+            active_items_count += 1
+            item_data = doc.to_dict()
+            updated_at = item_data.get('updatedAt')
+            if updated_at and hasattr(updated_at, 'timestamp'):
+                updated_date = datetime.fromtimestamp(updated_at.timestamp()).replace(hour=0, minute=0, second=0, microsecond=0)
+                if updated_date >= yesterday:
+                    active_items_today_yesterday += 1
+        
+        # Get item category distribution
+        all_items_snapshot = items_ref.stream()
+        category_counts = {}
+        resolved_count = 0
+        unresolved_count = 0
+        
+        for doc in all_items_snapshot:
+            item_data = doc.to_dict()
+            
+            # Category distribution
+            category = item_data.get('category', 'Uncategorized')
+            category_counts[category] = category_counts.get(category, 0) + 1
+            
+            # Resolution rate
+            status = item_data.get('status')
+            admin_approval = item_data.get('adminApproval', False)
+            
+            if status in ['Claimed', 'Claiming']:
+                resolved_count += 1
+            elif status == 'Unclaimed' or (status == 'Pending' and admin_approval) or status == 'Archived':
+                unresolved_count += 1
+        
+        # Format category distribution for pie chart
+        item_category_distribution = [{'name': key, 'value': value} for key, value in category_counts.items()]
+        
+        # Format resolution data for pie chart
+        report_resolution_data = [
+            {'name': 'Resolved', 'value': resolved_count},
+            {'name': 'Unresolved', 'value': unresolved_count}
+        ]
+        
+        stats = {
+            'pendingReports': {
+                'count': pending_reports_count,
+                'fromYesterday': pending_reports_today_yesterday
+            },
+            'pendingClaims': {
+                'count': pending_claims_count,
+                'fromYesterday': pending_claims_today_yesterday
+            },
+            'activeItems': {
+                'count': active_items_count,
+                'fromYesterday': active_items_today_yesterday
+            },
+            'itemCategoryDistribution': item_category_distribution,
+            'reportResolutionData': report_resolution_data
+        }
+        
+        return jsonify({'stats': stats}), 200
+        
+    except Exception as e:
+        logger.error(f"Error fetching dashboard stats: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch dashboard statistics'}), 500
 
 # Production-ready error handlers
 @app.errorhandler(404)

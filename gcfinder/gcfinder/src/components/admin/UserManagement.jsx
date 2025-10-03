@@ -36,6 +36,10 @@ const UserManagement = () => {
     const [banDuration, setBanDuration] = useState('permanent'); // '1day', '3days', '7days', '1month', 'permanent'
     const [flagDuration, setFlagDuration] = useState('1day'); // '1day', '3days', '7days'
 
+    // View Reason Modal State
+    const [viewReasonModalOpen, setViewReasonModalOpen] = useState(false);
+    const [viewReasonUser, setViewReasonUser] = useState(null);
+
     // Batch Add Students Modal State
     const [batchAddModalOpen, setBatchAddModalOpen] = useState(false);
     const [studentData, setStudentData] = useState('');
@@ -288,6 +292,46 @@ const UserManagement = () => {
         setActionReason('');
         setBanDuration('permanent');
         setFlagDuration('1day');
+    };
+
+    const handleViewReason = (user) => {
+        setViewReasonUser(user);
+        setViewReasonModalOpen(true);
+    };
+
+    const handleCloseViewReason = () => {
+        setViewReasonModalOpen(false);
+        setViewReasonUser(null);
+    };
+
+    const formatDuration = (duration) => {
+        switch (duration) {
+            case '1day': return '1 Day';
+            case '3days': return '3 Days';
+            case '7days': return '7 Days';
+            case '1month': return '1 Month';
+            case 'permanent': return 'Permanent';
+            default: return duration || 'Not specified';
+        }
+    };
+
+    const formatExpiryDate = (expiresAt) => {
+        if (!expiresAt) return 'Never (Permanent)';
+        
+        const date = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
+        const now = new Date();
+        
+        if (date < now) {
+            return 'Expired';
+        }
+        
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     };
 
     const handleDeleteUser = (user) => {
@@ -570,14 +614,38 @@ const UserManagement = () => {
         return users.filter(user => user.status === status).length;
     };
 
-    const renderStatusBadge = (status) => {
+    const renderStatusBadge = (status, user) => {
+        const hasReason = (status === 'flagged' && user.flagReason) || (status === 'banned' && user.banReason);
+        
         switch (status) {
             case 'active':
                 return <span className="user-status-badge active">Active</span>;
             case 'flagged':
-                return <span className="user-status-badge flagged">Flagged</span>;
+                return (
+                    <span className="user-status-badge flagged">
+                        Flagged
+                        {hasReason && (
+                            <i 
+                                className="fas fa-info-circle" 
+                                onClick={() => handleViewReason(user)}
+                                title="View reason"
+                            ></i>
+                        )}
+                    </span>
+                );
             case 'banned':
-                return <span className="user-status-badge banned">Banned</span>;
+                return (
+                    <span className="user-status-badge banned">
+                        Banned
+                        {hasReason && (
+                            <i 
+                                className="fas fa-info-circle" 
+                                onClick={() => handleViewReason(user)}
+                                title="View reason"
+                            ></i>
+                        )}
+                    </span>
+                );
             default:
                 return null;
         }
@@ -952,6 +1020,95 @@ const UserManagement = () => {
                     </div>
                 )}
 
+                {/* View Reason Modal */}
+                {viewReasonModalOpen && viewReasonUser && (
+                    <div className="export-modal-overlay">
+                        <div className="export-modal-content">
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title" style={{color: viewReasonUser.status === 'flagged' ? '#ffc107' : '#e74c3c'}}>
+                                    <i className={`fas ${viewReasonUser.status === 'flagged' ? 'fa-flag' : 'fa-ban'}`}></i> {viewReasonUser.status === 'flagged' ? 'Flag' : 'Ban'} Details
+                                </h2>
+                                <button onClick={handleCloseViewReason} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            
+                            <div>
+                                <p className="export-modal-description">
+                                    <strong>User:</strong> {viewReasonUser.full_name} ({viewReasonUser.email})
+                                </p>
+                                <p className="user-export-modal-description">
+                                    <strong>Status:</strong> {viewReasonUser.status.charAt(0).toUpperCase() + viewReasonUser.status.slice(1)}
+                                </p>
+                            </div>
+
+                            {viewReasonUser.status === 'flagged' && (
+                                <>
+                                    <div className="export-modal-date-input-group">
+                                        <strong>Duration:</strong> {formatDuration(viewReasonUser.flagDuration)}
+                                    </div>
+                                    <div className="export-modal-date-input-group">
+                                        <strong>Expires At:</strong> {formatExpiryDate(viewReasonUser.flagExpiresAt)}
+                                    </div>
+                                    <div className="export-modal-date-input-group">
+                                        <label><strong>Reason:</strong></label>
+                                        <div style={{
+                                            padding: '12px',
+                                            backgroundColor: '#f8f9fa',
+                                            border: '1px solid #dee2e6',
+                                            borderRadius: '6px',
+                                            marginTop: '8px',
+                                            color: '#333',
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word'
+                                        }}>
+                                            {viewReasonUser.flagReason || 'No reason provided'}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {viewReasonUser.status === 'banned' && (
+                                <>
+                                    <div className="export-modal-date-input-group">
+                                        <label><strong>Duration:</strong></label>
+                                        <p style={{margin: '5px 0', color: '#555'}}>{formatDuration(viewReasonUser.banDuration)}</p>
+                                    </div>
+                                    <div className="export-modal-date-input-group">
+                                        <label><strong>Expires At:</strong></label>
+                                        <p style={{margin: '5px 0', color: '#555'}}>{formatExpiryDate(viewReasonUser.banExpiresAt)}</p>
+                                    </div>
+                                    <div className="export-modal-date-input-group">
+                                        <label><strong>Reason:</strong></label>
+                                        <div style={{
+                                            padding: '12px',
+                                            backgroundColor: '#f8f9fa',
+                                            border: '1px solid #dee2e6',
+                                            borderRadius: '6px',
+                                            marginTop: '8px',
+                                            color: '#333',
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word'
+                                        }}>
+                                            {viewReasonUser.banReason || 'No reason provided'}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="export-modal-actions">
+                                <button 
+                                    onClick={handleCloseViewReason} 
+                                    className="export-modal-confirm-btn"
+                                    style={{width: '100%', backgroundColor: '#045195'}}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="filter-section">
                 <div className="tabs">
                         <button 
@@ -1042,7 +1199,7 @@ const UserManagement = () => {
                                         <td className="user-name">{user.full_name}</td>
                                         <td>{user.email}</td>
                                         <td>{user.year_level}</td>
-                                        <td className="user-status-badge">{renderStatusBadge(user.status)}</td>
+                                        <td className="user-status-badge">{renderStatusBadge(user.status, user)}</td>
                                         <td className="actions">
                                             <button 
                                                 className="action-btn flag" 

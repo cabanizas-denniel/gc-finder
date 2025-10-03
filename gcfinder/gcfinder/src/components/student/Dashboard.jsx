@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { browseItems, getClaims } from '../../admin-firebase';
 import ItemsList from './ItemsList';
 
 
@@ -26,87 +25,41 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     
-    // Fetch items from Firestore
+    // Fetch items from backend API
     useEffect(() => {
         const fetchItemsAndUserClaimsForDashboard = async () => {
             setLoading(true);
             setError('');
             try {
-                const userDataString = localStorage.getItem('userData');
-                const currentUserData = userDataString ? JSON.parse(userDataString) : null;
-                const currentUserId = currentUserData?.student_id;
+                // Fetch items from backend API (already filtered by claims and visibility)
+                const response = await browseItems();
+                const allItems = response.items || [];
+                const userSubmittedCount = response.userSubmittedCount || 0;
 
-                // 1. Fetch IDs of items claimed by the user
-                let claimedItemIds = new Set();
-                if (currentUserId) {
-                    const claimsRef = collection(db, 'claims');
-                    const userClaimsQuery = query(claimsRef, where('claimerId', '==', currentUserId));
-                    const userClaimsSnapshot = await getDocs(userClaimsQuery);
-                    userClaimsSnapshot.forEach(doc => claimedItemIds.add(doc.data().itemId));
-                }
-
-                // 2. Fetch items that are NOT archived
-                const itemsRef = collection(db, 'items');
-                const q = query(itemsRef, where('status', '!=', 'archived'));
-                const querySnapshot = await getDocs(q);
-                
-                const itemsData = [];
-                let currentUserSubmittedItemsCount = 0; // Counter for user's submitted items
-
-                querySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const item_id = doc.id;
-                    const isSubmitter = data.submitter && data.submitter.student_id === currentUserId;
-                    const isDisapproved = data.status === "Disapproved";
-
-                    if (isSubmitter) {
-                        currentUserSubmittedItemsCount++; // Increment if item is submitted by the current user
-                    }
-
-                    let isVisible;
-                    if (isDisapproved) {
-                        isVisible = isSubmitter;
-                    } else {
-                        // Item is not disapproved (i.e., it's Approved or Pending)
-                        // Visible if admin approved, OR if pending and current user is the submitter
-                        isVisible = data.adminApproval === true || isSubmitter;
-                    }
-
-                    // Finally, combine with the claimed check and 7-day filter
-                    if (!claimedItemIds.has(item_id) && isVisible && data.createdAt && (data.createdAt.toDate?.() || new Date(data.createdAt.seconds * 1000)) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
-                        itemsData.push({
-                            id: item_id,
-                            name: data.name || 'Unnamed Item',
-                            category: data.category || 'Uncategorized',
-                            location: data.location || 'Unknown location',
-                            date: data.date || new Date().toLocaleDateString(),
-                            status: data.status || 'Unclaimed',
-                            description: data.description || 'No description provided',
-                            imageData: data.imageData || [],
-                            image: data.imageData && data.imageData.length > 0 
-                                ? data.imageData[0].dataUrl 
-                                : null,
-                            createdAt: data.createdAt,
-                            submitter: data.submitter || null,
-                            adminApproval: data.adminApproval
-                        });
-                    }
+                // Apply 7-day filter for dashboard
+                const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                const recentItemsData = allItems.filter(item => {
+                    if (!item.createdAt) return false;
+                    const createdDate = new Date(item.createdAt);
+                    return createdDate >= sevenDaysAgo;
                 });
-                
-                // Sort and limit for dashboard
-                itemsData.sort((a, b) => {
+
+                // Sort by newest first
+                recentItemsData.sort((a, b) => {
                     if (a.createdAt && b.createdAt) {
-                        return b.createdAt.seconds - a.createdAt.seconds;
+                        return new Date(b.createdAt) - new Date(a.createdAt);
                     }
                     return new Date(b.date) - new Date(a.date);
                 });
-                const limitedItems = itemsData.slice(0, 6);
+
+                // Limit to 6 items for dashboard
+                const limitedItems = recentItemsData.slice(0, 6);
                 setRecentItems(limitedItems);
                 
                 // Update dashboard stats
                 setDashboardStats(prev => ({ 
                     ...prev, 
-                    activeReports: currentUserSubmittedItemsCount.toString() // Use the new counter
+                    activeReports: userSubmittedCount.toString()
                 }));
 
             } catch (error) {
@@ -120,41 +73,29 @@ const Dashboard = () => {
         fetchItemsAndUserClaimsForDashboard();
     }, []);
     
-    // Fetch PENDING claims count for the current user
+    // Fetch PENDING claims count for the current user from backend API
     useEffect(() => {
         const fetchPendingClaimsCount = async () => {
             try {
-                const userDataString = localStorage.getItem('userData');
-                const currentUserData = userDataString ? JSON.parse(userDataString) : null;
-                const currentUserId = currentUserData?.student_id;
-
-                if (!currentUserId) {
-                    console.log("No user ID found, cannot fetch pending claims count.");
-                    setDashboardStats(prev => ({ ...prev, pendingClaims: "0" }));
-                    return; // Exit if no user ID
-                }
-
-                const claimsRef = collection(db, 'claims');
-                const q = query(
-                    claimsRef, 
-                    where('claimerId', '==', currentUserId),
-                    where('claimStatus', '==', 'Pending') // Filter specifically for Pending status
-                );
+                // Fetch all user's claims from backend API
+                const allClaims = await getClaims();
                 
-                const querySnapshot = await getDocs(q);
-                const pendingCount = querySnapshot.size;
+                // Filter for pending claims on client-side
+                const pendingClaims = allClaims.filter(claim => 
+                    claim.claimStatus && claim.claimStatus.toLowerCase() === 'pending'
+                );
                 
                 setDashboardStats(prev => ({
                     ...prev,
-                    pendingClaims: pendingCount.toString() // Update state with the actual count
+                    pendingClaims: pendingClaims.length.toString()
                 }));
 
             } catch (error) {
                 console.error("Error fetching pending claims count:", error);
-                setDashboardStats(prev => ({ ...prev, pendingClaims: "-" })); // Indicate error
+                setDashboardStats(prev => ({ ...prev, pendingClaims: "-" }));
             }
         };
-        
+
         fetchPendingClaimsCount();
     }, []); // Runs once on mount
 

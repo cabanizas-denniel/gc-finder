@@ -1,31 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { getPendingItems, db } from '../../admin-firebase'; 
-import { collection, query, where, getDocs } from 'firebase/firestore';
-
-const wasTodayOrYesterday = (date) => {
-    if (!date) return false;
-
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(today.getDate() - 1);
-
-    let comparisonDate = date;
-    if (date.toDate) { // Firebase Timestamp
-        comparisonDate = date.toDate();
-    }
-
-    const isToday = comparisonDate.getFullYear() === today.getFullYear() &&
-                    comparisonDate.getMonth() === today.getMonth() &&
-                    comparisonDate.getDate() === today.getDate();
-
-    const isActuallyYesterday = comparisonDate.getFullYear() === yesterday.getFullYear() &&
-                              comparisonDate.getMonth() === yesterday.getMonth() &&
-                              comparisonDate.getDate() === yesterday.getDate();
-
-    return isToday || isActuallyYesterday;
-};
+import { getDashboardStats } from '../../admin-firebase';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A020F0', '#FF69B4', '#778899', '#2E8B57'];
 
@@ -47,95 +23,16 @@ const Dashboard = () => {
             setLoadingStats(true);
             setErrorStats(null);
             try {
-                // Fetch Pending Reports
-                const pendingItemsData = await getPendingItems();
-                let reportsFromTodayOrYesterday = 0;
-                pendingItemsData.forEach(item => {
-                    if (item.createdAt && wasTodayOrYesterday(item.createdAt)) {
-                        reportsFromTodayOrYesterday++;
-                    }
+                // Fetch all dashboard stats from backend API
+                const stats = await getDashboardStats();
+                
+                setDashboardStats({
+                    pendingReports: stats.pendingReports,
+                    pendingClaims: stats.pendingClaims,
+                    activeItems: stats.activeItems,
+                    itemCategoryDistribution: stats.itemCategoryDistribution,
+                    reportResolutionData: stats.reportResolutionData
                 });
-
-                // Fetch Pending Claims
-                const claimsRef = collection(db, 'claims');
-                const qClaims = query(claimsRef, where('claimStatus', '==', 'Pending'));
-                const claimsSnapshot = await getDocs(qClaims);
-                let claimsFromTodayOrYesterday = 0;
-                claimsSnapshot.forEach(doc => {
-                    const claimData = doc.data();
-                    if (claimData.createdAt && wasTodayOrYesterday(claimData.createdAt)) {
-                        claimsFromTodayOrYesterday++;
-                    }
-                });
-
-                // Fetch Active (Available) Items
-                const itemsRef = collection(db, 'items');
-                const qActiveItems = query(itemsRef, where('status', '==', 'Unclaimed'));
-                const activeItemsSnapshot = await getDocs(qActiveItems);
-                let activeItemsFromTodayOrYesterday = 0;
-                activeItemsSnapshot.forEach(doc => {
-                    const itemData = doc.data();
-                    if (itemData.updatedAt && wasTodayOrYesterday(itemData.updatedAt)) {
-                        activeItemsFromTodayOrYesterday++;
-                    }
-                });
-
-                // Fetch Item Category Distribution
-                const qItemsForCategories = query(
-                    itemsRef,
-                    where('adminApproval', '==', true) // Query only by adminApproval
-                );
-                const itemsForCategoriesSnapshot = await getDocs(qItemsForCategories);
-                const categoryCounts = {};
-                const excludedStatuses = ['Archived', 'Disapproved']; // Define statuses to exclude
-
-                itemsForCategoriesSnapshot.forEach(doc => {
-                    const itemData = doc.data();
-                    // Client-side filtering for status
-                    if (itemData.category && !excludedStatuses.includes(itemData.status)) {
-                        categoryCounts[itemData.category] = (categoryCounts[itemData.category] || 0) + 1;
-                    }
-                });
-                const newItemCategoryDistribution = Object.keys(categoryCounts).map(key => ({
-                    name: key,
-                    value: categoryCounts[key]
-                }));
-
-                // Fetch data for Report Resolution Rate
-                const allItemsSnapshot = await getDocs(collection(db, 'items'));
-                let resolvedCount = 0;
-                let unresolvedCount = 0;
-                allItemsSnapshot.forEach(doc => {
-                    const itemData = doc.data();
-                    const status = itemData.status;
-                    if ((status !== 'Archived' && status === 'Claimed') || (status === 'Archived' && status === 'Claimed') || status === 'Claiming') {
-                        resolvedCount++;
-                    } else if ((status !== 'Archived' && status === 'Unclaimed') || (status === 'Pending' && itemData.adminApproval === true) || (status === 'Archived' && status !== 'Claimed')) {
-                        unresolvedCount++;
-                    }
-                });
-                const newReportResolutionData = [
-                    { name: 'Resolved', value: resolvedCount },
-                    { name: 'Unresolved', value: unresolvedCount },
-                ];
-
-                setDashboardStats(prevStats => ({
-                    ...prevStats,
-                    pendingReports: {
-                        count: pendingItemsData.length,
-                        fromYesterday: reportsFromTodayOrYesterday
-                    },
-                    pendingClaims: {
-                        count: claimsSnapshot.size,
-                        fromYesterday: claimsFromTodayOrYesterday
-                    },
-                    activeItems: {
-                        count: activeItemsSnapshot.size,
-                        fromYesterday: activeItemsFromTodayOrYesterday // Updated variable name
-                    },
-                    itemCategoryDistribution: newItemCategoryDistribution, // Set pie chart data
-                    reportResolutionData: newReportResolutionData // Set resolution rate data
-                }));
 
             } catch (error) {
                 console.error("Error fetching dashboard stats:", error);
@@ -262,7 +159,11 @@ const Dashboard = () => {
                                     <Cell key={`cell-${index}`} fill={entry.name === 'Resolved' ? COLORS[1] : COLORS[3]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value, name, props) => [`${value} (${(props.payload.percent * 100).toFixed(0)}%)`, name]} />
+                            <Tooltip formatter={(value, name, props) => {
+                                const total = dashboardStats.reportResolutionData.reduce((sum, item) => sum + item.value, 0);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return [`${value} (${percentage}%)`, name];
+                            }} />
                             <Legend 
                                 layout="horizontal"
                                 iconSize={12}

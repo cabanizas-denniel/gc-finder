@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
-import { collection, getDocs, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { db } from '../../admin-firebase';
+import { getDoc, doc } from 'firebase/firestore';
+import { db, getClaims, updateClaimStatus } from '../../admin-firebase';
 import { AdminViewItemDetailsModal } from './ItemsLIst';
 import Toast, { useToast } from '../Toast';
 
@@ -21,6 +21,7 @@ const ClaimVerification = () => {
     const [proofOfReturnImage, setProofOfReturnImage] = useState(null); // Will store data URL
     const [claimToApproveWithProof, setClaimToApproveWithProof] = useState(null);
     const proofFileInputRef = useRef(null); // For triggering file input
+    const claimItemsRef = useRef(null); // For maintaining scroll position
 
     // New state for rejection modal
     const [showRejectionModal, setShowRejectionModal] = useState(false);
@@ -51,7 +52,7 @@ const ClaimVerification = () => {
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const dd = String(dateObj.getDate()).padStart(2, '0');
         const yyyy = dateObj.getFullYear();
-        return `${mm} - ${dd} - ${yyyy}`;
+        return `${mm}-${dd}-${yyyy}`;
     };
 
     useEffect(() => {
@@ -69,26 +70,28 @@ const ClaimVerification = () => {
 
     const fetchClaims = async () => {
         try {
-            const claimsRef = collection(db, 'claims');
-            const querySnapshot = await getDocs(claimsRef);
+            const claimsDataFromApi = await getClaims();
             
-            const claimsData = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                claimsData.push({
-                    id: doc.id,
+            const claimsData = claimsDataFromApi.map((data) => {
+                // Parse ISO timestamp strings back to Date objects
+                const createdAtDate = data.createdAt ? new Date(data.createdAt) : new Date(0);
+                
+                return {
+                    id: data.id,
                     title: data.itemName,
-                    status: data.claimStatus.toLowerCase(),
+                    status: data.claimStatus?.toLowerCase() || 'pending',
                     claimedBy: data.claimerName,
                     student_id: data.claimerId,
-                    date: formatDateMDY(data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt),
-                    createdAt: data.createdAt?.toDate() || new Date(0),
+                    date: formatDateMDY(createdAtDate),
+                    createdAt: createdAtDate,
                     itemId: data.itemId,
                     lastSeenLocation: data.lastSeenLocation,
                     uniqueIdentifier: data.uniqueIdentifier,
                     additionalDetails: data.additionalDetails,
-                    proofImageUrl: data.proofImageUrl
-                });
+                    proofImageUrl: data.proofImageUrl,
+                    rejectionReason: data.rejectionReason || null,
+                    ownershipProof: data.ownershipProof || null
+                };
             });
             
             // Sort by newest first
@@ -104,15 +107,20 @@ const ClaimVerification = () => {
     };
 
     const handleClaimSelect = (claim) => {
+        const scrollTop = claimItemsRef.current?.scrollTop;
         setSelectedClaim(claim);
+        requestAnimationFrame(() => {
+            if (claimItemsRef.current && scrollTop !== undefined) {
+                claimItemsRef.current.scrollTop = scrollTop;
+            }
+        });
     };
 
     const handleClaimAction = async (claimId, itemId, approve, rejectionReason = null) => {
         try {
-            const claimRef = doc(db, 'claims', claimId);
             const updateData = {
                 claimStatus: approve ? 'Approved' : 'Rejected',
-                updatedAt: serverTimestamp()
+                itemId: itemId
             };
             
             // Add rejection reason if rejecting
@@ -120,55 +128,40 @@ const ClaimVerification = () => {
                 updateData.rejectionReason = rejectionReason;
             }
             
-            await updateDoc(claimRef, updateData);
-
-            // Update item status based on approval/rejection
-            const itemRef = doc(db, 'items', itemId);
-            if (approve) {
-                // If approved, update item status to "Claiming"
-                await updateDoc(itemRef, {
-                    status: 'Claiming',
-                    updatedAt: serverTimestamp()
-                });
-            } else {
-                // If rejected, update item status to "Unclaimed"
-                await updateDoc(itemRef, {
-                    status: 'Unclaimed',
-                    updatedAt: serverTimestamp()
-                });
-            }
+            // Update claim via backend API (also updates item status automatically)
+            await updateClaimStatus(claimId, updateData);
 
             await fetchClaims();
             
             setSelectedClaim(prev => ({
                 ...prev,
-                status: approve ? 'approved' : 'rejected'
+                status: approve ? 'approved' : 'rejected',
+                rejectionReason: !approve && rejectionReason ? rejectionReason : prev.rejectionReason
             }));
 
             // Show notification message for approved claims
             if (approve) {
                 showToast("The student has been notified of this change");
+            } else {
+                showToast("Claim has been rejected and student has been notified", "info");
             }
 
         } catch (error) {
             console.error('Error updating claim:', error);
+            showToast("Failed to update claim. Please try again.", "error");
         }
     };
 
     const handleProofOfReturn = async (claimId, itemId, imageProofDataUrl) => {
         try {
-            const claimRef = doc(db, 'claims', claimId);
-            await updateDoc(claimRef, {
+            const updateData = {
                 claimStatus: 'Claimed',
                 ownershipProof: imageProofDataUrl,
-                updatedAt: serverTimestamp()
-            });
+                itemId: itemId
+            };
 
-            const itemRef = doc(db, 'items', itemId);
-            await updateDoc(itemRef, {
-                status: 'Claimed',
-                updatedAt: serverTimestamp()
-            });
+            // Update claim via backend API (also updates item status automatically)
+            await updateClaimStatus(claimId, updateData);
 
             await fetchClaims();
             
@@ -179,6 +172,7 @@ const ClaimVerification = () => {
 
         } catch (error) {
             console.error('Error updating proof of return:', error);
+            showToast("Failed to update proof of return. Please try again.", "error");
         }
     };
 
@@ -313,7 +307,7 @@ const ClaimVerification = () => {
                 </div>
             </div>
 
-            <div className="claim-items">
+            <div className="claim-items" ref={claimItemsRef}>
                 {loading ? (
                     <p>Loading claims...</p>
                 ) : filteredClaims.length === 0 ? (
@@ -390,10 +384,63 @@ const ClaimVerification = () => {
                                 <p>{selectedClaim.additionalDetails}</p>
                             </div>
                         )}
+                        {selectedClaim.status === 'rejected' && selectedClaim.rejectionReason && (
+                            <div className="info-group rejection-reason-box">
+                                <label style={{ color: '#dc3545', fontWeight: '600' }}>
+                                    <i className="fas fa-exclamation-circle" style={{ marginRight: '5px' }}></i>
+                                    Rejection Reason
+                                </label>
+                                <p style={{ 
+                                    backgroundColor: 'rgba(220, 53, 69, 0.05)', 
+                                    padding: '10px', 
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(220, 53, 69, 0.2)',
+                                    color: '#721c24',
+                                    marginTop: '5px'
+                                }}>
+                                    {selectedClaim.rejectionReason}
+                                </p>
+                            </div>
+                        )}
+                        {selectedClaim.status === 'claimed' && selectedClaim.ownershipProof && (
+                            <div className="info-group ownership-proof-box">
+                                <label style={{ color: '#28a745', fontWeight: '600' }}>
+                                    <i className="fas fa-check-circle" style={{ marginRight: '5px' }}></i>
+                                    Proof of Return to Owner
+                                </label>
+                                <div style={{ 
+                                    backgroundColor: 'rgba(40, 167, 69, 0.05)', 
+                                    padding: '10px', 
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(40, 167, 69, 0.2)',
+                                    marginTop: '5px',
+                                    textAlign: 'center'
+                                }}>
+                                    <img 
+                                        src={selectedClaim.ownershipProof} 
+                                        alt="Proof of return" 
+                                        style={{ 
+                                            maxWidth: '100%', 
+                                            maxHeight: '300px',
+                                            borderRadius: '4px',
+                                            border: '2px solid rgba(40, 167, 69, 0.3)'
+                                        }}
+                                    />
+                                    <p style={{ 
+                                        marginTop: '8px', 
+                                        fontSize: '0.85rem', 
+                                        color: '#155724',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        This image serves as documentation that the item was returned to its rightful owner.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="info-group">
-                        <label>Proof Image</label>
+                        <label>Proof Image (Claim Submission)</label>
                         <img 
                             src={selectedClaim.proofImageUrl} 
                             alt="No image provided" 
