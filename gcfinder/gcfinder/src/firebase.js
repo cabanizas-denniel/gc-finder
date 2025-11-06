@@ -10,7 +10,7 @@ const firebaseConfig = {
   authDomain: "gcfinder-database.firebaseapp.com",
   databaseURL: "https://gcfinder-database-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "gcfinder-database",
-  storageBucket: "gcfinder-database.firebasestorage.app",
+  storageBucket: "gcfinder-database.appspot.com",
   messagingSenderId: "864225449977",
   appId: "1:864225449977:web:d7f60ab7074d00be7c8f28",
   measurementId: "G-VSEJBNE3BH"

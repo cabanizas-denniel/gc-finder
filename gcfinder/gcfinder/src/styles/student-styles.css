@@ -532,6 +532,61 @@
     margin-top: 5px;
 }
 
+/* Lost Item Card in Messages */
+.message-lost-item-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 2px solid var(--primary-color);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 8px 0;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.message-lost-item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color-light);
+}
+
+.message-lost-item-card img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.lost-item-card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lost-item-card-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.lost-item-card-name i {
+    color: var(--primary-color);
+    font-size: 0.9rem;
+}
+
+.lost-item-card-link {
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
 .attach-btn {
     background: none;
     border: none;
@@ -988,6 +1043,59 @@ input:checked + .slider:before {
     font-size: 1.1em;
 }
 
+/* Date and Location Badges for Lost Items */
+.date-badge,
+.location-badge-lost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.date-badge {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+.date-badge i {
+    font-size: 0.9em;
+    color: #e65100;
+}
+
+.location-badge-lost {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.location-badge-lost i {
+    font-size: 0.9em;
+    color: #2e7d32;
+}
+
+.thread-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+/* Table cell badges for Lost Requests */
+.users-table .date-badge,
+.users-table .location-badge-lost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
 .claim-modal {
     max-width: 600px;
 }
@@ -1169,4 +1277,187 @@ input:checked + .slider:before {
     border-left: 4px solid #dc3545;
     color: #721c24;
     font-weight: 500;
+}
+
+/* ======= LOST REQUESTS ======= */
+.lost-requests-container {}
+.lost-requests-header h1 { 
+    margin: 0 0 6px 0;
+    font-size: 28px;
+    color: #333;
+}
+.lost-request-form {
+    background: #fff;
+    border: 2px solid var(--primary-color);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+.lost-request-form .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.lost-request-form .form-row label {
+    color: #555;
+    font-weight: 600;
+}
+.lost-request-form .lr-input {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.95rem;
+}
+
+.admin-subtitle {
+    margin-bottom: 25px;
+    color: #666;
+}
+
+.lost-request-form .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.lost-request-form .form-actions { display: flex; justify-content: flex-end; }
+
+/* Image Upload Styling */
+.lr-image-upload-container {
+    position: relative;
+    width: 100%;
+}
+
+.lr-image-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.lr-image-upload-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 20px;
+    border: 2px dashed var(--primary-color);
+    border-radius: 12px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.lr-image-upload-area:hover {
+    border-color: var(--primary-color-light);
+    background-color: #f0f4f8;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(4, 81, 149, 0.1);
+}
+
+.lr-upload-icon {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 8px;
+}
+
+.lr-upload-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lr-upload-main-text {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.lr-upload-sub-text {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.lr-image-preview-container {
+    margin-top: 0;
+}
+
+.lr-image-preview {
+    position: relative;
+    display: inline-block;
+    margin-top: 8px;
+}
+
+.lr-image-preview img {
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 4px 12px rgba(4, 81, 149, 0.15);
+}
+
+.lr-remove-image {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #e74c3c;
+    color: white;
+    border: 2px solid white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.lr-remove-image:hover {
+    background-color: #c0392b;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+.lost-requests-list { background: #fff; border: 2px solid var(--primary-color); border-radius: 10px; padding: 16px; }
+
+/* Lost Items Sort Select */
+.lost-items-sort-select {
+    min-width: 200px;
+    padding: 10px 40px 10px 12px;
+    border: 2px solid var(--primary-color);
+    border-radius: 8px;
+    background-color: white;
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%23045195" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(4, 81, 149, 0.1);
+}
+
+.lost-items-sort-select:hover {
+    border-color: var(--primary-color-light);
+    box-shadow: 0 2px 8px rgba(4, 81, 149, 0.15);
+}
+
+.lost-items-sort-select:focus {
+    outline: none;
+    border-color: var(--primary-color-light);
+    box-shadow: 0 0 0 3px rgba(4, 81, 149, 0.1);
+}
+
+.lost-items-sort-select option {
+    padding: 8px;
+    background-color: white;
+    color: #333;
 }

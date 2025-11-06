@@ -40,17 +40,28 @@ service cloud.firestore {
                       (resource == null || isAdmin() || request.auth.uid in resource.data.participants);
         allow update: if request.auth != null && 
                          (isAdmin() || request.auth.uid in resource.data.participants);
-        // Allow any authenticated user tmo create conversations
+        // Allow any authenticated user to create conversations
         allow create: if request.auth != null;
     }
 
     match /conversations/{conversationId}/messages/{messageId} {
         // Authenticated users who are participants can create messages
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.senderId;
+        allow create: if request.auth != null 
+                       && request.auth.uid == request.resource.data.senderId
+                       && (isAdmin() || request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants);
         // Participants can read messages (check if user is in conversation participants array)
         allow read: if isAdmin() || 
                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
         allow update, delete: if false; // Don't allow message edits/deletes from client.
+    }
+
+    // Explicitly block direct client access to Lost Requests and Lost Items.
+    // Access should go through secured backend (Flask) which enforces RBAC and data sanitization.
+    match /lost_requests/{requestId} {
+        allow read, write: if false;
+    }
+    match /lost_items/{itemId} {
+        allow read, write: if false;
     }
 
     // Helper function to check for admin role

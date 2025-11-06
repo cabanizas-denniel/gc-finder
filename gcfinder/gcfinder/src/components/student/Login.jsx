@@ -141,17 +141,8 @@ const Login = () => {
 
   const handleStudentIdChange = (e) => {
     const value = e.target.value;
-    // Only allow numbers
-    if (/^\d*$/.test(value)) {
-      setStudentId(value);
-      setError(''); // Clear any previous error
-    } else {
-      setError('Student ID must contain only numbers');
-      // Clear error message after 3 seconds
-      setTimeout(() => {
-        setError('');
-      }, 3000);
-    }
+    setStudentId(value);
+    setError('');
   };
 
   const acceptTerms = () => {
@@ -223,8 +214,6 @@ const Login = () => {
               value={studentId}
               onChange={handleStudentIdChange}
               disabled={loading}
-              inputMode="numeric"
-              pattern="[0-9]*"
             />
           </div>
           <div className="input-group">

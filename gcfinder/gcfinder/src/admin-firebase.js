@@ -36,7 +36,7 @@ const firebaseConfig = {
   authDomain: "gcfinder-database.firebaseapp.com",
   databaseURL: "https://gcfinder-database-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "gcfinder-database",
-  storageBucket: "gcfinder-database.firebasestorage.app",
+  storageBucket: "gcfinder-database.appspot.com",
   messagingSenderId: "864225449977",
   appId: "1:864225449977:web:d7f60ab7074d00be7c8f28",
   measurementId: "G-VSEJBNE3BH"
@@ -350,6 +350,31 @@ export const updateUserStatus = async (userId, statusData) => {
   }
 };
 
+// Update user role via backend API (secure)
+export const updateUserRole = async (userId, role) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}/role`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ role })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update user role');
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error updating user role:", error);
+    throw error;
+  }
+};
+
 // Get dashboard statistics via backend API (secure)
 export const getDashboardStats = async () => {
   try {
@@ -450,3 +475,180 @@ export const updateClaimStatus = async (claimId, updateData) => {
     throw error;
   }
 }; 
+
+// ============== Lost Requests APIs ==============
+export const submitLostRequest = async (payload) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-requests`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to submit request');
+    return data;
+  } catch (e) {
+    console.error('submitLostRequest error:', e);
+    throw e;
+  }
+};
+
+export const getLostRequests = async (status) => {
+  try {
+    const token = await getAuthToken();
+    const url = new URL(`${process.env.REACT_APP_API_URL}/api/lost-requests`);
+    if (status) url.searchParams.set('status', status);
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch lost requests');
+    return data.requests;
+  } catch (e) {
+    console.error('getLostRequests error:', e);
+    throw e;
+  }
+};
+
+export const approveLostRequest = async (requestId) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-requests/${requestId}/approve`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to approve');
+    return data;
+  } catch (e) {
+    console.error('approveLostRequest error:', e);
+    throw e;
+  }
+};
+
+export const rejectLostRequest = async (requestId, feedback) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-requests/${requestId}/reject`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ feedback })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to reject');
+    return data;
+  } catch (e) {
+    console.error('rejectLostRequest error:', e);
+    throw e;
+  }
+};
+
+export const getLostItemsPublic = async () => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-items`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to fetch lost items');
+    return data.items;
+  } catch (e) {
+    console.error('getLostItemsPublic error:', e);
+    throw e;
+  }
+};
+
+// ===== Lost Items admin actions =====
+export const resolveLostItem = async (itemId) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-items/${itemId}/resolve`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to resolve lost item');
+    return true;
+  } catch (e) {
+    console.error('resolveLostItem error:', e);
+    throw e;
+  }
+};
+
+export const unresolveLostItem = async (itemId) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-items/${itemId}/unresolve`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to unresolve lost item');
+    return true;
+  } catch (e) {
+    console.error('unresolveLostItem error:', e);
+    throw e;
+  }
+};
+
+export const archiveLostItem = async (itemId) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-items/${itemId}/archive`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to archive lost item');
+    return true;
+  } catch (e) {
+    console.error('archiveLostItem error:', e);
+    throw e;
+  }
+};
+
+export const unarchiveLostItem = async (itemId) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-items/${itemId}/unarchive`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to unarchive lost item');
+    return true;
+  } catch (e) {
+    console.error('unarchiveLostItem error:', e);
+    throw e;
+  }
+};

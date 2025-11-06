@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import profilePic from '../../assets/Profile.png';
 import messageService from '../../services/messageService';
 
 const Messages = () => {
+    const navigate = useNavigate();
     const [activeConversation, setActiveConversation] = useState(null);
     const [conversations, setConversations] = useState([]);
     const [messages, setMessages] = useState([]);
@@ -391,6 +393,23 @@ const Messages = () => {
                                             {msg.imageData && (
                                                 <div className="message-image">
                                                     <img src={msg.imageData} alt="Shared image" />
+                                                </div>
+                                            )}
+                                            {msg.lostItemId && (
+                                                <div 
+                                                    className="message-lost-item-card"
+                                                    onClick={() => navigate('/lost-items')}
+                                                    style={{ cursor: 'pointer' }}
+                                                >
+                                                    {msg.lostItemImage && (
+                                                        <img src={msg.lostItemImage} alt={msg.lostItemName || 'Lost item'} />
+                                                    )}
+                                                    <div className="lost-item-card-info">
+                                                        <div className="lost-item-card-name">
+                                                            <i className="fas fa-search"></i> {msg.lostItemName || 'Lost Item'}
+                                                        </div>
+                                                        <div className="lost-item-card-link">View Lost Item →</div>
+                                                    </div>
                                                 </div>
                                             )}
                                             <p>{msg.text}</p>

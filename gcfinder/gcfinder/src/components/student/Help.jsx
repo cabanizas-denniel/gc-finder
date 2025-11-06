@@ -1,9 +1,11 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import profilePic from '../../assets/Profile.png';
+import javawockeezLogo from '../../assets/javawockeez-logo.png';
 
 const Help = () => {
     const navigate = useNavigate();
+    const [showTeamModal, setShowTeamModal] = useState(false);
 
     // Handle contact button clicks
     const handleSendMessage = useCallback(() => {
@@ -13,6 +15,24 @@ const Help = () => {
     const handleVisitOffice = useCallback(() => {
         window.open('https://www.google.com/maps/search/Gordon+College+Olongapo+City', '_blank');
     }, []);
+
+    const teamContacts = [
+        {
+            name: 'Denniel John P. Cabanizas',
+            email: 'cabanizas.denniel@gmail.com',
+            phone: '+63 968 323 3287'
+        },
+        {
+            name: 'John Lawrence T. Asoro',
+            email: 'johnlawrenceasoro17@gmail.com ',
+            phone: '+63 970 790 0329'
+        },
+        {   
+            name: 'Dench Gregory Zhylle P. Casaul',
+            email: 'casaul.dench@gmail.com',
+            phone: '+63 960 891 5622'
+        }
+    ];
 
     return (
                 <section className="help-center">
@@ -49,13 +69,13 @@ const Help = () => {
                         <h2>Meet the Team</h2>
                         <p>GC Finder is managed by the Gordon College Disciplinary Office, working in collaboration with the CS students named JavaWokeez.</p>
                         <div className="team-members">
-                            <div className="team-member">
-                                <img src={profilePic} alt="Disciplinary Office" />
+                        <div className="team-member">
+                                <img className="disciplinary-office-logo" src={profilePic} alt="Disciplinary Office" />
                                 <h3>Disciplinary Office</h3>
                                 <p>Oversees the verification and approval process.</p>
                             </div>
-                            <div className="team-member">
-                                <img src={profilePic} alt="Javawockeez" />
+                        <div className="team-member" onClick={() => setShowTeamModal(true)}>
+                                <img className="javawockeez-logo" src={javawockeezLogo} alt="Javawockeez" />
                                 <h3>Javawockeez</h3>
                                 <p>Development & Maintenance Team</p>
                             </div>
@@ -105,6 +125,30 @@ const Help = () => {
                             </div>
                         </div>
                     </div>
+
+                    {showTeamModal && (
+                        <div className="modal-overlay" onClick={() => setShowTeamModal(false)}>
+                            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>Javawockeez Contacts</h3>
+                                    <button className="close-btn" onClick={() => setShowTeamModal(false)} aria-label="Close">
+                                        ×
+                                    </button>
+                                </div>
+                                <div className="modal-body">
+                                    <ul style={{listStyle:'none', padding:0, margin:0, display:'grid', gap:'12px'}}>
+                                        {teamContacts.map((m, idx) => (
+                                            <li key={idx} style={{border:'1px solid #e0e0e0', borderRadius:8, padding:'12px'}}>
+                                                <div style={{fontWeight:600, marginBottom:4}}>{m.name}</div>
+                                                <div style={{color:'#555'}}><i className="fas fa-envelope" style={{marginRight:6}}></i>{m.email}</div>
+                                                <div style={{color:'#555'}}><i className="fas fa-phone" style={{marginRight:6}}></i>{m.phone}</div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </section>
     );
 };

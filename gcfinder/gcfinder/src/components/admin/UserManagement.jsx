@@ -25,7 +25,6 @@ const UserManagement = () => {
     const [exportEndDate, setExportEndDate] = useState('');
     
     // Show Export Modal State
-    const [showExportModal, setShowExportModal] = useState(false);
 
     // Flag/Ban Modal State
     const [flagModalOpen, setFlagModalOpen] = useState(false);
@@ -503,41 +502,85 @@ const UserManagement = () => {
             if (!line) continue;
             
             const parts = line.split(',').map(part => part.trim());
-            
-            let student_id, full_name, year_level_raw, password, status, email;
 
-            if (parts.length === 6) {
-                [student_id, full_name, email, year_level_raw, password, status] = parts;
-            } else if (parts.length === 5) {
-                [student_id, full_name, year_level_raw, password, status] = parts;
-                email = `${student_id}@gordoncollege.edu.ph`; // Construct email if not provided
+            // Expected format:
+            // ID, Name, [Email], Year Level, Password, Status, [Role]
+            let tokens = [...parts];
+            let role = 'student';
+            const allowedRoles = new Set(['student', 'staff']);
+            // Pop role if present as last token
+            const lastToken = tokens[tokens.length - 1]?.toLowerCase();
+            if (lastToken && allowedRoles.has(lastToken)) {
+                role = lastToken;
+                tokens = tokens.slice(0, -1);
+            }
+
+            let student_id = '';
+            let full_name = '';
+            let email = '';
+            let year_level_raw = '';
+            let password = '';
+            let status = '';
+
+            const allowedStatuses = new Set(['active', 'flagged', 'banned']);
+
+            // Helper to default email
+            const ensureEmail = () => {
+                if (!email) email = `${student_id}@gordoncollege.edu.ph`;
+            };
+
+            // Parse based on token length and whether an email token exists
+            const hasEmailLike = (val) => typeof val === 'string' && val.includes('@');
+
+            if (tokens.length === 6) {
+                // ID, Name, Email, Year Level, Password, Status
+                [student_id, full_name, email, year_level_raw, password, status] = tokens;
+            } else if (tokens.length === 5) {
+                // Either: ID, Name, Email, Password, Status (staff no year)
+                // Or:     ID, Name, Year Level, Password, Status (student no email)
+                if (hasEmailLike(tokens[2])) {
+                    [student_id, full_name, email, password, status] = tokens;
+                    year_level_raw = '';
+                } else {
+                    [student_id, full_name, year_level_raw, password, status] = tokens;
+                    ensureEmail();
+                }
+            } else if (tokens.length === 4) {
+                // ID, Name, Password, Status (assume staff, no email/year)
+                [student_id, full_name, password, status] = tokens;
+                year_level_raw = '';
+                ensureEmail();
+                if (role === 'student') {
+                    console.warn(`Row ${i + 1}: missing year level for student; skipping.`);
+                    continue;
+                }
+            } else if (tokens.length === 3) {
+                console.warn(`Skipping row ${i + 1}: not enough columns.`);
+                continue;
             } else {
-                console.warn(`Skipping row ${i + 1}: incorrect number of columns. Expected 5 or 6, got ${parts.length}`);
+                console.warn(`Skipping row ${i + 1}: unexpected number of columns (${tokens.length}).`);
                 continue;
             }
 
-            if (status) {
-                status = status.toLowerCase();
-            }
-
-            const year_level = year_level_raw ? parseInt(year_level_raw, 10) : null;
-            const allowedStatuses = new Set(['active', 'flagged', 'banned']);
+            status = status ? status.toLowerCase() : '';
 
             if (!student_id || !full_name) {
                 console.warn(`Skipping row ${i + 1}: missing required identity fields.`);
                 continue;
             }
-            if (year_level === null || isNaN(year_level)) {
-                console.warn(`Skipping row ${i + 1}: invalid year level for student: ${full_name}`);
-                continue;
-            }
-            if (!password) {
-                console.warn(`Skipping row ${i + 1}: missing password for student: ${full_name}`);
-                continue;
-            }
+            // Password is optional; server auto-generates if not provided
             if (!status || !allowedStatuses.has(status)) {
                 console.warn(`Skipping row ${i + 1}: invalid status '${status}' for student: ${full_name}`);
                 continue;
+            }
+            // Year level handling: required for students, optional/ignored for staff
+            let year_level = null;
+            if (role === 'student') {
+                year_level = year_level_raw ? parseInt(year_level_raw, 10) : null;
+                if (year_level === null || isNaN(year_level)) {
+                    console.warn(`Skipping row ${i + 1}: invalid year level for student: ${full_name}`);
+                    continue;
+                }
             }
             
             students.push({
@@ -546,7 +589,8 @@ const UserManagement = () => {
                 email,
                 password,
                 status,
-                year_level
+                year_level,
+                role
             });
         }
         
@@ -569,24 +613,24 @@ const UserManagement = () => {
                 return;
             }
 
-            // Create a clean payload for the backend, removing client-side only fields
-            const studentsToCreate = parsedStudents.map(({ student_id, full_name, email, password, status, year_level }) => ({
+            // Create a clean payload for the backend, including role
+            const studentsToCreate = parsedStudents.map(({ student_id, full_name, email, password, status, year_level, role }) => ({
                 student_id,
                 full_name,
                 email,
-                password,
                 status,
-                year_level
+                year_level,
+                role: role || 'student'
             }));
 
             const token = await auth.currentUser.getIdToken();
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/batch-create-students`, {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/batch-create-users`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ students: studentsToCreate })
+                body: JSON.stringify({ users: studentsToCreate })
             });
 
             const result = await response.json();
@@ -969,7 +1013,8 @@ const UserManagement = () => {
                                         className="export-modal-date-input"
                                     />
                                     <small style={{color: '#666', fontSize: '12px'}}>
-                                        CSV format: ID, Name, Email, Year Level, Password, Status
+                                        CSV format: ID, Name, [Email], [Year Level], Status, [Role]
+                                        (Role optional: student | staff). Password auto-generated: GC&#123;hash&#125;&#123;year&#125;
                                     </small>
                                 </div>
                             )}
@@ -984,7 +1029,7 @@ const UserManagement = () => {
                                     onChange={(e) => setStudentData(e.target.value)}
                                     className="export-modal-date-input"
                                     placeholder={uploadMode === 'manual' 
-                                        ? "Enter student data in CSV format:\n202400001,Bob Wilson,1,password123,active\n\nFormat: ID, Name, [Email], Year Level, Password, Status\nStatus options: active, flagged, banned"
+                                        ? "Enter user data in CSV format:\n202400001,Bob Wilson,1,active,student\nP.Lopez,Peter Lopez,peter.lopez@gordoncollege.edu.ph,active,staff\n\nFormat: ID, Name, [Email], [Year Level], Status, [Role]\nStatus: active|flagged|banned; Role: student|staff\nPassword auto-generated: GC&#123;hash&#125;&#123;year&#125;"
                                         : "CSV data will appear here..."}
                                     rows="8"
                                     style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}
@@ -1183,12 +1228,13 @@ const UserManagement = () => {
                                         )}
                                     </th>
                                     <th>Email</th>
-                                    <th onClick={() => requestSort('year_level')}>
+                            <th onClick={() => requestSort('year_level')}>
                                         Year Level
                                         {sortConfig.key === 'year_level' && (
                                             <i className={`fas fa-sort-${sortConfig.direction === 'ascending' ? 'up' : 'down'}`}></i>
                                         )}
                                     </th>
+                            <th>Role</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -1199,6 +1245,12 @@ const UserManagement = () => {
                                         <td className="user-name">{user.full_name}</td>
                                         <td>{user.email}</td>
                                         <td>{user.year_level}</td>
+                                <td>
+                                    <span className={`role-badge ${(user.role || 'student')}`}>
+                                        <i className={`fas ${user.role === 'staff' ? 'fa-briefcase' : 'fa-user-graduate'}`}></i>
+                                        {(user.role || 'student').charAt(0).toUpperCase() + (user.role || 'student').slice(1)}
+                                    </span>
+                                </td>
                                         <td className="user-status-badge">{renderStatusBadge(user.status, user)}</td>
                                         <td className="actions">
                                             <button 

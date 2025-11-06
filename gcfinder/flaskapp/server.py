@@ -18,6 +18,8 @@ import traceback
 import logging
 from firebase_admin import auth
 from functools import wraps
+import re
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app first
 app = Flask(__name__)
+# Limit incoming request size (e.g., ~5 MB) to mitigate large payload abuse
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 # Initialize Firebase with robust error handling
 def initialize_firebase():
@@ -377,6 +381,9 @@ CORS(app, resources={
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Allow CORS preflight to pass
+        if request.method == 'OPTIONS':
+            return ('', 200)
         id_token = request.headers.get('Authorization')
         if not id_token or not id_token.startswith('Bearer '):
             return jsonify({'error': 'Authorization token is missing or invalid'}), 401
@@ -409,6 +416,9 @@ def admin_required(f):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Allow CORS preflight to pass
+        if request.method == 'OPTIONS':
+            return ('', 200)
         id_token = request.headers.get('Authorization')
         if not id_token or not id_token.startswith('Bearer '):
             return jsonify({'error': 'Authorization token is missing or invalid'}), 401
@@ -575,6 +585,147 @@ def batch_create_students():
         "failure_count": failure_count,
         "results": results
     }), 200
+
+@app.route('/api/batch-create-users', methods=['POST'])
+@admin_required
+def batch_create_users():
+    """
+    Creates users (students or staff) in Firebase Auth and Firestore.
+    Accepts an array 'users' where each entry can include:
+      student_id (used as UID), full_name, email, password, status, role, year_level (optional for staff)
+    """
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    users_data = request.get_json().get('users')
+    if not users_data or not isinstance(users_data, list):
+        return jsonify({"error": "Missing or invalid 'users' array in request body"}), 400
+
+    valid_roles = {'student', 'staff'}
+
+    success_count = 0
+    failure_count = 0
+    results = []
+
+    def generate_password(email_addr, user_role):
+        try:
+            username = (email_addr or '').split('@')[0]
+            if (user_role or '').lower() == 'student':
+                digits = ''.join([c for c in username if c.isdigit()])
+                hash_part = (digits[-5:] if digits else username[-5:]).rjust(5, '0')
+            else:
+                base = username.split('.')[0] if username else ''
+                letters = ''.join([c for c in base if c.isalpha()])
+                hash_part = letters or (base or 'user')
+            year = datetime.now().year
+            return f"GC{hash_part}{year}"
+        except Exception:
+            # Fallback if parsing fails
+            return f"GCuser{datetime.now().year}"
+
+    for user in users_data:
+        email = user.get('email')
+        # password is optional/ignored; server will generate based on rules
+        full_name = user.get('full_name')
+        student_id = user.get('student_id')
+        year_level = user.get('year_level')
+        status = user.get('status', 'active')
+        role = (user.get('role') or 'student').lower()
+
+        if role not in valid_roles:
+            failure_count += 1
+            results.append({'email': email, 'status': 'failed', 'reason': f"Invalid role '{role}'."})
+            continue
+
+        # For students, require year_level
+        if role == 'student' and (year_level is None or str(year_level).strip() == ''):
+            failure_count += 1
+            results.append({'email': email, 'status': 'failed', 'reason': 'Missing year_level for student.'})
+            continue
+
+        # Default email if missing (student_id based)
+        if not email and student_id:
+            email = f"{student_id}@gordoncollege.edu.ph"
+
+        if not all([email, full_name, student_id]):
+            failure_count += 1
+            results.append({'email': email, 'status': 'failed', 'reason': 'Missing required fields.'})
+            continue
+
+        try:
+            gen_password = generate_password(email, role)
+            # Create user in Firebase Authentication with student_id as UID
+            user_record = auth.create_user(
+                uid=student_id,
+                email=email,
+                password=gen_password,
+                display_name=full_name,
+                email_verified=True
+            )
+
+            # Create user document in Firestore with the same UID (student_id)
+            student_doc_ref = db.collection('students').document(student_id)
+            doc_payload = {
+                'full_name': full_name,
+                'student_id': student_id,
+                'email': email,
+                'status': status,
+                'role': role,
+                'createdAt': firestore.SERVER_TIMESTAMP
+            }
+            if role == 'student' and year_level is not None:
+                doc_payload['year_level'] = year_level
+
+            student_doc_ref.set(doc_payload)
+
+            success_count += 1
+            results.append({'email': email, 'status': 'success', 'uid': user_record.uid})
+
+        except Exception as e:
+            failure_count += 1
+            error_reason = str(e)
+            results.append({'email': email, 'status': 'failed', 'reason': error_reason})
+
+    return jsonify({
+        "message": "Batch creation process completed.",
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "results": results
+    }), 200
+
+@app.route('/api/users/<uid>/role', methods=['PUT'])
+@admin_required
+def update_user_role(uid):
+    """Update a user's role (student or staff) - Admin only"""
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    role = (request.get_json() or {}).get('role')
+    if not role:
+        return jsonify({"error": "Missing 'role' in request body"}), 400
+
+    role = str(role).lower()
+    if role not in {'student', 'staff'}:
+        return jsonify({"error": "Invalid role. Must be 'student' or 'staff'"}), 400
+
+    try:
+        user_ref = db.collection('students').document(uid)
+        user_doc = user_ref.get()
+        if not user_doc.exists:
+            return jsonify({"error": "User not found"}), 404
+
+        user_ref.update({
+            'role': role,
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+
+        return jsonify({
+            'message': f"User {uid} role updated to {role}",
+            'role': role
+        }), 200
+    except Exception as e:
+        logger.error(f"Error updating user role: {e}")
+        return jsonify({"error": "Failed to update user role"}), 500
 
 @app.route('/api/delete-user', methods=['DELETE'])
 @admin_required
@@ -1118,6 +1269,7 @@ def get_all_users():
                 'email': user_data.get('email', f"{user_data.get('student_id')}@gordoncollege.edu.ph"),
                 'year_level': user_data.get('year_level', 'N/A'),
                 'status': user_data.get('status', 'active'),
+                'role': user_data.get('role', 'student'),
                 'flagReason': user_data.get('flagReason'),
                 'flagDuration': user_data.get('flagDuration'),
                 'flagExpiresAt': user_data.get('flagExpiresAt'),
@@ -1133,6 +1285,450 @@ def get_all_users():
     except Exception as e:
         logger.error(f"Error fetching users: {e}", exc_info=True)
         return jsonify({'error': 'Failed to fetch users'}), 500
+
+# ===================== LOST REQUESTS =====================
+
+def _sanitize_text(value, max_len=2000):
+    try:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if len(text) > max_len:
+            text = text[:max_len]
+        return text
+    except Exception:
+        return None
+
+def _get_user_role(uid):
+    try:
+        user_ref = db.collection('students').document(uid)
+        docu = user_ref.get()
+        if docu.exists:
+            data = docu.to_dict()
+            return (data.get('role') or 'student').lower()
+    except Exception as e:
+        logger.warning(f"Failed to get role for {uid}: {e}")
+    return 'student'
+
+# ==== Additional Security Helpers ====
+_DATA_URL_IMAGE_RE = re.compile(r'^data:image/(jpeg|jpg|png);base64,[A-Za-z0-9+/=\r\n]+$')
+_DATE_YMD_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+def _is_valid_date_yyyy_mm_dd(date_str: str) -> bool:
+    if not isinstance(date_str, str):
+        return False
+    if not _DATE_YMD_RE.match(date_str):
+        return False
+    try:
+        # Ensure it's a valid calendar date
+        datetime.strptime(date_str, '%Y-%m-%d')
+        return True
+    except Exception:
+        return False
+
+def _is_valid_image_data_url(image_url: str) -> bool:
+    if not isinstance(image_url, str):
+        return False
+    if not _DATA_URL_IMAGE_RE.match(image_url.strip()):
+        return False
+    # Basic size check on base64 length to avoid extremely large payloads (approx < 2MB)
+    # 4/3 expansion ratio for base64; be generous: up to ~3MB payloads
+    try:
+        b64_part = image_url.split(',', 1)[1]
+        # Remove newlines for safety
+        b64_part = b64_part.replace('\n', '').replace('\r', '')
+        # Rough upper bound; skip decoding for performance
+        if len(b64_part) > 4_200_000:  # ~3.1MB decoded
+            return False
+        return True
+    except Exception:
+        return False
+
+# Simple in-memory rate limiter for lost request creation
+_LR_RATE_WINDOW_SECONDS = 60  # 1 minute window
+_LR_RATE_MAX_IN_WINDOW = 3    # up to 3 requests/min
+_LR_RATE_DAILY_MAX = 30       # up to 30/day
+_lost_req_window: dict = {}   # uid -> (window_start_ts, count)
+_lost_req_daily: dict = {}    # uid -> (day_ymd_str, count)
+
+def _check_lost_request_rate_limit(uid: str) -> bool:
+    now = time.time()
+    # Per-minute window
+    ws, cnt = _lost_req_window.get(uid, (0, 0))
+    if now - ws > _LR_RATE_WINDOW_SECONDS:
+        _lost_req_window[uid] = (now, 1)
+    else:
+        if cnt + 1 > _LR_RATE_MAX_IN_WINDOW:
+            return False
+        _lost_req_window[uid] = (ws, cnt + 1)
+    # Per-day limit
+    day_str = datetime.now().strftime('%Y-%m-%d')
+    d_day, d_cnt = _lost_req_daily.get(uid, (day_str, 0))
+    if d_day != day_str:
+        _lost_req_daily[uid] = (day_str, 1)
+    else:
+        if d_cnt + 1 > _LR_RATE_DAILY_MAX:
+            return False
+        _lost_req_daily[uid] = (day_str, d_cnt + 1)
+    return True
+
+@app.route('/api/lost-requests', methods=['POST'])
+@login_required
+def create_lost_request():
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    payload = request.get_json() or {}
+    item_name = _sanitize_text(payload.get('itemName'), 200)
+    description = _sanitize_text(payload.get('description'), 2000)
+    date_lost = _sanitize_text(payload.get('dateLost'), 64)
+    location_lost = _sanitize_text(payload.get('locationLost'), 256)
+    # Allow large data URLs for images (resized client-side). Limit generously to avoid truncation
+    image_url = _sanitize_text(payload.get('imageUrl'), 2000000)
+    if not all([item_name, description, date_lost, location_lost, image_url]):
+        return jsonify({"error": "Missing required fields"}), 400
+    # Basic image data URL validation to prevent malformed inputs
+    try:
+        if not _is_valid_image_data_url(image_url):
+            return jsonify({"error": "Invalid image format"}), 400
+    except Exception:
+        return jsonify({"error": "Invalid image format"}), 400
+    # Strict date validation YYYY-MM-DD
+    if not _is_valid_date_yyyy_mm_dd(date_lost):
+        return jsonify({"error": "Invalid date format (expected YYYY-MM-DD)"}), 400
+
+    uid = request.user['uid']
+    # Rate limit to prevent abuse
+    if not _check_lost_request_rate_limit(uid):
+        return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+
+    role = _get_user_role(uid)
+    # Fetch requester profile for denormalization
+    requester_name = None
+    requester_email = None
+    try:
+        user_doc = db.collection('students').document(uid).get()
+        if user_doc.exists:
+            u = user_doc.to_dict()
+            requester_name = u.get('full_name') or u.get('name')
+            requester_email = u.get('email') or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else None)
+        if not requester_email:
+            requester_email = f"{uid}@gordoncollege.edu.ph"
+    except Exception as ue:
+        logger.warning(f"Could not fetch requester profile for {uid}: {ue}")
+
+    try:
+        lost_ref = db.collection('lost_requests')
+        doc_ref = lost_ref.document()
+        doc_ref.set({
+            'itemName': item_name,
+            'description': description,
+            'dateLost': date_lost,
+            'locationLost': location_lost,
+            'imageUrl': image_url,
+            'requesterId': uid,
+            'requesterRole': role,
+            'requesterName': requester_name,
+            'requesterEmail': requester_email,
+            # Store normalized fields as well for convenience/consistency
+            'full_name': requester_name,
+            'email': requester_email,
+            'status': 'pending',
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        return jsonify({'id': doc_ref.id, 'message': 'Lost request submitted', 'status': 'pending'}), 201
+    except Exception as e:
+        logger.error(f"Error creating lost request: {e}")
+        return jsonify({"error": "Failed to submit lost request"}), 500
+
+@app.route('/api/lost-requests', methods=['GET'])
+@login_required
+def list_lost_requests():
+    try:
+        uid = request.user['uid']
+        # Admin check
+        is_admin = db.collection('admin').document(uid).get().exists
+        status_filter = request.args.get('status')
+
+        q = db.collection('lost_requests')
+        if not is_admin:
+            q = q.where('requesterId', '==', uid)
+        if status_filter:
+            q = q.where('status', '==', status_filter)
+
+        snapshot = q.stream()
+        items = []
+        for d in snapshot:
+            data = d.to_dict()
+            created_at = data.get('createdAt')
+            updated_at = data.get('updatedAt')
+            # Start with any denormalized values stored on the request itself
+            requester_name = data.get('requesterName')
+            requester_email = data.get('requesterEmail')
+            if is_admin:
+                try:
+                    req_id = data.get('requesterId')
+                    if req_id:
+                        user_doc = db.collection('students').document(req_id).get()
+                        if user_doc.exists:
+                            u = user_doc.to_dict()
+                            # Prefer live profile data, but fall back to stored values if missing
+                            requester_name = (
+                                u.get('full_name') or u.get('name') or requester_name or 'N/A'
+                            )
+                            requester_email = (
+                                u.get('email') or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else requester_email)
+                            )
+                except Exception as ue:
+                    logger.warning(f"Failed to enrich requester info for {d.id}: {ue}")
+            items.append({
+                'id': d.id,
+                'itemName': data.get('itemName'),
+                'description': data.get('description'),
+                'dateLost': data.get('dateLost'),
+                'locationLost': data.get('locationLost'),
+                'imageUrl': data.get('imageUrl'),
+                'requesterRole': data.get('requesterRole', 'student'),
+                'status': data.get('status', 'pending'),
+                **({'requesterName': requester_name, 'requesterEmail': requester_email} if is_admin else {}),
+                'createdAt': created_at.isoformat() if hasattr(created_at, 'isoformat') else created_at,
+                'updatedAt': updated_at.isoformat() if hasattr(updated_at, 'isoformat') else updated_at
+            })
+        return jsonify({'requests': items}), 200
+    except Exception as e:
+        logger.error(f"Error listing lost requests: {e}")
+        return jsonify({'error': 'Failed to list lost requests'}), 500
+
+@app.route('/api/lost-requests/<request_id>/approve', methods=['PUT'])
+@admin_required
+def approve_lost_request(request_id):
+    try:
+        req_ref = db.collection('lost_requests').document(request_id)
+        req_doc = req_ref.get()
+        if not req_doc.exists:
+            return jsonify({'error': 'Request not found'}), 404
+
+        data = req_doc.to_dict()
+        # Create public entry in lost_items (without PII)
+        public_ref = db.collection('lost_items').document()
+        public_ref.set({
+            'itemName': data.get('itemName'),
+            'description': data.get('description'),
+            'dateLost': data.get('dateLost'),
+            'locationLost': data.get('locationLost'),
+            'imageUrl': data.get('imageUrl'),
+            'postedByRole': data.get('requesterRole', 'student'),
+            'status': 'approved',
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            'sourceRequestId': request_id,
+            # Denormalized requester info for admin convenience
+            'requesterName': data.get('requesterName'),
+            'requesterEmail': data.get('requesterEmail')
+        })
+
+        # Update original request
+        req_ref.update({
+            'status': 'approved',
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+
+        return jsonify({'message': 'Request approved and published', 'publicId': public_ref.id}), 200
+    except Exception as e:
+        logger.error(f"Error approving lost request {request_id}: {e}")
+        return jsonify({'error': 'Failed to approve lost request'}), 500
+
+@app.route('/api/lost-requests/<request_id>/reject', methods=['PUT'])
+@admin_required
+def reject_lost_request(request_id):
+    try:
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
+        feedback = _sanitize_text((request.get_json() or {}).get('feedback'), 500)
+        req_ref = db.collection('lost_requests').document(request_id)
+        req_doc = req_ref.get()
+        if not req_doc.exists:
+            return jsonify({'error': 'Request not found'}), 404
+
+        update_data = {
+            'status': 'rejected',
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        }
+        if feedback:
+            update_data['feedback'] = feedback
+
+        req_ref.update(update_data)
+        return jsonify({'message': 'Request rejected'}), 200
+    except Exception as e:
+        logger.error(f"Error rejecting lost request {request_id}: {e}")
+        return jsonify({'error': 'Failed to reject lost request'}), 500
+
+@app.route('/api/lost-items', methods=['GET'])
+@login_required
+def list_lost_items():
+    try:
+        uid = request.user['uid']
+        decoded_email = request.user.get('email')
+        is_admin = db.collection('admin').document(uid).get().exists
+        # Fallback to profile email if token lacks it
+        viewer_email = decoded_email
+        if not viewer_email:
+            try:
+                user_doc = db.collection('students').document(uid).get()
+                if user_doc.exists:
+                    u = user_doc.to_dict()
+                    viewer_email = u.get('email') or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else None)
+            except Exception as ue:
+                logger.warning(f"Could not resolve viewer email for {uid}: {ue}")
+        q = db.collection('lost_items').stream()
+        results = []
+        for d in q:
+            data = d.to_dict()
+            created_at = data.get('createdAt')
+            # Hide resolved/archived items from non-admin viewers
+            item_status = (data.get('status') or 'approved').lower()
+            if not is_admin and item_status in ('resolved', 'archived'):
+                continue
+            # Build requester info for admins, compute ownership flag for all
+            requester_name = None
+            requester_email = None
+            if is_admin:
+                try:
+                    source_id = data.get('sourceRequestId')
+                    if source_id:
+                        req_doc = db.collection('lost_requests').document(source_id).get()
+                        if req_doc.exists:
+                            req_data = req_doc.to_dict()
+                            rid = req_data.get('requesterId')
+                            if rid:
+                                user_doc = db.collection('students').document(rid).get()
+                                if user_doc.exists:
+                                    u = user_doc.to_dict()
+                                    requester_name = u.get('full_name') or u.get('name') or 'N/A'
+                                    requester_email = u.get('email') or f"{u.get('student_id')}@gordoncollege.edu.ph"
+                except Exception as ue:
+                    logger.warning(f"Failed to enrich lost item {d.id} with requester info: {ue}")
+            # Ownership flag (no PII exposure)
+            is_owner = False
+            try:
+                # Prefer direct email compare if available on item
+                item_email = data.get('requesterEmail')
+                if not item_email:
+                    # fallback to source request's stored email or uid
+                    source_id = data.get('sourceRequestId')
+                    if source_id:
+                        req_doc = db.collection('lost_requests').document(source_id).get()
+                        if req_doc.exists:
+                            req_data = req_doc.to_dict()
+                            item_email = req_data.get('requesterEmail')
+                            if not item_email and req_data.get('requesterId') == uid:
+                                is_owner = True
+                if not is_owner and item_email and viewer_email:
+                    is_owner = (item_email.lower() == viewer_email.lower())
+            except Exception as oe:
+                logger.warning(f"Ownership compute failed for lost item {d.id}: {oe}")
+            results.append({
+                'id': d.id,
+                'itemName': data.get('itemName'),
+                'description': data.get('description'),
+                'dateLost': data.get('dateLost'),
+                'locationLost': data.get('locationLost'),
+                'imageUrl': data.get('imageUrl'),
+                'postedByRole': data.get('postedByRole', 'student'),
+                'isOwner': is_owner,
+                **({'requesterName': requester_name, 'requesterEmail': requester_email, 'status': item_status} if is_admin else {}),
+                'createdAt': created_at.isoformat() if hasattr(created_at, 'isoformat') else created_at
+            })
+        return jsonify({'items': results}), 200
+    except Exception as e:
+        logger.error(f"Error listing lost items: {e}")
+        return jsonify({'error': 'Failed to list lost items'}), 500
+
+@app.route('/api/lost-items/<item_id>/resolve', methods=['PUT'])
+@admin_required
+def resolve_lost_item(item_id):
+    try:
+        ref = db.collection('lost_items').document(item_id)
+        doc = ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Lost item not found'}), 404
+        current = (doc.to_dict() or {}).get('status', 'approved').lower()
+        # Only allow resolve from approved
+        if current not in ('approved',):
+            return jsonify({'error': f'Invalid transition from {current} to resolved'}), 400
+        ref.update({
+            'status': 'resolved',
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        return jsonify({'message': 'Lost item marked as resolved'}), 200
+    except Exception as e:
+        logger.error(f"Error resolving lost item {item_id}: {e}")
+        return jsonify({'error': 'Failed to resolve lost item'}), 500
+
+@app.route('/api/lost-items/<item_id>/unresolve', methods=['PUT'])
+@admin_required
+def unresolve_lost_item(item_id):
+    try:
+        ref = db.collection('lost_items').document(item_id)
+        doc = ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Lost item not found'}), 404
+        current = (doc.to_dict() or {}).get('status', 'approved').lower()
+        # Only allow unresolve from resolved
+        if current not in ('resolved',):
+            return jsonify({'error': f'Invalid transition from {current} to approved'}), 400
+        # Revert back to approved so it shows publicly again
+        ref.update({
+            'status': 'approved',
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        return jsonify({'message': 'Lost item un-resolved'}), 200
+    except Exception as e:
+        logger.error(f"Error unresolving lost item {item_id}: {e}")
+        return jsonify({'error': 'Failed to unresolve lost item'}), 500
+
+@app.route('/api/lost-items/<item_id>/archive', methods=['PUT'])
+@admin_required
+def archive_lost_item(item_id):
+    try:
+        ref = db.collection('lost_items').document(item_id)
+        doc = ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Lost item not found'}), 404
+        current = (doc.to_dict() or {}).get('status', 'approved').lower()
+        # Allow archive from approved or resolved
+        if current not in ('approved', 'resolved'):
+            return jsonify({'error': f'Invalid transition from {current} to archived'}), 400
+        ref.update({
+            'status': 'archived',
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        return jsonify({'message': 'Lost item archived'}), 200
+    except Exception as e:
+        logger.error(f"Error archiving lost item {item_id}: {e}")
+        return jsonify({'error': 'Failed to archive lost item'}), 500
+
+@app.route('/api/lost-items/<item_id>/unarchive', methods=['PUT'])
+@admin_required
+def unarchive_lost_item(item_id):
+    try:
+        ref = db.collection('lost_items').document(item_id)
+        doc = ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Lost item not found'}), 404
+        current = (doc.to_dict() or {}).get('status', 'approved').lower()
+        # Only allow unarchive from archived
+        if current not in ('archived',):
+            return jsonify({'error': f'Invalid transition from {current} to approved'}), 400
+        # Revert back to approved so it shows publicly again
+        ref.update({
+            'status': 'approved',
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+        return jsonify({'message': 'Lost item un-archived'}), 200
+    except Exception as e:
+        logger.error(f"Error unarchiving lost item {item_id}: {e}")
+        return jsonify({'error': 'Failed to unarchive lost item'}), 500
 
 @app.route('/api/users/<uid>/status', methods=['PUT'])
 @admin_required

@@ -83,7 +83,7 @@ class MessageService {
     }
 
     // Send a message
-    async sendMessage(conversationId, senderId, senderName, text, isAdmin = false, imageData = null) {
+    async sendMessage(conversationId, senderId, senderName, text, isAdmin = false, imageData = null, lostItemId = null, lostItemImage = null, lostItemName = null) {
         try {
             const messagesRef = collection(db, 'conversations', conversationId, 'messages');
             
@@ -99,6 +99,17 @@ class MessageService {
             // Add image data if provided
             if (imageData) {
                 messageData.imageData = imageData;
+            }
+
+            // Add lost item reference if provided
+            if (lostItemId) {
+                messageData.lostItemId = lostItemId;
+                if (lostItemImage) {
+                    messageData.lostItemImage = lostItemImage;
+                }
+                if (lostItemName) {
+                    messageData.lostItemName = lostItemName;
+                }
             }
 
             // Add message to subcollection

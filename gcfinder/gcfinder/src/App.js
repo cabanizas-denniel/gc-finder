@@ -10,6 +10,8 @@ import BrowseItems from './components/student/BrowseItems';
 import MyClaims from './components/student/MyClaims';
 import Messages from './components/student/Messages';
 import Help from './components/student/Help';
+import LostRequests from './components/student/LostRequests';
+import LostItems from './components/student/LostItems';
 import NotFound from './components/student/NotFound';
 import Layout from './components/student/Layout';
 // Admin imports
@@ -23,6 +25,8 @@ import UserManagement from './components/admin/UserManagement';
 import ItemManagement from './components/admin/ItemManagement';
 import AdminMessages from './components/admin/Messages';
 import AdminHelp from './components/admin/Help';
+import AdminLostRequests from './components/admin/LostRequests';
+import AdminLostItems from './components/admin/LostItems';
 import './styles/student-styles.css';
 import './styles/admin-styles.css';
 import './styles/shared-styles.css';
@@ -145,6 +149,22 @@ function App() {
                         }
                     />
                     <Route
+                        path="/lost-requests"
+                        element={
+                            <ProtectedRoute>
+                                <LostRequests />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/lost-items"
+                        element={
+                            <ProtectedRoute>
+                                <LostItems />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/help"
                         element={
                             <ProtectedRoute>
@@ -160,6 +180,8 @@ function App() {
                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
                     <Route path="/admin/report-items" element={<ReportItems />} />
                     <Route path="/admin/review-reports" element={<ReviewReports />} />
+                    <Route path="/admin/lost-requests" element={<AdminLostRequests />} />
+                    <Route path="/admin/lost-items" element={<AdminLostItems />} />
                     <Route path="/admin/claim-verification" element={<ClaimVerification />} />
                     <Route path="/admin/user-management" element={<UserManagement />} />
                     <Route path="/admin/item-management" element={<ItemManagement />} />
