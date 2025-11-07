@@ -72,6 +72,46 @@ except Exception as e:
 # Hugging Face API configuration
 HF_API_TOKEN = os.environ.get('HUGGING_FACE_API_TOKEN')
 
+def _to_fixed_embedding(vector, target_dim: int = 128) -> np.ndarray:
+    """
+    Convert any incoming embedding-like object to a fixed-size, normalized vector.
+    - Flattens
+    - Pads or truncates to target_dim
+    - Replaces NaNs/Infs
+    - L2-normalizes with epsilon guard
+    """
+    try:
+        arr = np.array(vector, dtype=np.float32).reshape(-1)
+    except Exception:
+        arr = np.zeros(target_dim, dtype=np.float32)
+    if arr.size == 0:
+        arr = np.zeros(target_dim, dtype=np.float32)
+    # Truncate or pad deterministically
+    if arr.size > target_dim:
+        arr = arr[:target_dim]
+    elif arr.size < target_dim:
+        # Repeat then cut to fit to preserve information order
+        repeats = max(1, target_dim // max(1, arr.size))
+        tiled = np.tile(arr, repeats)
+        if tiled.size < target_dim:
+            # Last resort pad zeros
+            padded = np.zeros(target_dim, dtype=np.float32)
+            padded[:tiled.size] = tiled
+            arr = padded
+        else:
+            arr = tiled[:target_dim]
+    # Clean NaNs/Infs
+    arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+    # Normalize
+    norm = float(np.linalg.norm(arr))
+    if not np.isfinite(norm) or norm == 0.0:
+        # Use a stable unit vector
+        arr = np.zeros_like(arr)
+        arr[0] = 1.0
+    else:
+        arr = arr / norm
+    return arr
+
 def validate_image_input(image_input):
     """Validate and standardize image input"""
     try:
@@ -147,22 +187,9 @@ def get_local_image_embedding(image_input):
         features.append(texture)
         
         # Total: 58 features - pad to 128
-        while len(features) < 128:
-            features.extend(features[:min(len(features), 128-len(features))])
-        
-        # Convert to numpy array and normalize
-        embedding = np.array(features[:128], dtype=np.float32)
-        
-        # Normalize to unit length (similar to what CLIP would do)
-        norm = np.linalg.norm(embedding)
-        if norm > 0:
-            embedding = embedding / norm
-        else:
-            # Fallback if norm is zero
-            embedding = np.random.rand(128).astype(np.float32)
-            embedding = embedding / np.linalg.norm(embedding)
-        
-        logger.info(f"Created local embedding with {len(embedding)} features")
+        # Convert to fixed-size normalized embedding
+        embedding = _to_fixed_embedding(features, target_dim=128)
+        logger.info(f"Created local embedding with {embedding.shape[0]} features")
         return embedding
         
     except Exception as e:
@@ -245,7 +272,7 @@ def try_sentence_transformers_clip(image_bytes):
         if response.status_code == 200:
             result = response.json()
             if isinstance(result, list) and len(result) > 0:
-                embedding = np.array(result, dtype=np.float32)
+                embedding = _to_fixed_embedding(result, target_dim=128)
                 logger.info(f"Successfully got sentence-transformers embedding with shape: {embedding.shape}")
                 return embedding
         else:
@@ -276,9 +303,10 @@ def try_openai_clip_feature_extraction(image_bytes):
             result = response.json()
             if isinstance(result, list) and len(result) > 0:
                 if isinstance(result[0], list):
-                    embedding = np.array(result[0], dtype=np.float32)
+                    raw = result[0]
                 else:
-                    embedding = np.array(result, dtype=np.float32)
+                    raw = result
+                embedding = _to_fixed_embedding(raw, target_dim=128)
                 logger.info(f"Successfully got OpenAI CLIP embedding with shape: {embedding.shape}")
                 return embedding
         else:
@@ -312,14 +340,15 @@ def get_image_embedding_remote(image_input):
                 logger.info(f"Trying {method_name}...")
                 result = method_func(image_bytes)
                 if result is not None:
-                    logger.info(f"Successfully got embedding using {method_name}")
-                    return result
+                    fixed = _to_fixed_embedding(result, target_dim=128)
+                    logger.info(f"Successfully got embedding using {method_name} -> fixed dim {fixed.shape[0]}")
+                    return fixed
             except Exception as e:
                 logger.warning(f"{method_name} failed: {e}")
                 continue
         
         logger.warning("All HuggingFace API methods failed, falling back to local embedding...")
-        return get_local_image_embedding(image_input)
+        return _to_fixed_embedding(get_local_image_embedding(image_input), target_dim=128)
             
     except Exception as e:
         logger.error(f"Error in get_image_embedding_remote: {e}")
@@ -327,7 +356,7 @@ def get_image_embedding_remote(image_input):
         
         # Last resort: try local embedding
         try:
-            return get_local_image_embedding(image_input)
+            return _to_fixed_embedding(get_local_image_embedding(image_input), target_dim=128)
         except Exception as local_e:
             logger.error(f"Local embedding also failed: {local_e}")
             # Return normalized random embedding as absolute last resort
@@ -343,12 +372,18 @@ def compute_similarity(query_embedding, database_embeddings):
             return np.array([])
             
         # Ensure all embeddings are same dimension
-        query_flat = query_embedding.flatten()
-        db_flat = np.array([emb.flatten() for emb in database_embeddings])
+        query_flat = _to_fixed_embedding(query_embedding, target_dim=128)
+        db_list = [ _to_fixed_embedding(emb, target_dim=128) for emb in database_embeddings ]
+        db_flat = np.stack(db_list, axis=0)  # shape: (N, 128)
         
         # Normalize embeddings
-        query_norm = query_flat / np.linalg.norm(query_flat)
-        db_norms = db_flat / np.linalg.norm(db_flat, axis=1, keepdims=True)
+        eps = 1e-8
+        qnorm = float(np.linalg.norm(query_flat))
+        qnorm = qnorm if (np.isfinite(qnorm) and qnorm > 0.0) else eps
+        query_norm = query_flat / qnorm
+        db_norms_den = np.linalg.norm(db_flat, axis=1, keepdims=True)
+        db_norms_den = np.where(np.isfinite(db_norms_den) & (db_norms_den > 0.0), db_norms_den, eps)
+        db_norms = db_flat / db_norms_den
         
         # Compute cosine similarity
         similarities = np.dot(db_norms, query_norm)
@@ -901,7 +936,9 @@ def search():
             if len(similarities) == 0:
                 return jsonify({'error': 'Failed to compute similarities'}), 500
                 
-            results = sorted(zip(similarities, database_items), reverse=True)
+            # Sort strictly by similarity score to avoid comparing dicts on ties
+            order = np.argsort(similarities)[::-1]
+            results = [(float(similarities[i]), database_items[i]) for i in order]
             
             logger.info(f"Returning {len(results)} results")
             return jsonify({
