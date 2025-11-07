@@ -71,6 +71,9 @@ except Exception as e:
 
 # Hugging Face API configuration
 HF_API_TOKEN = os.environ.get('HUGGING_FACE_API_TOKEN')
+# Global switch to enable/disable remote HF inference
+# Set DISABLE_HF_INFERENCE=1 in env to force local embeddings only
+HF_AVAILABLE = os.environ.get('DISABLE_HF_INFERENCE', '').lower() not in ('1', 'true', 'yes')
 
 def _to_fixed_embedding(vector, target_dim: int = 128) -> np.ndarray:
     """
@@ -201,6 +204,9 @@ def get_local_image_embedding(image_input):
 def try_classification_as_features(image_bytes):
     """Use ResNet for classification and extract feature-like scores"""
     try:
+        # Skip if remote inference disabled
+        if not HF_AVAILABLE:
+            return None
         headers = {"Content-Type": "application/json"}
         if HF_API_TOKEN:
             headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
@@ -243,6 +249,10 @@ def try_classification_as_features(image_bytes):
                     return embedding
         else:
             logger.warning(f"ResNet classification failed: {response.status_code} - {response.text[:200]}")
+            if response.status_code == 410:
+                # Permanently disable remote inference for this process to avoid repeated 410s
+                global HF_AVAILABLE
+                HF_AVAILABLE = False
             
     except requests.exceptions.Timeout:
         logger.error("ResNet classification timed out")
@@ -256,6 +266,9 @@ def try_classification_as_features(image_bytes):
 def try_sentence_transformers_clip(image_bytes):
     """Try using sentence-transformers CLIP model"""
     try:
+        # Skip if remote inference disabled
+        if not HF_AVAILABLE:
+            return None
         headers = {}
         if HF_API_TOKEN:
             headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
@@ -277,6 +290,9 @@ def try_sentence_transformers_clip(image_bytes):
                 return embedding
         else:
             logger.warning(f"Sentence-transformers CLIP failed: {response.status_code}")
+            if response.status_code == 410:
+                global HF_AVAILABLE
+                HF_AVAILABLE = False
             
     except Exception as e:
         logger.error(f"Sentence-transformers CLIP error: {e}")
@@ -286,6 +302,9 @@ def try_sentence_transformers_clip(image_bytes):
 def try_openai_clip_feature_extraction(image_bytes):
     """Try using OpenAI CLIP model for feature extraction"""
     try:
+        # Skip if remote inference disabled
+        if not HF_AVAILABLE:
+            return None
         headers = {}
         if HF_API_TOKEN:
             headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
@@ -311,6 +330,9 @@ def try_openai_clip_feature_extraction(image_bytes):
                 return embedding
         else:
             logger.warning(f"OpenAI CLIP feature extraction failed: {response.status_code}")
+            if response.status_code == 410:
+                global HF_AVAILABLE
+                HF_AVAILABLE = False
             
     except Exception as e:
         logger.error(f"OpenAI CLIP feature extraction error: {e}")
@@ -322,6 +344,9 @@ def get_image_embedding_remote(image_input):
     Get image embedding using HuggingFace's models with robust fallbacks
     """
     try:
+        # If remote is disabled, use local immediately
+        if not HF_AVAILABLE:
+            return _to_fixed_embedding(get_local_image_embedding(image_input), target_dim=128)
         # Validate and convert image to bytes
         image = validate_image_input(image_input)
         buffer = BytesIO()
