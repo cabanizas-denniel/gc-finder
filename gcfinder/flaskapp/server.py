@@ -203,6 +203,7 @@ def get_local_image_embedding(image_input):
 
 def try_classification_as_features(image_bytes):
     """Use ResNet for classification and extract feature-like scores"""
+    global HF_AVAILABLE
     try:
         # Skip if remote inference disabled
         if not HF_AVAILABLE:
@@ -251,7 +252,6 @@ def try_classification_as_features(image_bytes):
             logger.warning(f"ResNet classification failed: {response.status_code} - {response.text[:200]}")
             if response.status_code == 410:
                 # Permanently disable remote inference for this process to avoid repeated 410s
-                global HF_AVAILABLE
                 HF_AVAILABLE = False
             
     except requests.exceptions.Timeout:
@@ -265,6 +265,7 @@ def try_classification_as_features(image_bytes):
 
 def try_sentence_transformers_clip(image_bytes):
     """Try using sentence-transformers CLIP model"""
+    global HF_AVAILABLE
     try:
         # Skip if remote inference disabled
         if not HF_AVAILABLE:
@@ -291,7 +292,6 @@ def try_sentence_transformers_clip(image_bytes):
         else:
             logger.warning(f"Sentence-transformers CLIP failed: {response.status_code}")
             if response.status_code == 410:
-                global HF_AVAILABLE
                 HF_AVAILABLE = False
             
     except Exception as e:
@@ -301,6 +301,7 @@ def try_sentence_transformers_clip(image_bytes):
 
 def try_openai_clip_feature_extraction(image_bytes):
     """Try using OpenAI CLIP model for feature extraction"""
+    global HF_AVAILABLE
     try:
         # Skip if remote inference disabled
         if not HF_AVAILABLE:
@@ -331,7 +332,6 @@ def try_openai_clip_feature_extraction(image_bytes):
         else:
             logger.warning(f"OpenAI CLIP feature extraction failed: {response.status_code}")
             if response.status_code == 410:
-                global HF_AVAILABLE
                 HF_AVAILABLE = False
             
     except Exception as e:
@@ -667,16 +667,27 @@ def batch_create_users():
     failure_count = 0
     results = []
 
-    def generate_password(email_addr, user_role):
+    def generate_password(email_addr, user_role, full_name_str):
         try:
             username = (email_addr or '').split('@')[0]
             if (user_role or '').lower() == 'student':
                 digits = ''.join([c for c in username if c.isdigit()])
                 hash_part = (digits[-5:] if digits else username[-5:]).rjust(5, '0')
             else:
-                base = username.split('.')[0] if username else ''
-                letters = ''.join([c for c in base if c.isalpha()])
-                hash_part = letters or (base or 'user')
+                # Staff: try to use last name first
+                hash_part = ''
+                if full_name_str:
+                    parts = full_name_str.strip().split()
+                    if parts:
+                        last_name = parts[-1]
+                        # Keep only letters for the password part
+                        hash_part = ''.join([c for c in last_name if c.isalpha()])
+                
+                # Fallback to email base if last name didn't work
+                if not hash_part:
+                    base = username.split('.')[0] if username else ''
+                    hash_part = ''.join([c for c in base if c.isalpha()]) or 'user'
+
             year = datetime.now().year
             return f"GC{hash_part}{year}"
         except Exception:
@@ -713,7 +724,7 @@ def batch_create_users():
             continue
 
         try:
-            gen_password = generate_password(email, role)
+            gen_password = generate_password(email, role, full_name)
             # Create user in Firebase Authentication with student_id as UID
             user_record = auth.create_user(
                 uid=student_id,
@@ -2423,6 +2434,112 @@ def get_dashboard_stats():
     except Exception as e:
         logger.error(f"Error fetching dashboard stats: {e}", exc_info=True)
         return jsonify({'error': 'Failed to fetch dashboard statistics'}), 500
+
+@app.route('/api/cron/cleanup-items', methods=['GET'])
+def cron_cleanup_items():
+    """
+    Cron job endpoint to archive items older than 15 days.
+    Secure via CRON_SECRET or Vercel signature.
+    """
+    # Security check
+    is_vercel = request.headers.get('x-vercel-cron') == '1'
+    auth_header = request.headers.get('Authorization')
+    cron_secret = os.environ.get('CRON_SECRET')
+    
+    # Allow if it's Vercel Cron OR if a valid secret is provided OR if explicitly allowed in query params for testing
+    is_authorized = is_vercel or (cron_secret and auth_header == f"Bearer {cron_secret}")
+    
+    # In debug mode (local), allow without auth for testing
+    # Also allow if ?force=true is present for manual testing (be careful in prod!)
+    if not is_authorized and not app.debug and request.args.get('force') != 'true':
+        logger.warning("Unauthorized attempt to access cleanup cron")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        logger.info("Starting automated 15-day item cleanup...")
+        from datetime import datetime, timedelta
+        
+        # 15 days ago cutoff
+        cutoff_date = datetime.now() - timedelta(days=15)
+        
+        items_ref = db.collection('items')
+        # Get all items (filtering in memory is safer for complex logic without composite indexes)
+        # Optimization: If you have an index on createdAt, use .where('createdAt', '<=', cutoff_date)
+        # For now, we'll stream and filter to be safe and support legacy data.
+        docs = items_ref.stream()
+        
+        archived_count = 0
+        processed_count = 0
+        
+        claims_ref = db.collection('claims')
+        
+        for doc in docs:
+            processed_count += 1
+            item_data = doc.to_dict()
+            
+            # 1. Check Status: Must be 'Unclaimed' or 'Lost'
+            status = item_data.get('status')
+            if status not in ['Unclaimed', 'Lost']:
+                continue
+                
+            # 2. Check Approval: Must be Admin Approved
+            if not item_data.get('adminApproval'):
+                continue
+                
+            # 3. Check Age: createdAt < 15 days ago
+            created_at = item_data.get('createdAt')
+            if not created_at:
+                continue
+                
+            # Handle Firestore Timestamp or datetime string
+            item_date = None
+            if hasattr(created_at, 'timestamp'):
+                item_date = datetime.fromtimestamp(created_at.timestamp())
+            elif isinstance(created_at, str):
+                try:
+                    item_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                except:
+                    continue
+            
+            if not item_date or item_date > cutoff_date:
+                continue
+                
+            # 4. Check Pending Claims (Don't archive if actively being negotiated)
+            item_id = doc.id
+            pending_claims = claims_ref.where('itemId', '==', item_id).where('claimStatus', '==', 'Pending').limit(1).stream()
+            has_pending_claim = False
+            for _ in pending_claims:
+                has_pending_claim = True
+                break
+            
+            if has_pending_claim:
+                logger.info(f"Skipping cleanup for item {item_id}: Has pending claims.")
+                continue
+            
+            # ACTION: Archive the item
+            logger.info(f"Archiving expired item: {item_id} (Created: {item_date})")
+            
+            # Update payload: set status to Archived and DELETE the image data to save space
+            update_payload = {
+                'status': 'Archived',
+                'previousStatus': status,
+                'archivedAt': firestore.SERVER_TIMESTAMP,
+                'archivedReason': 'Automated 15-day expiration',
+                'imageData': firestore.DELETE_FIELD  # Automatically remove the image data
+            }
+            
+            items_ref.document(item_id).update(update_payload)
+            archived_count += 1
+            
+        return jsonify({
+            "message": "Cleanup completed successfully",
+            "processed_items": processed_count,
+            "archived_items": archived_count
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Cleanup cron failed: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 # Production-ready error handlers
 @app.errorhandler(404)
