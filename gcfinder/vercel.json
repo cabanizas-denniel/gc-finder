@@ -1,0 +1,21 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-items",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "builds": [
+    {
+      "src": "flaskapp/server.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "flaskapp/server.py"
+    }
+  ]
+}
+
