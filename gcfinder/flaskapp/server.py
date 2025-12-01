@@ -1774,7 +1774,7 @@ def archive_lost_item(item_id):
         if current not in ('approved', 'resolved'):
             return jsonify({'error': f'Invalid transition from {current} to archived'}), 400
         ref.update({
-            'status': 'archived',
+            'status': 'Archived',
             'updatedAt': firestore.SERVER_TIMESTAMP
         })
         return jsonify({'message': 'Lost item archived'}), 200
@@ -2467,7 +2467,8 @@ def cleanup_old_items():
         }
         
         # 1. Archive old items with specified statuses
-        statuses_to_archive = ['unclaimed', 'pending', 'claimed', 'disapproved']
+        # Include both capitalized and lowercase versions for compatibility
+        statuses_to_archive = ['Unclaimed', 'unclaimed', 'Pending', 'pending', 'Claimed', 'claimed', 'Disapproved', 'disapproved', 'Claiming', 'claiming']
         items_ref = db.collection('items')
         
         for status in statuses_to_archive:
@@ -2503,7 +2504,7 @@ def cleanup_old_items():
                             # Store previous status before archiving
                             item_doc.reference.update({
                                 'previousStatus': status,
-                                'status': 'archived',
+                                'status': 'Archived',
                                 'archivedAt': firestore.SERVER_TIMESTAMP,
                                 'archivedReason': 'auto-cleanup-15-days',
                                 'updatedAt': firestore.SERVER_TIMESTAMP
@@ -2608,7 +2609,10 @@ def delete_all_archived_items():
     """
     try:
         items_ref = db.collection('items')
-        archived_items = items_ref.where('status', '==', 'archived').stream()
+        # Check both capitalized and lowercase for compatibility
+        archived_items_cap = list(items_ref.where('status', '==', 'Archived').stream())
+        archived_items_low = list(items_ref.where('status', '==', 'archived').stream())
+        archived_items = archived_items_cap + archived_items_low
         
         deleted_count = 0
         errors = []
