@@ -2436,7 +2436,6 @@ def get_dashboard_stats():
         logger.error(f"Error fetching dashboard stats: {e}", exc_info=True)
         return jsonify({'error': 'Failed to fetch dashboard statistics'}), 500
 
-<<<<<<< HEAD
 # ======= CLEANUP / CRON ENDPOINTS =======
 
 @app.route('/api/cron/cleanup-items', methods=['POST', 'GET'])
@@ -2644,114 +2643,6 @@ def delete_all_archived_items():
     except Exception as e:
         logger.error(f"Error deleting all archived items: {e}", exc_info=True)
         return jsonify({'error': 'Failed to delete archived items'}), 500
-
-=======
-@app.route('/api/cron/cleanup-items', methods=['GET'])
-def cron_cleanup_items():
-    """
-    Cron job endpoint to archive items older than 15 days.
-    Secure via CRON_SECRET or Vercel signature.
-    """
-    # Security check
-    is_vercel = request.headers.get('x-vercel-cron') == '1'
-    auth_header = request.headers.get('Authorization')
-    cron_secret = os.environ.get('CRON_SECRET')
-    
-    # Allow if it's Vercel Cron OR if a valid secret is provided OR if explicitly allowed in query params for testing
-    is_authorized = is_vercel or (cron_secret and auth_header == f"Bearer {cron_secret}")
-    
-    # In debug mode (local), allow without auth for testing
-    # Also allow if ?force=true is present for manual testing (be careful in prod!)
-    if not is_authorized and not app.debug and request.args.get('force') != 'true':
-        logger.warning("Unauthorized attempt to access cleanup cron")
-        return jsonify({'error': 'Unauthorized'}), 401
-
-    try:
-        logger.info("Starting automated 15-day item cleanup...")
-        from datetime import datetime, timedelta
-        
-        # 15 days ago cutoff
-        cutoff_date = datetime.now() - timedelta(days=15)
-        
-        items_ref = db.collection('items')
-        # Get all items (filtering in memory is safer for complex logic without composite indexes)
-        # Optimization: If you have an index on createdAt, use .where('createdAt', '<=', cutoff_date)
-        # For now, we'll stream and filter to be safe and support legacy data.
-        docs = items_ref.stream()
-        
-        archived_count = 0
-        processed_count = 0
-        
-        claims_ref = db.collection('claims')
-        
-        for doc in docs:
-            processed_count += 1
-            item_data = doc.to_dict()
-            
-            # 1. Check Status: Must be 'Unclaimed' or 'Lost'
-            status = item_data.get('status')
-            if status not in ['Unclaimed', 'Lost']:
-                continue
-                
-            # 2. Check Approval: Must be Admin Approved
-            if not item_data.get('adminApproval'):
-                continue
-                
-            # 3. Check Age: createdAt < 15 days ago
-            created_at = item_data.get('createdAt')
-            if not created_at:
-                continue
-                
-            # Handle Firestore Timestamp or datetime string
-            item_date = None
-            if hasattr(created_at, 'timestamp'):
-                item_date = datetime.fromtimestamp(created_at.timestamp())
-            elif isinstance(created_at, str):
-                try:
-                    item_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                except:
-                    continue
-            
-            if not item_date or item_date > cutoff_date:
-                continue
-                
-            # 4. Check Pending Claims (Don't archive if actively being negotiated)
-            item_id = doc.id
-            pending_claims = claims_ref.where('itemId', '==', item_id).where('claimStatus', '==', 'Pending').limit(1).stream()
-            has_pending_claim = False
-            for _ in pending_claims:
-                has_pending_claim = True
-                break
-            
-            if has_pending_claim:
-                logger.info(f"Skipping cleanup for item {item_id}: Has pending claims.")
-                continue
-            
-            # ACTION: Archive the item
-            logger.info(f"Archiving expired item: {item_id} (Created: {item_date})")
-            
-            # Update payload: set status to Archived and DELETE the image data to save space
-            update_payload = {
-                'status': 'Archived',
-                'previousStatus': status,
-                'archivedAt': firestore.SERVER_TIMESTAMP,
-                'archivedReason': 'Automated 15-day expiration',
-                'imageData': firestore.DELETE_FIELD  # Automatically remove the image data
-            }
-            
-            items_ref.document(item_id).update(update_payload)
-            archived_count += 1
-            
-        return jsonify({
-            "message": "Cleanup completed successfully",
-            "processed_items": processed_count,
-            "archived_items": archived_count
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Cleanup cron failed: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
->>>>>>> 31c21028190afac468997914adcf11f80954349f
 
 # Production-ready error handlers
 @app.errorhandler(404)
