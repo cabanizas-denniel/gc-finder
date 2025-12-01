@@ -2468,7 +2468,7 @@ def cleanup_old_items():
         
         # 1. Archive old items with specified statuses
         # Include both capitalized and lowercase versions for compatibility
-        statuses_to_archive = ['Unclaimed', 'unclaimed', 'Pending', 'pending', 'Claimed', 'claimed', 'Disapproved', 'disapproved', 'Claiming', 'claiming']
+        statuses_to_archive = ['Unclaimed', 'unclaimed', 'Pending', 'pending', 'Claimed', 'claimed', 'Disapproved', 'disapproved']
         items_ref = db.collection('items')
         
         for status in statuses_to_archive:
