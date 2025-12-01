@@ -511,7 +511,7 @@ const UserManagement = () => {
             // ID, Name, [Email], Year Level, Password, Status, [Role]
             let tokens = [...parts];
             let role = 'student';
-            const allowedRoles = new Set(['student', 'staff']);
+            const allowedRoles = new Set(['student', 'official']);
             // Pop role if present as last token
             const lastToken = tokens[tokens.length - 1]?.toLowerCase();
             if (lastToken && allowedRoles.has(lastToken)) {
@@ -536,31 +536,39 @@ const UserManagement = () => {
             // Parse based on token length and whether an email token exists
             const hasEmailLike = (val) => typeof val === 'string' && val.includes('@');
 
-            if (tokens.length === 6) {
-                // ID, Name, Email, Year Level, Password, Status
-                [student_id, full_name, email, year_level_raw, password, status] = tokens;
-            } else if (tokens.length === 5) {
-                // Either: ID, Name, Email, Password, Status (staff no year)
-                // Or:     ID, Name, Year Level, Password, Status (student no email)
+            if (tokens.length === 4) {
+                // Check if 3rd token is email-like
                 if (hasEmailLike(tokens[2])) {
-                    [student_id, full_name, email, password, status] = tokens;
+                    // Official format: ID, Name, Email, Status
+                    [student_id, full_name, email, status] = tokens;
                     year_level_raw = '';
                 } else {
-                    [student_id, full_name, year_level_raw, password, status] = tokens;
+                    // Student format: ID, Name, Year Level, Status
+                    [student_id, full_name, year_level_raw, status] = tokens;
                     ensureEmail();
                 }
-            } else if (tokens.length === 4) {
-                // ID, Name, Password, Status (assume staff, no email/year)
-                [student_id, full_name, password, status] = tokens;
-                year_level_raw = '';
-                ensureEmail();
-                if (role === 'student') {
-                    console.warn(`Row ${i + 1}: missing year level for student; skipping.`);
-                    continue;
+            } else if (tokens.length === 5) {
+                // Check if 3rd token is email-like
+                if (hasEmailLike(tokens[2])) {
+                    // ID, Name, Email, Year Level, Status (student with email)
+                    [student_id, full_name, email, year_level_raw, status] = tokens;
+                } else {
+                    // Shouldn't happen often, but handle gracefully
+                    [student_id, full_name, year_level_raw, email, status] = tokens;
+                    if (!hasEmailLike(email)) {
+                        email = '';
+                        ensureEmail();
+                    }
                 }
             } else if (tokens.length === 3) {
-                console.warn(`Skipping row ${i + 1}: not enough columns.`);
-                continue;
+                // Minimal format: ID, Name, Status (only for officials)
+                if (role === 'official') {
+                    [student_id, full_name, status] = tokens;
+                    ensureEmail();
+                } else {
+                    console.warn(`Skipping row ${i + 1}: not enough columns for student.`);
+                    continue;
+                }
             } else {
                 console.warn(`Skipping row ${i + 1}: unexpected number of columns (${tokens.length}).`);
                 continue;
@@ -577,7 +585,7 @@ const UserManagement = () => {
                 console.warn(`Skipping row ${i + 1}: invalid status '${status}' for student: ${full_name}`);
                 continue;
             }
-            // Year level handling: required for students, optional/ignored for staff
+            // Year level handling: required for students, optional/ignored for official
             let year_level = null;
             if (role === 'student') {
                 year_level = year_level_raw ? parseInt(year_level_raw, 10) : null;
@@ -626,6 +634,9 @@ const UserManagement = () => {
                 year_level,
                 role: role || 'student'
             }));
+            
+            // Debug: log what we're sending
+            console.log('Parsed users to create:', studentsToCreate);
 
             const token = await auth.currentUser.getIdToken();
             const response = await fetch(`${process.env.REACT_APP_API_URL}/api/batch-create-users`, {
@@ -640,14 +651,25 @@ const UserManagement = () => {
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || 'Failed to add students.');
+                throw new Error(result.error || 'Failed to add users.');
             }
 
+            // Log results for debugging
+            console.log('Batch add results:', result);
+            
             // Fetch the updated list of users to get the new UIDs and data
             const usersDataFromFirebase = await getAllUsers();
             setUsers(usersDataFromFirebase);
             
-            showToast(`Successfully added ${result.success_count} students. Failures: ${result.failure_count}.`, 'success');
+            // Show detailed result
+            if (result.failure_count > 0 && result.results) {
+                const failures = result.results.filter(r => r.status === 'failed');
+                const failureReasons = failures.map(f => `${f.email}: ${f.reason}`).join('\n');
+                console.error('Failed entries:', failureReasons);
+                showToast(`Added ${result.success_count} users. ${result.failure_count} failed. Check console for details.`, 'warning');
+            } else {
+                showToast(`Successfully added ${result.success_count} users.`, 'success');
+            }
             handleCloseBatchAddModal();
             
         } catch (error) {
@@ -1017,15 +1039,14 @@ const UserManagement = () => {
                                         className="export-modal-date-input"
                                     />
                                     <small style={{color: '#666', fontSize: '12px'}}>
-                                        CSV format: ID, Name, [Email], [Year Level], Status, [Role]
-                                        (Role optional: student | staff). Password auto-generated: GC&#123;hash&#125;&#123;year&#125;
+                                        Same format as manual entry. Password will be auto-generated.
                                     </small>
                                 </div>
                             )}
 
                             <div className="export-modal-date-input-group">
                                 <label htmlFor="studentDataTextarea">
-                                    {uploadMode === 'manual' ? 'Student Data (one per line):' : 'Preview/Edit Data:'}
+                                    {uploadMode === 'manual' ? 'User Data (one per line):' : 'Preview/Edit Data:'}
                                 </label>
                                 <textarea
                                     id="studentDataTextarea"
@@ -1033,7 +1054,7 @@ const UserManagement = () => {
                                     onChange={(e) => setStudentData(e.target.value)}
                                     className="export-modal-date-input"
                                     placeholder={uploadMode === 'manual' 
-                                        ? "Enter user data in CSV format:\n202400001,Bob Wilson,1,active,student\nP.Lopez,Peter Lopez,peter.lopez@gordoncollege.edu.ph,active,staff\n\nFormat: ID, Name, [Email], [Year Level], Status, [Role]\nStatus: active|flagged|banned; Role: student|staff\nPassword auto-generated: GC&#123;hash&#125;&#123;year&#125;"
+                                        ? `STUDENT:\n202400001,Juan Dela Cruz,1,active,student\n\nOFFICIAL:\nP.Lopez,Peter Lopez,peter.lopez@gordoncollege.edu.ph,active,official`
                                         : "CSV data will appear here..."}
                                     rows="8"
                                     style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}
@@ -1251,7 +1272,7 @@ const UserManagement = () => {
                                         <td>{user.year_level}</td>
                                 <td>
                                     <span className={`role-badge ${(user.role || 'student')}`}>
-                                        <i className={`fas ${user.role === 'staff' ? 'fa-briefcase' : 'fa-user-graduate'}`}></i>
+                                        <i className={`fas ${user.role === 'official' ? 'fa-briefcase' : 'fa-user-graduate'}`}></i>
                                         {(user.role || 'student').charAt(0).toUpperCase() + (user.role || 'student').slice(1)}
                                     </span>
                                 </td>

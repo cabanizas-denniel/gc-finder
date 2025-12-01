@@ -24,7 +24,7 @@ export const auth = getAuth(app);
 export const analytics = getAnalytics(app);
 export const storage = getStorage(app);
 
-// Login function
+// Login function for Students
 export const loginWithStudentId = async (studentId, password) => {
   try {
     // Student IDs are not emails, so we need to construct the email.
@@ -37,14 +37,16 @@ export const loginWithStudentId = async (studentId, password) => {
     const studentDoc = await getDoc(studentDocRef);
 
     if (!studentDoc.exists()) {
-      // This case should be rare if auth succeeded, but good for data consistency.
-      throw new Error('Student data not found in Firestore.');
+      // User not found in students collection - could be an official or invalid account
+      await auth.signOut();
+      throw new Error('Invalid student ID or password.');
     }
     
     const studentData = studentDoc.data();
     
     return {
       id: studentDoc.id,
+      userType: 'student',
       ...studentData
     };
   } catch (error) {
@@ -53,7 +55,7 @@ export const loginWithStudentId = async (studentId, password) => {
       throw new Error('Invalid student ID or password.');
     }
     console.error("Login error:", error);
-    throw new Error('An unexpected error occurred. Please try again.');
+    throw new Error(error.message || 'An unexpected error occurred. Please try again.');
   }
 };
 
@@ -181,5 +183,45 @@ export const deleteStudentReportedItem = async (itemId) => {
   } catch (error) {
     console.error("Error deleting student reported item: ", error);
     throw error; 
+  }
+};
+
+// Login function for Officials/Faculty
+export const loginWithOfficialId = async (academicEmail, password) => {
+  try {
+    // Accept full email or just username part
+    // If user enters full email, use it; otherwise append domain
+    let email = academicEmail.trim();
+    if (!email.includes('@')) {
+      email = `${email}@gordoncollege.edu.ph`;
+    }
+    
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    // After successful authentication, get the user's data from Firestore using their UID.
+    const officialDocRef = doc(db, 'officials', user.uid);
+    const officialDoc = await getDoc(officialDocRef);
+
+    if (!officialDoc.exists()) {
+      // User not found in officials collection - could be a student or invalid account
+      await auth.signOut();
+      throw new Error('Invalid Academic Email or password.');
+    }
+    
+    const officialData = officialDoc.data();
+    
+    return {
+      id: officialDoc.id,
+      userType: 'official', // Mark as official for Layout component
+      ...officialData
+    };
+  } catch (error) {
+    // Handle specific auth errors
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      throw new Error('Invalid Academic Email or password.');
+    }
+    console.error("Login error:", error);
+    throw new Error(error.message || 'An unexpected error occurred. Please try again.');
   }
 };

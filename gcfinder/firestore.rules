@@ -16,6 +16,14 @@ service cloud.firestore {
         allow update, delete: if isAdmin() || request.auth.uid == studentId; // Admins or the student themselves.
     }
 
+    // Officials/Faculty can read/write their own documents. Admins can manage all officials.
+    match /officials/{officialId} {
+        allow get: if request.auth != null; // Any authenticated user can get an official doc (for login).
+        allow list: if isAdmin(); // Only admins can list all officials.
+        allow create: if isAdmin(); // Only admins can create officials.
+        allow update, delete: if isAdmin() || request.auth.uid == officialId; // Admins or the official themselves.
+    }
+
     // Items can be created by authenticated users. Only admins can delete/update.
     match /items/{itemId} {
         allow read: if request.auth != null; // Any authenticated user can view items.

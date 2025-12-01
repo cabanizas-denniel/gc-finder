@@ -661,7 +661,7 @@ def batch_create_users():
     if not users_data or not isinstance(users_data, list):
         return jsonify({"error": "Missing or invalid 'users' array in request body"}), 400
 
-    valid_roles = {'student', 'staff'}
+    valid_roles = {'student', 'official'}  # 'official' for faculty/staff
 
     success_count = 0
     failure_count = 0
@@ -674,7 +674,7 @@ def batch_create_users():
                 digits = ''.join([c for c in username if c.isdigit()])
                 hash_part = (digits[-5:] if digits else username[-5:]).rjust(5, '0')
             else:
-                # Staff: try to use last name first
+                # Official: try to use last name first
                 hash_part = ''
                 if full_name_str:
                     parts = full_name_str.strip().split()
@@ -725,7 +725,7 @@ def batch_create_users():
 
         try:
             gen_password = generate_password(email, role, full_name)
-            # Create user in Firebase Authentication with student_id as UID
+            # Create user in Firebase Authentication with student_id/employee_id as UID
             user_record = auth.create_user(
                 uid=student_id,
                 email=email,
@@ -734,23 +734,33 @@ def batch_create_users():
                 email_verified=True
             )
 
-            # Create user document in Firestore with the same UID (student_id)
-            student_doc_ref = db.collection('students').document(student_id)
+            # Determine which collection to use based on role
+            # 'official' goes to 'officials' collection, 'student' goes to 'students'
+            is_official = role == 'official'
+            collection_name = 'officials' if is_official else 'students'
+            
+            # Create user document in Firestore with the same UID
+            user_doc_ref = db.collection(collection_name).document(student_id)
             doc_payload = {
                 'full_name': full_name,
-                'student_id': student_id,
                 'email': email,
                 'status': status,
                 'role': role,
                 'createdAt': firestore.SERVER_TIMESTAMP
             }
-            if role == 'student' and year_level is not None:
-                doc_payload['year_level'] = year_level
+            
+            # Add appropriate ID field based on role
+            if is_official:
+                doc_payload['employee_id'] = student_id
+            else:
+                doc_payload['student_id'] = student_id
+                if year_level is not None:
+                    doc_payload['year_level'] = year_level
 
-            student_doc_ref.set(doc_payload)
+            user_doc_ref.set(doc_payload)
 
             success_count += 1
-            results.append({'email': email, 'status': 'success', 'uid': user_record.uid})
+            results.append({'email': email, 'status': 'success', 'uid': user_record.uid, 'collection': collection_name})
 
         except Exception as e:
             failure_count += 1
@@ -803,6 +813,7 @@ def update_user_role(uid):
 def delete_user():
     """
     Deletes a user from Firebase Auth and their corresponding document from Firestore.
+    Checks both students and officials collections.
     """
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
@@ -815,9 +826,15 @@ def delete_user():
         # Delete user from Firebase Authentication
         auth.delete_user(uid)
         
-        # Delete user document from Firestore
+        # Try to delete from students collection
         student_doc_ref = db.collection('students').document(uid)
-        student_doc_ref.delete()
+        if student_doc_ref.get().exists:
+            student_doc_ref.delete()
+        
+        # Also try to delete from officials collection
+        official_doc_ref = db.collection('officials').document(uid)
+        if official_doc_ref.get().exists:
+            official_doc_ref.delete()
         
         return jsonify({"message": f"Successfully deleted user {uid}"}), 200
 
@@ -1318,23 +1335,21 @@ def export_data_route():
 @app.route('/api/users', methods=['GET'])
 @admin_required
 def get_all_users():
-    """Get all users - Admin only"""
+    """Get all users (students + officials) - Admin only"""
     try:
         logger.info("=== Starting user fetch ===")
         logger.info(f"Database connection: {'Connected' if db else 'Not connected'}")
         
-        users_ref = db.collection('students')
-        logger.info("Getting students collection reference...")
-        
-        users_snapshot = users_ref.stream()
-        logger.info("Streaming documents...")
-        
         users = []
         doc_count = 0
         
-        for doc in users_snapshot:
+        # Fetch students
+        students_ref = db.collection('students')
+        logger.info("Getting students collection reference...")
+        students_snapshot = students_ref.stream()
+        
+        for doc in students_snapshot:
             doc_count += 1
-            logger.info(f"Found document {doc_count}: ID={doc.id}")
             user_data = doc.to_dict()
             users.append({
                 'id': doc.id,
@@ -1354,7 +1369,38 @@ def get_all_users():
                 'createdAt': user_data.get('createdAt')
             })
         
-        logger.info(f"=== Fetch complete: Found {doc_count} documents, processed {len(users)} users ===")
+        logger.info(f"Found {doc_count} students")
+        
+        # Fetch officials
+        officials_ref = db.collection('officials')
+        logger.info("Getting officials collection reference...")
+        officials_snapshot = officials_ref.stream()
+        
+        official_count = 0
+        for doc in officials_snapshot:
+            official_count += 1
+            doc_count += 1
+            user_data = doc.to_dict()
+            users.append({
+                'id': doc.id,
+                'full_name': user_data.get('full_name', user_data.get('name', 'N/A')),
+                'student_id': user_data.get('employee_id'),  # Use employee_id for officials
+                'email': user_data.get('email', f"{user_data.get('employee_id')}@gordoncollege.edu.ph"),
+                'year_level': 'N/A',  # Officials don't have year levels
+                'status': user_data.get('status', 'active'),
+                'role': user_data.get('role', 'official'),
+                'flagReason': user_data.get('flagReason'),
+                'flagDuration': user_data.get('flagDuration'),
+                'flagExpiresAt': user_data.get('flagExpiresAt'),
+                'banReason': user_data.get('banReason'),
+                'banDuration': user_data.get('banDuration'),
+                'banExpiresAt': user_data.get('banExpiresAt'),
+                'profileUrl': user_data.get('profileUrl'),
+                'createdAt': user_data.get('createdAt')
+            })
+        
+        logger.info(f"Found {official_count} officials")
+        logger.info(f"=== Fetch complete: Found {doc_count} total documents, processed {len(users)} users ===")
         return jsonify({'users': users}), 200
     except Exception as e:
         logger.error(f"Error fetching users: {e}", exc_info=True)
@@ -1807,15 +1853,21 @@ def unarchive_lost_item(item_id):
 @app.route('/api/users/<uid>/status', methods=['PUT'])
 @admin_required
 def update_user_status(uid):
-    """Update user status (flag/ban/unban) - Admin only"""
+    """Update user status (flag/ban/unban) - Admin only. Checks both students and officials collections."""
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
     
     status_data = request.get_json()
     
     try:
+        # Check students collection first
         user_ref = db.collection('students').document(uid)
         user_doc = user_ref.get()
+        
+        # If not in students, check officials
+        if not user_doc.exists:
+            user_ref = db.collection('officials').document(uid)
+            user_doc = user_ref.get()
         
         if not user_doc.exists:
             return jsonify({"error": "User not found"}), 404

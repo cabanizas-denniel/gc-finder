@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaIdCard, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaInfoCircle } from 'react-icons/fa';
+import { FaIdCard, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaInfoCircle, FaShieldAlt } from 'react-icons/fa';
 import gcLogo from '../../assets/gc-finder.png';
 import logo from '../../assets/gc-logo.png';
 import { loginWithAdminEmail } from '../../admin-firebase';
@@ -83,7 +83,7 @@ const Login = () => {
   };
 
   return (
-    <div className="login-container">
+    <div className="login-container admin-login">
       {/* Terms and Privacy Policy Modal */}
       {showTermsModal && (
         <div className="terms-modal-overlay">
@@ -135,6 +135,10 @@ const Login = () => {
       {/* Right Section */}
       <div className="login-right-section">
         <form onSubmit={handleLogin}>
+          <div className="admin-badge">
+            <FaShieldAlt className="admin-icon" />
+            <span>Admin Portal</span>
+          </div>
           <h2>Welcome Admin!</h2>
           {error && <div className="error-message">{error}</div>}
           <div className="input-group">

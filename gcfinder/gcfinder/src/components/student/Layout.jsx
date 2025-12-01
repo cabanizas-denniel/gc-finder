@@ -24,6 +24,7 @@ const Layout = () => {
         profilePicture: profilePic,
         status: "active",
         flagReason: null,
+        userType: 'student',
     });
     
     // Handle window resize and sidebar state
@@ -88,7 +89,7 @@ const Layout = () => {
         };
     }, [isProfileDropdownOpen]);
 
-    // Fetch user data from Firebase
+    // Fetch user data from Firebase (supports both students and officials)
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -96,8 +97,9 @@ const Layout = () => {
                 const userData = JSON.parse(localStorage.getItem('userData'));
                 
                 if (userData && userData.id) {
-                    // Fetch the user document from Firestore
-                    const userRef = doc(db, 'students', userData.id);
+                    // Determine which collection to query based on userType
+                    const collectionName = userData.userType === 'official' ? 'officials' : 'students';
+                    const userRef = doc(db, collectionName, userData.id);
                     const userSnap = await getDoc(userRef);
                     
                     if (userSnap.exists()) {
@@ -107,16 +109,22 @@ const Layout = () => {
                         if (data.status === 'banned') {
                             localStorage.removeItem('userData');
                             localStorage.removeItem('isAuthenticated');
-                            navigate('/');
+                            // Redirect to appropriate login page
+                            navigate(userData.userType === 'official' ? '/official' : '/');
                             return;
                         }
                         
+                        // Handle different ID field names for students vs officials
+                        const idField = userData.userType === 'official' ? data.employee_id : data.student_id;
+                        const emailFallback = `${idField}@gordoncollege.edu.ph`;
+                        
                         setCurrentUser({
-                            displayName: data.full_name || "Unknown User",
-                            userEmail: data.email || `${data.student_id}@gordoncollege.edu.ph`,
+                            displayName: data.full_name || data.name || "Unknown User",
+                            userEmail: data.email || emailFallback,
                             profilePicture: data.profileUrl || profilePic,
                             status: data.status || "active",
                             flagReason: data.flagReason || null,
+                            userType: userData.userType || 'student',
                         });
                     }
                 } else {
@@ -168,10 +176,16 @@ const Layout = () => {
 
     // Logout handler
     const handleLogout = useCallback(() => {
+        // Get userType before clearing data to redirect to correct login
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        const isOfficial = userData.userType === 'official';
+        
         // Clear user data from localStorage
         localStorage.removeItem('userData');
         localStorage.removeItem('isAuthenticated');
-        navigate('/');
+        
+        // Redirect to appropriate login page
+        navigate(isOfficial ? '/official' : '/');
     }, [navigate]);
 
     // Toggle sidebar

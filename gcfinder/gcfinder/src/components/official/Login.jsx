@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaIdCard, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaInfoCircle, FaUserGraduate } from 'react-icons/fa';
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaCheckCircle, FaInfoCircle, FaUserTie } from 'react-icons/fa';
 import gcLogo from '../../assets/gc-finder.png';
 import logo from '../../assets/gc-logo.png';
-import { loginWithStudentId } from '../../firebase';
+import { loginWithOfficialId } from '../../firebase';
 import { updateUserStatus } from '../../admin-firebase';
 
-const Login = () => {
-  const [studentId, setStudentId] = useState('');
+const OfficialLogin = () => {
+  const [academicEmail, setAcademicEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ const Login = () => {
 
   // Check if terms have been accepted before
   useEffect(() => {
-    const hasAcceptedTerms = localStorage.getItem('termsAccepted');
+    const hasAcceptedTerms = localStorage.getItem('officialTermsAccepted');
     if (hasAcceptedTerms === 'true') {
       setTermsAccepted(true);
       setShowTermsModal(false);
@@ -41,9 +41,8 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    if (!studentId || !password) {
-      setError('Please enter both Student ID and password');
-      // Clear error message after 3 seconds
+    if (!academicEmail || !password) {
+      setError('Please enter both Academic Email and password');
       setTimeout(() => {
         setError('');
       }, 3000);
@@ -52,18 +51,16 @@ const Login = () => {
     }
 
     try {
-      const userData = await loginWithStudentId(studentId, password);
+      const userData = await loginWithOfficialId(academicEmail, password);
       
       // Check if user is flagged
       if (userData.status === 'flagged') {
         const flagExpiresAt = userData.flagExpiresAt;
         
-        // Check if flag has expired
         if (flagExpiresAt) {
           const expiryDate = flagExpiresAt.toDate ? flagExpiresAt.toDate() : new Date(flagExpiresAt);
           const now = new Date();
           if (expiryDate <= now) {
-            // Flag has expired, update status to active
             updateUserStatus(userData.id, { status: 'active' }).catch(error => {
               console.error('Failed to update expired flag status:', error);
             });
@@ -76,18 +73,14 @@ const Login = () => {
         const banDuration = userData.banDuration || 'permanent';
         const banExpiresAt = userData.banExpiresAt;
         
-        // Check if ban has expired
         if (banDuration !== 'permanent' && banExpiresAt) {
           const expiryDate = banExpiresAt.toDate ? banExpiresAt.toDate() : new Date(banExpiresAt);
           const now = new Date();
           if (expiryDate <= now) {
-            // Ban has expired, allow login to proceed normally
-            // Update user status to 'active' in database
             updateUserStatus(userData.id, { status: 'active' }).catch(error => {
               console.error('Failed to update expired ban status:', error);
             });
           } else {
-            // Ban is still active
             const banReason = userData.banReason || 'No specific reason provided';
             const durationMap = {
               '1day': '1 day',
@@ -103,7 +96,6 @@ const Login = () => {
             return;
           }
         } else {
-          // Permanent ban
           const banReason = userData.banReason || 'No specific reason provided';
           setError(`Account Banned\n\nReason: ${banReason}\n\nThis is a permanent ban.\n\nContact the Disciplinary Office (Room 122) to resolve this issue.`);
           setLoading(false);
@@ -111,11 +103,12 @@ const Login = () => {
         }
       }
       
-      // Store user data in localStorage with proper shape for our context
+      // Store user data in localStorage with proper shape
       const enhancedUserData = {
         ...userData,
-        displayName: userData.full_name || "User",
-        userEmail: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
+        userType: 'official', // Important: Mark as official
+        displayName: userData.full_name || userData.name || "Official",
+        userEmail: userData.email || `${userData.employee_id}@gordoncollege.edu.ph`,
         profilePicture: userData.profileUrl || null,
       };
       
@@ -126,7 +119,6 @@ const Login = () => {
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'An error occurred during login. Please try again.');
-      // Clear error message after 3 seconds
       setTimeout(() => {
         setError('');
       }, 3000);
@@ -139,21 +131,20 @@ const Login = () => {
     setShowPassword(!showPassword);
   };
 
-  const handleStudentIdChange = (e) => {
-    // Only allow numbers in Student ID
-    const value = e.target.value.replace(/[^0-9]/g, '');
-    setStudentId(value);
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setAcademicEmail(value);
     setError('');
   };
 
   const acceptTerms = () => {
     setTermsAccepted(true);
     setShowTermsModal(false);
-    localStorage.setItem('termsAccepted', 'true');
+    localStorage.setItem('officialTermsAccepted', 'true');
   };
 
   return (
-    <div className="login-container student-login">
+    <div className="login-container official-login">
       {/* Terms and Privacy Policy Modal */}
       {showTermsModal && (
         <div className="terms-modal-overlay">
@@ -175,11 +166,10 @@ const Login = () => {
               <h3>Privacy Policy</h3>
               <p>At GC Finder, we are committed to protecting your privacy:</p>
               <ul>
-                <li>We collect your student information solely for the purpose of facilitating the lost and found process.</li>
+                <li>We collect your information solely for the purpose of facilitating the lost and found process.</li>
                 <li>Your personal information will never be shared with third parties outside Gordon College.</li>
                 <li>Item reports and claims will be stored for record-keeping purposes.</li>
                 <li>We use cookies and local storage to improve your experience and maintain your session.</li>
-                <li>You have the right to request deletion of your data upon withdrawal or graduation.</li>
               </ul>
             </div>
             <div className="terms-footer">
@@ -205,21 +195,19 @@ const Login = () => {
       {/* Right Section */}
       <div className="login-right-section">
         <form onSubmit={handleLogin}>
-          <div className="student-badge">
-            <FaUserGraduate className="student-icon" />
-            <span>Student Portal</span>
+          <div className="official-badge">
+            <FaUserTie className="official-icon" />
+            <span>Faculty / Staff Portal</span>
           </div>
-          <h2>Welcome Students!</h2>
+          <h2>Welcome Officials!</h2>
           {error && <div className="error-message">{error}</div>}
           <div className="input-group">
-            <FaIdCard className="input-icon" />
+            <FaEnvelope className="input-icon" />
             <input
               type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Student ID"
-              value={studentId}
-              onChange={handleStudentIdChange}
+              placeholder="Academic Email"
+              value={academicEmail}
+              onChange={handleEmailChange}
               disabled={loading}
             />
           </div>
@@ -246,11 +234,12 @@ const Login = () => {
           </button>
         </form>
         <p className="terms-link">
-            By signing in, you agree to our <button type="button" className="text-button" onClick={() => setShowTermsModal(true)}>Terms & Privacy Policy</button>
-          </p>
+          By signing in, you agree to our <button type="button" className="text-button" onClick={() => setShowTermsModal(true)}>Terms & Privacy Policy</button>
+        </p>
       </div>
     </div>
   );
 };
 
-export default Login; 
+export default OfficialLogin;
+

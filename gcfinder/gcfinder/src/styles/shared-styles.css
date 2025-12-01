@@ -541,6 +541,93 @@ header {
     margin-bottom: 10px;
 }
 
+/* Student Login Badge */
+.student-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--hovered-button-color) 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(4, 149, 22, 0.3);
+}
+
+.student-badge .student-icon {
+    font-size: 16px;
+}
+
+/* Official/Faculty Login Badge */
+.official-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(26, 82, 118, 0.3);
+}
+
+.official-badge .official-icon {
+    font-size: 16px;
+}
+
+.official-login .login-left-section {
+    background: linear-gradient(135deg, #1a5276 0%, #154360 100%);
+}
+
+/* Admin Login Badge */
+.admin-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(142, 68, 173, 0.3);
+}
+
+.admin-badge .admin-icon {
+    font-size: 16px;
+}
+
+.admin-login .login-left-section {
+    background: linear-gradient(135deg, #8e44ad 0%, #7b3a9e 100%);
+}
+
+/* Login Switch Link */
+.login-switch {
+    margin-top: 15px;
+    font-size: 14px;
+    color: #666;
+}
+
+.login-switch a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.login-switch a:hover {
+    color: var(--hovered-button-color);
+    text-decoration: underline;
+}
+
 /*==== Submitted by you ====*/
 .user-submitted-indicator {
     position: absolute;

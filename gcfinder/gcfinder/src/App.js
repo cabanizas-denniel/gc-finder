@@ -15,6 +15,8 @@ import LostRequests from './components/student/LostRequests';
 import LostItems from './components/student/LostItems';
 import NotFound from './components/student/NotFound';
 import Layout from './components/student/Layout';
+// Official/Faculty imports (shares components with students)
+import OfficialLogin from './components/official/Login';
 // Admin imports
 import AdminLogin from './components/admin/Login';
 import AdminDashboard from './components/admin/Dashboard';
@@ -109,6 +111,8 @@ function App() {
                 <Routes>
                 {/* Student Routes */}
                 <Route path="/" element={<Login />} />
+                {/* Official/Faculty Login - shares student components */}
+                <Route path="/official" element={<OfficialLogin />} />
                 <Route element={<Layout />}>
                     <Route
                         path="/dashboard"
