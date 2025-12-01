@@ -1461,3 +1461,133 @@ input:checked + .slider:before {
     background-color: white;
     color: #333;
 }
+
+/* ======= LOST REQUESTS MOBILE RESPONSIVE ======= */
+/* Mobile table wrapper - use this class on table containers for horizontal scroll */
+.mobile-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+    /* Stack the form grid on mobile */
+    .lost-request-form .form-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+    
+    /* Ensure lost requests list doesn't overflow */
+    .lost-requests-list {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Make table horizontally scrollable on mobile */
+    .lost-requests-list .users-table {
+        min-width: 500px;
+        display: table;
+    }
+    
+    /* Reduce padding for mobile */
+    .lost-request-form {
+        padding: 12px;
+    }
+    
+    .lost-requests-list {
+        padding: 12px;
+    }
+    
+    /* Adjust header spacing */
+    .lost-requests-header h1 {
+        font-size: 24px;
+    }
+    
+    /* Filter dropdown full width on mobile */
+    .lost-requests-list .export-modal-date-input {
+        max-width: 100% !important;
+    }
+    
+    /* Prevent container overflow */
+    .lost-requests-container {
+        overflow-x: hidden;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Further reduce sizing for small screens */
+    .lost-request-form {
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .lost-requests-list {
+        padding: 10px;
+    }
+    
+    .lost-requests-header h1 {
+        font-size: 20px;
+    }
+    
+    .admin-subtitle {
+        font-size: 0.85rem;
+        margin-bottom: 15px;
+    }
+    
+    /* Smaller badges on mobile */
+    .lost-requests-list .date-badge,
+    .lost-requests-list .location-badge-lost {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+    }
+    
+    /* Make badges wrap properly */
+    .lost-requests-list .users-table td {
+        white-space: nowrap;
+    }
+    
+    /* Image upload area smaller on mobile */
+    .lr-image-upload-area {
+        padding: 25px 15px;
+    }
+    
+    .lr-upload-icon {
+        font-size: 2rem;
+    }
+    
+    .lr-upload-main-text {
+        font-size: 0.9rem;
+    }
+    
+    .lr-upload-sub-text {
+        font-size: 0.75rem;
+    }
+    
+    /* Smaller preview image on mobile */
+    .lr-image-preview img {
+        width: 150px;
+        height: 150px;
+    }
+    
+    /* Table header adjustments */
+    .lost-requests-list h2 {
+        font-size: 1rem;
+    }
+    
+    /* Stack header and filter on mobile */
+    .lost-requests-list > div:first-child {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 10px;
+    }
+    
+    .lost-requests-list .export-modal-date-input {
+        width: 100%;
+    }
+    
+    /* Reduce main container padding on mobile */
+    .lost-requests-container {
+        padding: 10px !important;
+    }
+}

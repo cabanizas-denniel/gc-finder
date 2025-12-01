@@ -2410,10 +2410,26 @@ header {
 }
 
 .thread-actions {
-    margin-top: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed #e0e0e0;
     display: flex;
-    justify-content: flex-end;
-    gap: 5px;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Thread action prompt text */
+.thread-actions-prompt {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Contact button container for better alignment */
+.thread-actions-btn-wrapper {
+    display: flex;
     align-items: center;
 }
 
@@ -2422,25 +2438,126 @@ header {
     background-color: var(--primary-color);
     color: white;
     border: none;
-    border-radius: 8px;
-    padding: 10px 16px;
+    border-radius: 25px;
+    padding: 10px 20px;
     cursor: pointer;
-    font-weight: 500;
-    font-size: 14px;
-    transition: background-color 0.2s ease, transform 0.05s ease;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(4, 81, 149, 0.25);
+}
+
+.claim i {
+    font-size: 0.85rem;
 }
 
 .claim:hover {
     background-color: var(--hovered-button-color);
+    box-shadow: 0 4px 12px rgba(4, 81, 149, 0.35);
+    transform: translateY(-1px);
 }
 
 .claim:active {
-    transform: translateY(1px);
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(4, 81, 149, 0.2);
 }
 
 .claim:disabled {
     opacity: 0.65;
     cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* ======= Lost Items Thread Mobile Responsive ======= */
+@media (max-width: 768px) {
+    .forum-thread {
+        padding: 14px;
+    }
+    
+    .thread-row {
+        gap: 12px;
+    }
+    
+    .thread-thumb {
+        width: 64px;
+        min-width: 64px;
+    }
+    
+    .thread-thumb img,
+    .thread-thumb-placeholder {
+        width: 64px;
+        height: 64px;
+    }
+    
+    .thread-title-row h3 {
+        font-size: 1rem;
+    }
+    
+    .thread-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding-top: 14px;
+    }
+    
+    .thread-actions-prompt {
+        text-align: center;
+        font-size: 0.85rem;
+    }
+    
+    .claim {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .forum-thread {
+        padding: 12px;
+    }
+    
+    .thread-row {
+        gap: 10px;
+    }
+    
+    .thread-thumb {
+        width: 56px;
+        min-width: 56px;
+    }
+    
+    .thread-thumb img,
+    .thread-thumb-placeholder {
+        width: 56px;
+        height: 56px;
+    }
+    
+    .thread-title-row h3 {
+        font-size: 0.95rem;
+    }
+    
+    .thread-role-badge {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+    
+    .thread-meta {
+        font-size: 12px;
+        gap: 8px;
+    }
+    
+    .thread-description {
+        font-size: 0.9rem;
+        margin-top: 8px;
+    }
+    
+    .claim {
+        font-size: 0.85rem;
+        padding: 11px 16px;
+    }
 }
 
 /* ======= Thread Credentials (Admin Lost Items) ======= */

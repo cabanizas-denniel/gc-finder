@@ -80,57 +80,59 @@ const AdminLostRequests = () => {
                         <p>Try adjusting the filter</p>
                     </div>
                 ) : (
-                    <table className="users-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Date Lost</th>
-                                <th>Location</th>
-                                <th>Role</th>
-                                <th>Requester</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {requests.map((r) => (
-                                <tr key={r.id}>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <img src={r.imageUrl} alt={r.itemName} style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #eee' }} />
-                                                <div>
-                                                    <div className="user-name">{r.itemName}</div>
-                                                </div>
-                                        </div>
-                                    </td>
-                                    <td><span className="date-badge"><i className="fas fa-calendar"></i> {r.dateLost}</span></td>
-                                    <td><span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {r.locationLost}</span></td>
-                                    <td><span className={`role-badge ${r.requesterRole || 'student'}`}>{(r.requesterRole || 'student').charAt(0).toUpperCase() + (r.requesterRole || 'student').slice(1)}</span></td>
-                                    <td>
-                                        <div style={{display:'flex', flexDirection:'column'}}>
-                                            <span className="user-name" style={{fontWeight:600}}>{r.requesterName || 'N/A'}</span>
-                                            <span style={{color:'#666', fontSize:12}}>{r.requesterEmail || 'N/A'}</span>
-                                        </div>
-                                    </td>
-                                    <td><span className={`user-status-badge ${r.status}`}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
-                                    <td className="actions">
-                                        {r.status === 'pending' ? (
-                                            <>
-                                                <button className="action-btn view" title="Approve" onClick={() => handleApprove(r.id)}>
-                                                    <i className="fas fa-check"></i>
-                                                </button>
-                                                <button className="action-btn ban" title="Reject" onClick={() => setRejectingId(r.id)}>
-                                                    <i className="fas fa-times"></i>
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <span style={{ color: '#666', fontSize: 12 }}>No actions</span>
-                                        )}
-                                    </td>
+                    <div className="mobile-table-wrapper">
+                        <table className="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Date Lost</th>
+                                    <th>Location</th>
+                                    <th>Role</th>
+                                    <th>Requester</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {requests.map((r) => (
+                                    <tr key={r.id}>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <img src={r.imageUrl} alt={r.itemName} style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #eee' }} />
+                                                    <div>
+                                                        <div className="user-name">{r.itemName}</div>
+                                                    </div>
+                                            </div>
+                                        </td>
+                                        <td><span className="date-badge"><i className="fas fa-calendar"></i> {r.dateLost}</span></td>
+                                        <td><span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {r.locationLost}</span></td>
+                                        <td><span className={`role-badge ${r.requesterRole || 'student'}`}>{(r.requesterRole || 'student').charAt(0).toUpperCase() + (r.requesterRole || 'student').slice(1)}</span></td>
+                                        <td>
+                                            <div style={{display:'flex', flexDirection:'column'}}>
+                                                <span className="user-name" style={{fontWeight:600}}>{r.requesterName || 'N/A'}</span>
+                                                <span style={{color:'#666', fontSize:12}}>{r.requesterEmail || 'N/A'}</span>
+                                            </div>
+                                        </td>
+                                        <td><span className={`user-status-badge ${r.status}`}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
+                                        <td className="actions">
+                                            {r.status === 'pending' ? (
+                                                <>
+                                                    <button className="action-btn view" title="Approve" onClick={() => handleApprove(r.id)}>
+                                                        <i className="fas fa-check"></i>
+                                                    </button>
+                                                    <button className="action-btn ban" title="Reject" onClick={() => setRejectingId(r.id)}>
+                                                        <i className="fas fa-times"></i>
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <span style={{ color: '#666', fontSize: 12 }}>No actions</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 

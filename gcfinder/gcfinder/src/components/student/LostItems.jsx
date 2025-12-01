@@ -204,16 +204,18 @@ const LostItems = () => {
                                         <div className="thread-description">
                                             {it.description || 'No description provided.'}
                                         </div>
-                                        {!(it?.isOwner === true) && !(it?.requesterEmail && currentEmail && String(it.requesterEmail).toLowerCase() === String(currentEmail).toLowerCase()) && (
-                                            <div className="thread-actions">
-                                                Think you found this? 
-                                                <button className="claim" onClick={() => handleContactAdmin(it)}>
-                                                <i className="fas fa-phone"></i> Contact the Disciplinary Office
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
+                                {!(it?.isOwner === true) && !(it?.requesterEmail && currentEmail && String(it.requesterEmail).toLowerCase() === String(currentEmail).toLowerCase()) && (
+                                    <div className="thread-actions">
+                                        <span className="thread-actions-prompt">Think you found this?</span>
+                                        <div className="thread-actions-btn-wrapper">
+                                            <button className="claim" onClick={() => handleContactAdmin(it)}>
+                                                <i className="fas fa-phone"></i> Contact the Disciplinary Office
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}

@@ -6,7 +6,6 @@ import ItemsList from './ItemsList';
 
 
 const Dashboard = () => {
-    console.log("Dashboard component is rendering");
     const navigate = useNavigate();
     
     // Get current user status

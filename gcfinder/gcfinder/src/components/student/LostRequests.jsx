@@ -17,6 +17,7 @@ const LostRequests = () => {
     const [requests, setRequests] = useState([]);
     const [filterStatus, setFilterStatus] = useState('');
     const [showReminder, setShowReminder] = useState(false);
+    const [loadingRequests, setLoadingRequests] = useState(true);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -97,10 +98,13 @@ const LostRequests = () => {
 
     const fetchRequests = async () => {
         try {
+            setLoadingRequests(true);
             const data = await getLostRequests(filterStatus || undefined);
             setRequests(data);
         } catch (e) {
-            console.error(e);
+            console.error('Error fetching lost requests:', e);
+        } finally {
+            setLoadingRequests(false);
         }
     };
 
@@ -201,33 +205,40 @@ const LostRequests = () => {
                         <option value="rejected">Rejected</option>
                     </select>
                 </div>
-                {requests.length === 0 ? (
+                {loadingRequests ? (
+                    <div className="loading-message" style={{ textAlign: 'center', padding: '40px 20px' }}>
+                        <i className="fas fa-spinner fa-pulse" style={{ fontSize: '2rem', color: 'var(--primary-color)', marginBottom: '15px' }}></i>
+                        <p style={{ color: '#666', margin: 0 }}>Loading your requests...</p>
+                    </div>
+                ) : requests.length === 0 ? (
                     <div className="no-results">
                         <i className="fas fa-search"></i>
                         <h3>No requests found</h3>
                         <p>Try a different filter</p>
                     </div>
                 ) : (
-                    <table className="users-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Date Lost</th>
-                                <th>Location</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {requests.map((r) => (
-                                <tr key={r.id}>
-                                    <td>{r.itemName}</td>
-                                    <td><span className="date-badge"><i className="fas fa-calendar"></i> {r.dateLost}</span></td>
-                                    <td><span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {r.locationLost}</span></td>
-                                    <td><span className={`user-status-badge ${r.status}`}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
+                    <div className="mobile-table-wrapper">
+                        <table className="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Date Lost</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {requests.map((r) => (
+                                    <tr key={r.id}>
+                                        <td>{r.itemName}</td>
+                                        <td><span className="date-badge"><i className="fas fa-calendar"></i> {r.dateLost}</span></td>
+                                        <td><span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {r.locationLost}</span></td>
+                                        <td><span className={`user-status-badge ${r.status}`}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 

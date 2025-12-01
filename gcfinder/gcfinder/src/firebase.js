@@ -4,16 +4,17 @@ import { getFirestore, collection, query, where, getDocs, addDoc, serverTimestam
 import { getAnalytics } from 'firebase/analytics';
 import { getStorage } from 'firebase/storage';
 
-// Your web app's Firebase configuration
+// Firebase configuration from environment variables
+// These values are loaded from .env file (see .env.example for template)
 const firebaseConfig = {
-  apiKey: "AIzaSyCyCN4ur2Z0kwZzbc1V1XVMGDnV2kvLNfk",
-  authDomain: "gcfinder-database.firebaseapp.com",
-  databaseURL: "https://gcfinder-database-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "gcfinder-database",
-  storageBucket: "gcfinder-database.appspot.com",
-  messagingSenderId: "864225449977",
-  appId: "1:864225449977:web:d7f60ab7074d00be7c8f28",
-  measurementId: "G-VSEJBNE3BH"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.REACT_APP_FIREBASE_DATABASE_URL,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase

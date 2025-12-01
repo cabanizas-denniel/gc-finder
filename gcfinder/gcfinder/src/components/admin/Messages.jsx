@@ -29,7 +29,6 @@ const Messages = () => {
     // Get current user from localStorage
     useEffect(() => {
         const userData = JSON.parse(localStorage.getItem('userData'));
-        console.log('Admin userData from localStorage:', userData);
         if (userData) {
             const user = {
                 id: userData.id, // Use the Auth UID from userData
@@ -37,10 +36,8 @@ const Messages = () => {
                 email: userData.email,
                 type: 'admin'
             };
-            console.log('Setting admin currentUser:', user);
             setCurrentUser(user);
         } else {
-            console.log('No userData found in localStorage');
             setLoading(false); // Stop loading if no user data
         }
     }, []);
@@ -68,7 +65,6 @@ const Messages = () => {
         
         // Set a timeout to ensure loading doesn't get stuck
         const loadingTimeout = setTimeout(() => {
-            console.log('Loading timeout reached, setting loading to false');
             setLoading(false);
         }, 10000); // 10 seconds timeout
         
@@ -78,7 +74,6 @@ const Messages = () => {
                 currentUser.id, 
                 true, // is admin
                 (conversationsData) => {
-                    console.log('Admin conversations received:', conversationsData);
                     clearTimeout(loadingTimeout);
                     setConversations(conversationsData);
                     setLoading(false);

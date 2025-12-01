@@ -24,7 +24,6 @@ const Messages = () => {
     // Get current user from localStorage
     useEffect(() => {
         const userData = JSON.parse(localStorage.getItem('userData'));
-        console.log('Student userData from localStorage:', userData);
         if (userData) {
             const user = {
                 id: userData.id, // Use the Auth UID (document ID from Firestore)
@@ -32,10 +31,8 @@ const Messages = () => {
                 email: userData.email || `${userData.student_id}@gordoncollege.edu.ph`,
                 type: 'student'
             };
-            console.log('Setting student currentUser:', user);
             setCurrentUser(user);
         } else {
-            console.log('No userData found in localStorage');
             setLoading(false); // Stop loading if no user data
         }
     }, []);
@@ -63,7 +60,6 @@ const Messages = () => {
         
         // Set a timeout to ensure loading doesn't get stuck
         const loadingTimeout = setTimeout(() => {
-            console.log('Loading timeout reached, setting loading to false');
             setLoading(false);
         }, 10000); // 10 seconds timeout
         
@@ -73,7 +69,6 @@ const Messages = () => {
                 currentUser.id, 
                 false, // not admin
                 (conversationsData) => {
-                    console.log('Student conversations received:', conversationsData);
                     clearTimeout(loadingTimeout);
                     setConversations(conversationsData);
                     setLoading(false);
@@ -192,22 +187,13 @@ const Messages = () => {
 
     // Handle sending a message
     const sendMessage = useCallback(async () => {
-        console.log('sendMessage called', { messageInput, currentUser, activeConversation });
-        
         if ((!messageInput.trim() && !selectedImage) || !currentUser) {
-            console.log('Message send blocked:', { 
-                hasMessage: !!messageInput.trim(), 
-                hasImage: !!selectedImage, 
-                hasUser: !!currentUser 
-            });
             return;
         }
         
         let conversationId = activeConversation?.id;
         if (!conversationId) {
-            console.log('No active conversation, creating one...');
             conversationId = await createConversationWithAdmin();
-            console.log('Created conversation ID:', conversationId);
             if (!conversationId) {
                 console.error('Failed to create conversation');
                 alert('Failed to create conversation. Try logging back in again.');
@@ -228,9 +214,7 @@ const Messages = () => {
                 if (!messageText) messageText = '[Image]';
             }
             
-            console.log('Sending message...', { conversationId, senderId: currentUser.id, messageText });
             await messageService.sendMessage(conversationId, currentUser.id, currentUser.name, messageText, false, imageData);
-            console.log('Message sent successfully');
             setMessageInput('');
             clearSelectedImage();
             messageInputRef.current?.focus();

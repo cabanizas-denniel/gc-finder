@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllItems, deleteItemFromDb, archiveItemInDb, unarchiveItemInDb } from '../../admin-firebase';
+import { getAllItems, deleteItemFromDb, archiveItemInDb, unarchiveItemInDb, deleteAllArchivedItems, auth } from '../../admin-firebase';
 import { AdminViewItemDetailsModal } from './ItemsLIst'; // Import the shared modal
 import Toast, { useToast } from '../Toast';
 
@@ -265,6 +265,31 @@ const ItemManagement = () => {
         });
     };
 
+    const handleDeleteAllArchived = async () => {
+        const archivedCount = getTabCount('archived');
+        if (archivedCount === 0) {
+            showToast('No archived items to delete.', 'info');
+            return;
+        }
+        
+        openConfirmModal({
+            title: 'Delete All Archived Items',
+            message: `Are you sure you want to permanently delete all ${archivedCount} archived items? This action cannot be undone.`,
+            confirmText: 'Delete All',
+            type: 'danger',
+            confirmAction: async () => {
+                try {
+                    const result = await deleteAllArchivedItems();
+                    showToast(`Successfully deleted ${result.deleted_count} archived items!`, 'success');
+                    fetchItems();
+                } catch (error) {
+                    console.error("Error deleting all archived items: ", error);
+                    showToast('Failed to delete archived items. See console for details.', 'error');
+                }
+            }
+        });
+    };
+
     const getTabCount = (status) => {
         return items.filter(item => item.status === status && item.adminApproval === true).length;
     };
@@ -301,10 +326,14 @@ const ItemManagement = () => {
         }
 
         try {
+            // Get the authentication token
+            const token = await auth.currentUser.getIdToken();
+            
             const response = await fetch(`${apiUrl}/api/export?type=items&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
                 method: 'GET',
                 headers: {
-                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Authorization': `Bearer ${token}`
                 }
             });
             
@@ -535,6 +564,17 @@ const ItemManagement = () => {
                             <i className="fas fa-archive"></i> Archived
                             <span className="item-count">{getTabCount('archived')}</span>
                         </button>
+                        
+                        {/* Delete All Archived Button - Only visible when archived tab is active */}
+                        {activeTab === 'archived' && getTabCount('archived') > 0 && (
+                            <button 
+                                className="delete-all-archived-btn"
+                                onClick={handleDeleteAllArchived}
+                                title="Permanently delete all archived items"
+                            >
+                                <i className="fas fa-trash-alt"></i> Delete All Archived
+                            </button>
+                        )}
                     </div>
 
                     <div className="search-bar">

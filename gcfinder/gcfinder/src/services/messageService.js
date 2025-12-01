@@ -24,11 +24,9 @@ class MessageService {
     // Test Firebase connection
     async testFirebaseConnection() {
         try {
-            console.log('Testing Firebase connection...');
             const testRef = collection(db, 'conversations');
             const testQuery = query(testRef, limit(1));
             await getDocs(testQuery);
-            console.log('Firebase connection successful');
         } catch (error) {
             console.error('Firebase connection failed:', error);
         }
@@ -70,9 +68,6 @@ class MessageService {
                     lastMessageTime: serverTimestamp(),
                     unreadCount: {}
                 });
-                console.log('Created new conversation:', conversationId);
-            } else {
-                console.log('Found existing conversation:', conversationId);
             }
 
             return conversationId;
@@ -133,18 +128,14 @@ class MessageService {
 
     // Get conversations for a user - SIMPLE VERSION (no extra reads)
     getConversations(userId, isAdmin, callback) {
-        console.log(`Getting conversations for ${isAdmin ? 'admin' : 'student'} ${userId}`);
-        
         try {
             let q;
             
             if (isAdmin) {
                 // Admin can see all conversations
-                console.log('Setting up admin conversations query');
                 q = query(collection(db, 'conversations'));
             } else {
                 // Students can only see conversations they're part of
-                console.log('Setting up student conversations query for:', userId);
                 q = query(
                     collection(db, 'conversations'),
                     where('participants', 'array-contains', userId)
@@ -153,12 +144,10 @@ class MessageService {
 
             const unsubscribe = onSnapshot(q, async (snapshot) => {
                 try {
-                    console.log(`Received snapshot with ${snapshot.docs.length} documents`);
                     const conversations = [];
                     
                     for (const doc of snapshot.docs) {
                         const data = doc.data();
-                        console.log('Processing conversation:', doc.id, data);
                         
                         // Get participant info
                         let otherParticipant = null;
@@ -167,7 +156,6 @@ class MessageService {
                             const studentId = data.participants.find(p => p !== 'admin');
                             if (studentId) {
                                 otherParticipant = await this.getUserInfo(studentId, false);
-                                console.log('Found student participant for admin:', otherParticipant);
                             }
                         } else {
                             // For students, always show "Disciplinary Office"
@@ -198,7 +186,6 @@ class MessageService {
                         return timeB - timeA;
                     });
                     
-                    console.log(`Fetched ${conversations.length} conversations for ${isAdmin ? 'admin' : 'student'} ${userId}`);
                     callback(conversations);
                 } catch (error) {
                     console.error('Error processing conversations snapshot:', error);

@@ -1215,6 +1215,49 @@ h2{
     background: #f0f0f0;
     color: #666;
 }
+
+/* Delete All Archived Button */
+.delete-all-archived-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: auto;
+}
+
+.delete-all-archived-btn:hover {
+    background-color: #c82333;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+.delete-all-archived-btn:active {
+    transform: translateY(0);
+}
+
+.delete-all-archived-btn i {
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .delete-all-archived-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .delete-all-archived-btn span {
+        display: none;
+    }
+}
+
 /* Items Table */
 .items-table-container {
     background: white;
@@ -2461,8 +2504,21 @@ h2{
     font-size: 14px;
 }
 
+/* Mobile table wrapper - use this class on table containers for horizontal scroll */
+.mobile-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
+    
+    /* Mobile table minimum width */
+    .mobile-table-wrapper .users-table,
+    .mobile-table-wrapper .items-table {
+        min-width: 600px;
+    }
     
     /*Main Page*/
     .burger-menu {

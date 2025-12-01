@@ -402,10 +402,14 @@ const UserManagement = () => {
         }
     
         try {
+            // Get authentication token for secure export
+            const token = await auth.currentUser.getIdToken();
+            
             const response = await fetch(`${apiUrl}/api/export?type=users&startDate=${finalStartDate}&endDate=${finalEndDate}`, {
                 method: 'GET',
                 headers: {
-                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Authorization': `Bearer ${token}`
                 }
             });
     

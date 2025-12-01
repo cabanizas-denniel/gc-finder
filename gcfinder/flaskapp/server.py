@@ -9,7 +9,7 @@ from io import BytesIO
 import pandas as pd
 from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import requests
 from PIL import Image
@@ -203,6 +203,7 @@ def get_local_image_embedding(image_input):
 
 def try_classification_as_features(image_bytes):
     """Use ResNet for classification and extract feature-like scores"""
+    global HF_AVAILABLE
     try:
         # Skip if remote inference disabled
         if not HF_AVAILABLE:
@@ -251,7 +252,6 @@ def try_classification_as_features(image_bytes):
             logger.warning(f"ResNet classification failed: {response.status_code} - {response.text[:200]}")
             if response.status_code == 410:
                 # Permanently disable remote inference for this process to avoid repeated 410s
-                global HF_AVAILABLE
                 HF_AVAILABLE = False
             
     except requests.exceptions.Timeout:
@@ -265,6 +265,7 @@ def try_classification_as_features(image_bytes):
 
 def try_sentence_transformers_clip(image_bytes):
     """Try using sentence-transformers CLIP model"""
+    global HF_AVAILABLE
     try:
         # Skip if remote inference disabled
         if not HF_AVAILABLE:
@@ -291,7 +292,6 @@ def try_sentence_transformers_clip(image_bytes):
         else:
             logger.warning(f"Sentence-transformers CLIP failed: {response.status_code}")
             if response.status_code == 410:
-                global HF_AVAILABLE
                 HF_AVAILABLE = False
             
     except Exception as e:
@@ -301,6 +301,7 @@ def try_sentence_transformers_clip(image_bytes):
 
 def try_openai_clip_feature_extraction(image_bytes):
     """Try using OpenAI CLIP model for feature extraction"""
+    global HF_AVAILABLE
     try:
         # Skip if remote inference disabled
         if not HF_AVAILABLE:
@@ -331,7 +332,6 @@ def try_openai_clip_feature_extraction(image_bytes):
         else:
             logger.warning(f"OpenAI CLIP feature extraction failed: {response.status_code}")
             if response.status_code == 410:
-                global HF_AVAILABLE
                 HF_AVAILABLE = False
             
     except Exception as e:
@@ -1254,8 +1254,9 @@ def generate_excel_report_to_buffer(data_type, start_date_str=None, end_date_str
         raise
 
 @app.route('/api/export', methods=['GET'])
+@admin_required
 def export_data_route():
-    """Export data endpoint with enhanced error handling"""
+    """Export data endpoint with enhanced error handling - Admin only"""
     data_type = request.args.get('type')
     start_date_str = request.args.get('startDate')
     end_date_str = request.args.get('endDate')
@@ -2423,6 +2424,215 @@ def get_dashboard_stats():
     except Exception as e:
         logger.error(f"Error fetching dashboard stats: {e}", exc_info=True)
         return jsonify({'error': 'Failed to fetch dashboard statistics'}), 500
+
+# ======= CLEANUP / CRON ENDPOINTS =======
+
+@app.route('/api/cron/cleanup-items', methods=['POST', 'GET'])
+def cleanup_old_items():
+    """
+    Cleanup endpoint for automated maintenance:
+    1. Archive items with status 'unclaimed', 'pending', 'claimed', 'disapproved' that are older than 15 days
+    2. Delete lost requests that are older than 15 days
+    
+    Can be triggered by cron job or manually with ?force=true
+    """
+    # Allow force trigger via query param (for manual testing)
+    force = request.args.get('force', '').lower() == 'true'
+    
+    # Optional: Add a secret key check for cron jobs in production
+    cron_secret = request.headers.get('X-Cron-Secret') or request.args.get('secret')
+    expected_secret = os.environ.get('CRON_SECRET', '')
+    
+    # If not forced and secret doesn't match (when secret is configured), reject
+    if not force and expected_secret and cron_secret != expected_secret:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        cutoff_date = datetime.now() - timedelta(days=15)
+        results = {
+            'items_archived': 0,
+            'lost_requests_deleted': 0,
+            'errors': []
+        }
+        
+        # 1. Archive old items with specified statuses
+        statuses_to_archive = ['unclaimed', 'pending', 'claimed', 'disapproved']
+        items_ref = db.collection('items')
+        
+        for status in statuses_to_archive:
+            try:
+                # Query items with this status
+                query = items_ref.where('status', '==', status).stream()
+                
+                for item_doc in query:
+                    item_data = item_doc.to_dict()
+                    
+                    # Get the item's date (dateFound or createdAt)
+                    item_date = None
+                    date_field = item_data.get('date') or item_data.get('dateFound') or item_data.get('createdAt')
+                    
+                    if date_field:
+                        if hasattr(date_field, 'timestamp'):
+                            # Firestore Timestamp
+                            item_date = datetime.fromtimestamp(date_field.timestamp())
+                        elif isinstance(date_field, datetime):
+                            item_date = date_field
+                        elif isinstance(date_field, str):
+                            # Try parsing string date
+                            for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ'):
+                                try:
+                                    item_date = datetime.strptime(date_field, fmt)
+                                    break
+                                except ValueError:
+                                    continue
+                    
+                    # If we have a valid date and it's older than 15 days, archive it
+                    if item_date and item_date < cutoff_date:
+                        try:
+                            # Store previous status before archiving
+                            item_doc.reference.update({
+                                'previousStatus': status,
+                                'status': 'archived',
+                                'archivedAt': firestore.SERVER_TIMESTAMP,
+                                'archivedReason': 'auto-cleanup-15-days',
+                                'updatedAt': firestore.SERVER_TIMESTAMP
+                            })
+                            results['items_archived'] += 1
+                            logger.info(f"Auto-archived item {item_doc.id} (status: {status}, date: {item_date})")
+                        except Exception as e:
+                            results['errors'].append(f"Failed to archive item {item_doc.id}: {str(e)}")
+                            
+            except Exception as e:
+                results['errors'].append(f"Error processing status '{status}': {str(e)}")
+        
+        # 2. Delete old lost requests (both pending and approved that are old)
+        try:
+            lost_requests_ref = db.collection('lost_requests')
+            lost_requests = lost_requests_ref.stream()
+            
+            for req_doc in lost_requests:
+                req_data = req_doc.to_dict()
+                
+                # Get request date
+                req_date = None
+                date_field = req_data.get('createdAt') or req_data.get('dateLost')
+                
+                if date_field:
+                    if hasattr(date_field, 'timestamp'):
+                        req_date = datetime.fromtimestamp(date_field.timestamp())
+                    elif isinstance(date_field, datetime):
+                        req_date = date_field
+                    elif isinstance(date_field, str):
+                        for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y-%m-%dT%H:%M:%S.%fZ'):
+                            try:
+                                req_date = datetime.strptime(date_field, fmt)
+                                break
+                            except ValueError:
+                                continue
+                
+                if req_date and req_date < cutoff_date:
+                    try:
+                        req_doc.reference.delete()
+                        results['lost_requests_deleted'] += 1
+                        logger.info(f"Auto-deleted lost request {req_doc.id} (date: {req_date})")
+                    except Exception as e:
+                        results['errors'].append(f"Failed to delete lost request {req_doc.id}: {str(e)}")
+                        
+        except Exception as e:
+            results['errors'].append(f"Error processing lost requests: {str(e)}")
+        
+        # 3. Also delete old lost_items (the published/approved ones)
+        try:
+            lost_items_ref = db.collection('lost_items')
+            lost_items = lost_items_ref.stream()
+            
+            for item_doc in lost_items:
+                item_data = item_doc.to_dict()
+                
+                item_date = None
+                date_field = item_data.get('createdAt') or item_data.get('dateLost')
+                
+                if date_field:
+                    if hasattr(date_field, 'timestamp'):
+                        item_date = datetime.fromtimestamp(date_field.timestamp())
+                    elif isinstance(item_data, datetime):
+                        item_date = date_field
+                    elif isinstance(date_field, str):
+                        for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y-%m-%dT%H:%M:%S.%fZ'):
+                            try:
+                                item_date = datetime.strptime(date_field, fmt)
+                                break
+                            except ValueError:
+                                continue
+                
+                if item_date and item_date < cutoff_date:
+                    try:
+                        item_doc.reference.delete()
+                        results['lost_requests_deleted'] += 1
+                        logger.info(f"Auto-deleted lost item {item_doc.id} (date: {item_date})")
+                    except Exception as e:
+                        results['errors'].append(f"Failed to delete lost item {item_doc.id}: {str(e)}")
+                        
+        except Exception as e:
+            results['errors'].append(f"Error processing lost items: {str(e)}")
+        
+        logger.info(f"Cleanup completed: {results['items_archived']} items archived, {results['lost_requests_deleted']} lost requests/items deleted")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cleanup completed',
+            'results': results
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Cleanup cron error: {e}", exc_info=True)
+        return jsonify({'error': f'Cleanup failed: {str(e)}'}), 500
+
+
+@app.route('/api/items/archived/delete-all', methods=['DELETE'])
+@admin_required
+def delete_all_archived_items():
+    """
+    Delete all archived items permanently - Admin only
+    """
+    try:
+        items_ref = db.collection('items')
+        archived_items = items_ref.where('status', '==', 'archived').stream()
+        
+        deleted_count = 0
+        errors = []
+        
+        for item_doc in archived_items:
+            try:
+                item_id = item_doc.id
+                
+                # Also delete associated claims
+                claims_ref = db.collection('claims')
+                claims_query = claims_ref.where('itemId', '==', item_id).stream()
+                
+                for claim_doc in claims_query:
+                    claim_doc.reference.delete()
+                
+                # Delete the item
+                item_doc.reference.delete()
+                deleted_count += 1
+                
+            except Exception as e:
+                errors.append(f"Failed to delete item {item_doc.id}: {str(e)}")
+        
+        logger.info(f"Deleted {deleted_count} archived items")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {deleted_count} archived items',
+            'deleted_count': deleted_count,
+            'errors': errors if errors else None
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error deleting all archived items: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to delete archived items'}), 500
+
 
 # Production-ready error handlers
 @app.errorhandler(404)

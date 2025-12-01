@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import ErrorBoundary from './components/ErrorBoundary';
 // Student imports
 import Login from './components/student/Login';
 import Dashboard from './components/student/Dashboard';
@@ -103,8 +104,9 @@ const ProtectedAdminLayout = () => {
 
 function App() {
     return (
-        <Router>
-            <Routes>
+        <ErrorBoundary>
+            <Router>
+                <Routes>
                 {/* Student Routes */}
                 <Route path="/" element={<Login />} />
                 <Route element={<Layout />}>
@@ -189,8 +191,9 @@ function App() {
                     <Route path="/admin/help" element={<AdminHelp />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
-            </Routes>
-        </Router>
+                </Routes>
+            </Router>
+        </ErrorBoundary>
     );
 }
 
