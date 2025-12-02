@@ -2497,17 +2497,20 @@ def cleanup_old_items():
     1. Archive items with status 'unclaimed', 'pending', 'claimed', 'disapproved' that are older than 15 days
     2. Delete lost requests that are older than 15 days
     
-    Can be triggered by cron job or manually with ?force=true
+    Can be triggered by cron job with proper authentication.
+    Requires CRON_SECRET environment variable to be set for security.
     """
-    # Allow force trigger via query param (for manual testing)
-    force = request.args.get('force', '').lower() == 'true'
-    
-    # Optional: Add a secret key check for cron jobs in production
+    # Check for cron secret (required for all access)
     cron_secret = request.headers.get('X-Cron-Secret') or request.args.get('secret')
     expected_secret = os.environ.get('CRON_SECRET', '')
     
-    # If not forced and secret doesn't match (when secret is configured), reject
-    if not force and expected_secret and cron_secret != expected_secret:
+    # SECURITY: Always require a valid secret - no bypass allowed
+    if not expected_secret:
+        logger.warning("CRON_SECRET not configured - cleanup endpoint disabled for security")
+        return jsonify({'error': 'Cleanup endpoint not configured. Set CRON_SECRET environment variable.'}), 503
+    
+    if cron_secret != expected_secret:
+        logger.warning(f"Unauthorized cleanup attempt from {request.remote_addr}")
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:

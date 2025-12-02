@@ -77,15 +77,30 @@ class MessageService {
         }
     }
 
+    // Sanitize text to prevent potential injection attacks
+    _sanitizeText(text, maxLength = 5000) {
+        if (!text || typeof text !== 'string') return '';
+        // Trim, limit length, and remove any null bytes
+        return text.trim().slice(0, maxLength).replace(/\0/g, '');
+    }
+
     // Send a message
     async sendMessage(conversationId, senderId, senderName, text, isAdmin = false, imageData = null, lostItemId = null, lostItemImage = null, lostItemName = null) {
         try {
             const messagesRef = collection(db, 'conversations', conversationId, 'messages');
             
+            // Sanitize inputs
+            const sanitizedText = this._sanitizeText(text);
+            const sanitizedSenderName = this._sanitizeText(senderName, 200);
+            
+            if (!sanitizedText && !imageData && !lostItemId) {
+                throw new Error('Message cannot be empty');
+            }
+            
             const messageData = {
-                text: text.trim(),
+                text: sanitizedText,
                 senderId,
-                senderName,
+                senderName: sanitizedSenderName,
                 senderType: isAdmin ? 'admin' : 'student',
                 timestamp: serverTimestamp(),
                 read: false
@@ -113,10 +128,10 @@ class MessageService {
             // Update conversation with last message info
             const conversationRef = doc(db, 'conversations', conversationId);
             await updateDoc(conversationRef, {
-                lastMessage: text.trim(),
+                lastMessage: sanitizedText.slice(0, 100), // Limit preview length
                 lastMessageTime: serverTimestamp(),
                 lastSenderId: senderId,
-                lastSenderName: senderName
+                lastSenderName: sanitizedSenderName
             });
 
             return true;

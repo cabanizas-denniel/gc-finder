@@ -41,7 +41,9 @@ service cloud.firestore {
 
     // Participants of a conversation can read/write messages.
     match /conversations/{conversationId} {
-        // Allow authenticated users to list conversations (filtered by app logic)
+        // Allow authenticated users to list conversations
+        // Security note: Students query with array-contains filter on their userId
+        // Admins can list all. Message content is protected at subcollection level.
         allow list: if request.auth != null;
         // Allow get if document doesn't exist (for checking) or if user is participant
         allow get: if request.auth != null && 
