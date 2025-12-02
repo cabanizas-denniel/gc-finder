@@ -72,11 +72,13 @@ service cloud.firestore {
         allow read, write: if false;
     }
 
-    // Helper function to check for admin role
+    // Helper function to check for admin role (includes officials for messaging access)
     function isAdmin() {
-      // Check for a custom claim OR existence in the 'admin' collection.
-      // Using a custom claim is the recommended and more secure approach.
-      return request.auth.token.isAdmin == true || exists(/databases/$(database)/documents/admin/$(request.auth.uid));
+      // Check for a custom claim OR existence in the 'admin' collection OR officials collection.
+      // Officials (Disciplinary Office staff) need admin-level access for messaging.
+      return request.auth.token.isAdmin == true 
+             || exists(/databases/$(database)/documents/admin/$(request.auth.uid))
+             || exists(/databases/$(database)/documents/officials/$(request.auth.uid));
     }
   }
 }

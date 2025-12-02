@@ -230,32 +230,52 @@ class MessageService {
         }
     }
 
-    // Get user info (student or admin)
+    // Get user info (student, official, or admin)
     async getUserInfo(userId, isAdmin) {
         try {
-            const collection_name = isAdmin ? 'admin' : 'students';
-            const userRef = doc(db, collection_name, userId);
-            const userDoc = await getDoc(userRef);
-            
-            if (userDoc.exists()) {
-                const data = userDoc.data();
-                if (isAdmin) {
+            // If looking for admin, check admin collection
+            if (isAdmin) {
+                const adminRef = doc(db, 'admin', userId);
+                const adminDoc = await getDoc(adminRef);
+                if (adminDoc.exists()) {
+                    const data = adminDoc.data();
                     return {
                         id: userId,
                         name: data.position || 'Admin',
                         email: data.email,
                         type: 'admin'
                     };
-                } else {
-                    return {
-                        id: userId,
-                        name: data.full_name || 'Student',
-                        email: data.email || `${data.student_id}@gordoncollege.edu.ph`,
-                        student_id: data.student_id,
-                        type: 'student'
-                    };
                 }
             }
+            
+            // Check students collection first
+            const studentRef = doc(db, 'students', userId);
+            const studentDoc = await getDoc(studentRef);
+            if (studentDoc.exists()) {
+                const data = studentDoc.data();
+                return {
+                    id: userId,
+                    name: data.full_name || 'Student',
+                    email: data.email || `${data.student_id}@gordoncollege.edu.ph`,
+                    student_id: data.student_id,
+                    type: 'student'
+                };
+            }
+            
+            // Check officials collection if not found in students
+            const officialRef = doc(db, 'officials', userId);
+            const officialDoc = await getDoc(officialRef);
+            if (officialDoc.exists()) {
+                const data = officialDoc.data();
+                return {
+                    id: userId,
+                    name: data.full_name || data.name || 'Official',
+                    email: data.email || `${data.employee_id}@gordoncollege.edu.ph`,
+                    employee_id: data.employee_id,
+                    type: 'official'
+                };
+            }
+            
             return null;
         } catch (error) {
             console.error('Error getting user info:', error);
@@ -263,30 +283,58 @@ class MessageService {
         }
     }
 
-    // Search for users (admin only)
+    // Search for users (admin only) - searches both students and officials
     async searchUsers(searchTerm) {
         try {
-            const studentsRef = collection(db, 'students');
-            const snapshot = await getDocs(studentsRef);
-            
             const users = [];
-            snapshot.forEach((doc) => {
+            const searchLower = searchTerm.toLowerCase();
+            
+            // Search students collection
+            const studentsRef = collection(db, 'students');
+            const studentsSnapshot = await getDocs(studentsRef);
+            
+            studentsSnapshot.forEach((doc) => {
                 const data = doc.data();
                 const fullName = data.full_name || '';
                 const studentId = data.student_id || '';
                 const email = data.email || `${studentId}@gordoncollege.edu.ph`;
                 
                 if (
-                    fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    fullName.toLowerCase().includes(searchLower) ||
                     studentId.includes(searchTerm) ||
-                    email.toLowerCase().includes(searchTerm.toLowerCase())
+                    email.toLowerCase().includes(searchLower)
                 ) {
                     users.push({
-                        id: doc.id, // Use document ID (Auth UID) instead of student_id
+                        id: doc.id,
                         name: fullName,
                         email: email,
                         student_id: studentId,
                         type: 'student'
+                    });
+                }
+            });
+            
+            // Search officials collection
+            const officialsRef = collection(db, 'officials');
+            const officialsSnapshot = await getDocs(officialsRef);
+            
+            officialsSnapshot.forEach((doc) => {
+                const data = doc.data();
+                const fullName = data.full_name || data.name || '';
+                const employeeId = data.employee_id || '';
+                const email = data.email || `${employeeId}@gordoncollege.edu.ph`;
+                
+                if (
+                    fullName.toLowerCase().includes(searchLower) ||
+                    employeeId.includes(searchTerm) ||
+                    email.toLowerCase().includes(searchLower)
+                ) {
+                    users.push({
+                        id: doc.id,
+                        name: fullName,
+                        email: email,
+                        employee_id: employeeId,
+                        type: 'official'
                     });
                 }
             });

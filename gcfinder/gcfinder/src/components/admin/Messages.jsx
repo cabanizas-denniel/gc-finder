@@ -357,7 +357,7 @@ const Messages = () => {
                                 <i className="fas fa-search"></i>
                                 <input
                                     type="text"
-                                    placeholder="Search for students..."
+                                    placeholder="Search for students or officials..."
                                     value={searchTerm}
                                     onChange={handleSearchChange}
                                     autoFocus
@@ -389,7 +389,7 @@ const Messages = () => {
                                 {searchTerm && !isSearching && searchResults.length === 0 && (
                                     <div className="no-results">
                                         <i className="fas fa-search"></i>
-                                        <p>No students found</p>
+                                        <p>No users found</p>
                                     </div>
                                 )}
                             </div>
