@@ -172,10 +172,13 @@ const LostItems = () => {
                     {sortedItems.map((it) => {
                         const role = (it.postedByRole || 'student');
                         const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+                        const status = (it.status || 'approved');
+                        const isResolved = status === 'resolved';
+                        const isArchived = status === 'archived';
                         return (
                             <div
                                 key={it.id}
-                                className="forum-thread"
+                                className={`forum-thread ${isResolved ? 'item-resolved' : ''} ${isArchived ? 'item-archived' : ''}`}
                             >
                                 <div className="thread-row">
                                     <div className="thread-thumb">
@@ -196,6 +199,16 @@ const LostItems = () => {
                                             <span className="thread-role-badge">
                                                 {roleLabel}
                                             </span>
+                                            {isResolved && (
+                                                <span className="lost-item-status-badge resolved">
+                                                    <i className="fas fa-check-circle"></i> Found
+                                                </span>
+                                            )}
+                                            {isArchived && (
+                                                <span className="lost-item-status-badge archived">
+                                                    <i className="fas fa-archive"></i> Archived
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="thread-meta">
                                             <span className="date-badge"><i className="fas fa-calendar"></i> {it.dateLost || 'Date unknown'}</span>
@@ -206,7 +219,7 @@ const LostItems = () => {
                                         </div>
                                     </div>
                                 </div>
-                                {!(it?.isOwner === true) && !(it?.requesterEmail && currentEmail && String(it.requesterEmail).toLowerCase() === String(currentEmail).toLowerCase()) && (
+                                {!isResolved && !isArchived && !(it?.isOwner === true) && !(it?.requesterEmail && currentEmail && String(it.requesterEmail).toLowerCase() === String(currentEmail).toLowerCase()) && (
                                     <div className="thread-actions">
                                         <span className="thread-actions-prompt">Think you found this?</span>
                                         <div className="thread-actions-btn-wrapper">
@@ -214,6 +227,20 @@ const LostItems = () => {
                                                 <i className="fas fa-phone"></i> Contact the Disciplinary Office
                                             </button>
                                         </div>
+                                    </div>
+                                )}
+                                {isResolved && (
+                                    <div className="thread-actions" style={{ justifyContent: 'center' }}>
+                                        <span className="thread-actions-prompt" style={{ color: '#28a745' }}>
+                                            <i className="fas fa-check-circle"></i> This item has been found and returned to the owner!
+                                        </span>
+                                    </div>
+                                )}
+                                {isArchived && (
+                                    <div className="thread-actions" style={{ justifyContent: 'center' }}>
+                                        <span className="thread-actions-prompt" style={{ color: '#6c757d' }}>
+                                            <i className="fas fa-archive"></i> This lost item report has been archived.
+                                        </span>
                                     </div>
                                 )}
                             </div>

@@ -581,10 +581,6 @@ header {
     font-size: 16px;
 }
 
-.official-login .login-left-section {
-    background: linear-gradient(135deg, #1a5276 0%, #154360 100%);
-}
-
 /* Admin Login Badge */
 .admin-badge {
     display: flex;
@@ -604,11 +600,6 @@ header {
 .admin-badge .admin-icon {
     font-size: 16px;
 }
-
-.admin-login .login-left-section {
-    background: linear-gradient(135deg, #8e44ad 0%, #7b3a9e 100%);
-}
-
 /* Login Switch Link */
 .login-switch {
     margin-top: 15px;
@@ -2689,4 +2680,60 @@ header {
     background: #f1f3f5;
     border-color: #dee2e6;
     text-decoration: none;
+}
+
+/* ======= Lost Item Status Badges ======= */
+.lost-item-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.lost-item-status-badge.resolved {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+    border: 1px solid #28a745;
+}
+
+.lost-item-status-badge.resolved i {
+    color: #28a745;
+}
+
+.lost-item-status-badge.archived {
+    background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+    color: #383d41;
+    border: 1px solid #6c757d;
+}
+
+.lost-item-status-badge.archived i {
+    color: #6c757d;
+}
+
+.lost-item-status-badge.active {
+    background: linear-gradient(135deg, #cce5ff 0%, #b8daff 100%);
+    color: #004085;
+    border: 1px solid #007bff;
+}
+
+.lost-item-status-badge.active i {
+    color: #007bff;
+}
+
+/* Visual overlay for resolved/archived items */
+.forum-thread.item-resolved {
+    opacity: 0.85;
+    border-color: #28a745;
+    background: linear-gradient(135deg, #fff 0%, #f0fff4 100%);
+}
+
+.forum-thread.item-archived {
+    opacity: 0.7;
+    border-color: #6c757d;
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
 }

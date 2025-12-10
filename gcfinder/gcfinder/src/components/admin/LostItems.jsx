@@ -165,10 +165,13 @@ const AdminLostItems = () => {
                     {sortedItems.map((it) => {
                         const role = (it.postedByRole || 'student');
                         const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+                        const status = (it.status || 'approved');
+                        const isResolved = status === 'resolved';
+                        const isArchived = status === 'archived';
                         return (
                             <div
                                 key={it.id}
-                                className="forum-thread"
+                                className={`forum-thread ${isResolved ? 'item-resolved' : ''} ${isArchived ? 'item-archived' : ''}`}
                             >
                                 <div className="thread-row">
                                     <div className="thread-thumb">
@@ -189,6 +192,16 @@ const AdminLostItems = () => {
                                             <span className="thread-role-badge">
                                                 {roleLabel}
                                             </span>
+                                            {isResolved && (
+                                                <span className="lost-item-status-badge resolved">
+                                                    <i className="fas fa-check-circle"></i> Found
+                                                </span>
+                                            )}
+                                            {isArchived && (
+                                                <span className="lost-item-status-badge archived">
+                                                    <i className="fas fa-archive"></i> Archived
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="thread-meta">
                                             <span className="date-badge"><i className="fas fa-calendar"></i> {it.dateLost || 'Date unknown'}</span>
