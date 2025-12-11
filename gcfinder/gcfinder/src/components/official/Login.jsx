@@ -197,9 +197,9 @@ const OfficialLogin = () => {
         <form onSubmit={handleLogin}>
           <div className="official-badge">
             <FaUserTie className="official-icon" />
-            <span>Faculty / Staff Portal</span>
+            <span>Personnel / Staff Portal</span>
           </div>
-          <h2>Welcome Officials!</h2>
+          <h2>Welcome Personnel!</h2>
           {error && <div className="error-message">{error}</div>}
           <div className="input-group">
             <FaEnvelope className="input-icon" />

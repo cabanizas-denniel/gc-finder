@@ -837,7 +837,61 @@ def delete_user():
         if official_doc_ref.get().exists:
             official_doc_ref.delete()
         
-        return jsonify({"message": f"Successfully deleted user {uid}"}), 200
+        # Cascade delete: items, claims, conversations/messages, notifications
+        deleted_counts = {
+            "items": 0,
+            "claims": 0,
+            "conversations": 0,
+            "messages": 0,
+            "notifications": 0
+        }
+
+        # Delete items where this user is the submitter (match uid or student_id)
+        items_ref = db.collection('items')
+        item_queries = [
+            items_ref.where('submitter.id', '==', uid),
+            items_ref.where('submitter.student_id', '==', uid),
+            items_ref.where('userId', '==', uid)
+        ]
+        seen_item_ids = set()
+        for q in item_queries:
+            for doc in q.stream():
+                if doc.id in seen_item_ids:
+                    continue
+                doc.reference.delete()
+                seen_item_ids.add(doc.id)
+                deleted_counts["items"] += 1
+
+        # Delete claims created by this user
+        claims_ref = db.collection('claims')
+        claims_query = claims_ref.where('claimerId', '==', uid)
+        for claim_doc in claims_query.stream():
+            claim_doc.reference.delete()
+            deleted_counts["claims"] += 1
+
+        # Delete conversations where user is participant, and their messages
+        conv_ref = db.collection('conversations')
+        conv_query = conv_ref.where('participants', 'array_contains', uid)
+        for conv_doc in conv_query.stream():
+            # Delete messages subcollection
+            msgs_ref = conv_doc.reference.collection('messages')
+            for msg_doc in msgs_ref.stream():
+                msg_doc.reference.delete()
+                deleted_counts["messages"] += 1
+            conv_doc.reference.delete()
+            deleted_counts["conversations"] += 1
+
+        # Delete notifications targeted to this user
+        notif_ref = db.collection('notifications')
+        notif_query = notif_ref.where('userId', '==', uid)
+        for notif_doc in notif_query.stream():
+            notif_doc.reference.delete()
+            deleted_counts["notifications"] += 1
+        
+        return jsonify({
+            "message": f"Successfully deleted user {uid}",
+            "deleted": deleted_counts
+        }), 200
 
     except auth.UserNotFoundError:
         return jsonify({"error": f"User with UID {uid} not found in Firebase Authentication."}), 404

@@ -129,8 +129,8 @@ function App() {
                 <Routes>
                 {/* Student Routes */}
                 <Route path="/" element={<Login />} />
-                {/* Official/Faculty Login - shares student components */}
-                <Route path="/official" element={<OfficialLogin />} />
+                {/* Official/Personnel Login - shares student components */}
+                <Route path="/personnel" element={<OfficialLogin />} />
                 <Route element={<Layout />}>
                     <Route
                         path="/dashboard"

@@ -110,7 +110,7 @@ const Layout = () => {
                             localStorage.removeItem('userData');
                             localStorage.removeItem('isAuthenticated');
                             // Redirect to appropriate login page
-                            navigate(userData.userType === 'official' ? '/official' : '/');
+                            navigate(userData.userType === 'official' ? '/personnel' : '/');
                             return;
                         }
                         
@@ -185,7 +185,7 @@ const Layout = () => {
         localStorage.removeItem('isAuthenticated');
         
         // Redirect to appropriate login page
-        navigate(isOfficial ? '/official' : '/');
+        navigate(isOfficial ? '/personnel' : '/');
     }, [navigate]);
 
     // Toggle sidebar

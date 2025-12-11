@@ -973,11 +973,11 @@ const UserManagement = () => {
                                 You are about to permanently delete <strong>{selectedUser.full_name}</strong> ({selectedUser.email}) and <strong>all associated data</strong>:
                             </p>
                             <ul style={{marginLeft: '20px', marginBottom: '20px', color: '#666'}}>
-                                <li>• User account and profile</li>
-                                <li>• All posted items</li>
-                                <li>• All claims made by this user</li>
-                                <li>• All messages sent/received</li>
-                                <li>• All notifications and activity history</li>
+                                <li> User account and profile</li>
+                                <li> All posted items</li>
+                                <li> All claims made by this user</li>
+                                <li> All messages sent/received</li>
+                                <li> All notifications and activity history</li>
                             </ul>
                             <p style={{color: '#e74c3c', fontWeight: 'bold'}}>
                                 This will completely remove the user from the system.
