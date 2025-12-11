@@ -125,18 +125,26 @@ const LostItems = () => {
 
     return (
         <div className="browse-items-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <div>
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: 20,
+                    flexWrap: 'wrap'
+                }}
+            >
+                <div style={{ minWidth: 0 }}>
                     <h1>Lost Items</h1>
                     <p className="subtitle">Approved lost requests posted by students and staff.</p>
                 </div>
                 {!loading && items.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <select
                             id="sort-lost-items"
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
                             className="lost-items-sort-select"
+                            style={{ minWidth: 200 }}
                         >
                             <option value="date-newest">Date Lost (Newest First)</option>
                             <option value="date-oldest">Date Lost (Oldest First)</option>
