@@ -907,24 +907,40 @@ h2{
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: 12px;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.2px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-transform: capitalize;
 }
 .role-badge i {
     font-size: 0.8rem;
 }
 .role-badge.student {
-    background-color: rgba(33, 150, 243, 0.10);
-    color: #0d6efd;
-    border: 1px solid rgba(33, 150, 243, 0.25);
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.15) 0%, rgba(33, 150, 243, 0.08) 100%);
+    color: #1565c0;
+    border: 1.5px solid rgba(33, 150, 243, 0.3);
+}
+.role-badge.student:hover {
+    box-shadow: 0 3px 6px rgba(21, 101, 192, 0.2);
+    transform: translateY(-1px);
+}
+.role-badge.personnel {
+    background: linear-gradient(135deg, rgba(255, 152, 0, 0.15) 0%, rgba(255, 152, 0, 0.08) 100%);
+    color: #e65100;
+    border: 1.5px solid rgba(255, 152, 0, 0.3);
+}
+.role-badge.personnel:hover {
+    box-shadow: 0 3px 6px rgba(230, 81, 0, 0.2);
+    transform: translateY(-1px);
 }
 .role-badge.staff {
-    background-color: rgba(108, 117, 125, 0.10);
-    color: #6c757d;
-    border: 1px solid rgba(108, 117, 125, 0.25);
+    background: linear-gradient(135deg, rgba(108, 117, 125, 0.15) 0%, rgba(108, 117, 125, 0.08) 100%);
+    color: #495057;
+    border: 1.5px solid rgba(108, 117, 125, 0.3);
 }
 
 /* Row Highlighting */

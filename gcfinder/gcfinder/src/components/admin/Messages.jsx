@@ -25,6 +25,9 @@ const Messages = () => {
     const fileInputRef = useRef(null);
     const unsubscribeConversations = useRef(null);
     const unsubscribeMessages = useRef(null);
+    const [lastSentAt, setLastSentAt] = useState(0);
+    const [isSending, setIsSending] = useState(false);
+    const SEND_COOLDOWN_MS = 3000;
 
     // Get current user from localStorage
     useEffect(() => {
@@ -233,8 +236,16 @@ const Messages = () => {
 
     // Handle sending a message
     const sendMessage = useCallback(async () => {
-        if ((!messageInput.trim() && !selectedImage) || !activeConversation || !currentUser) return;
+        if (isSending || (!messageInput.trim() && !selectedImage) || !activeConversation || !currentUser) return;
+
+        const now = Date.now();
+        if (now - lastSentAt < SEND_COOLDOWN_MS) {
+            console.warn('Message throttled to prevent spam');
+            return;
+        }
         
+        setIsSending(true);
+        setLastSentAt(now);
         try {
             let messageText = messageInput.trim();
             let imageData = null;
@@ -262,8 +273,10 @@ const Messages = () => {
             messageInputRef.current?.focus();
         } catch (error) {
             console.error('Error sending message:', error);
+        } finally {
+            setIsSending(false);
         }
-    }, [messageInput, selectedImage, activeConversation, currentUser, clearSelectedImage]);
+    }, [messageInput, selectedImage, activeConversation, currentUser, clearSelectedImage, lastSentAt, isSending]);
 
     // Handle back button click in mobile view
     const handleBackClick = useCallback(() => {
@@ -561,7 +574,7 @@ const Messages = () => {
                             <button 
                                 className="send-btn"
                                 onClick={sendMessage}
-                                disabled={!messageInput.trim() && !selectedImage}
+                                disabled={isSending || (!messageInput.trim() && !selectedImage)}
                             >
                                 <i className="fas fa-paper-plane"></i>
                             </button>

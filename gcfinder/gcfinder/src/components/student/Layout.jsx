@@ -143,7 +143,7 @@ const Layout = () => {
     const navigationItems = [
         { path: 'dashboard', icon: 'fas fa-home', label: 'Dashboard' },
         { path: 'report-item', icon: 'fas fa-file-alt', label: 'Report Found Item' },
-        { path: 'lost-requests', icon: 'fas fa-question-circle', label: 'Report Lost' },
+        { path: 'lost-requests', icon: 'fas fa-question-circle', label: 'Report Lost Item' },
         { path: 'lost-items', icon: 'fas fa-bullhorn', label: 'Lost Items' },
         { path: 'browse-items', icon: 'fas fa-search', label: 'Found Items' },
         { path: 'my-claims', icon: 'fas fa-tasks', label: 'My Claims' },

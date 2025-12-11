@@ -8,6 +8,9 @@ const ChangePasswordModal = ({ isOpen, onClose, showToast }) => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -65,6 +68,9 @@ const ChangePasswordModal = ({ isOpen, onClose, showToast }) => {
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
+            setShowCurrentPassword(false);
+            setShowNewPassword(false);
+            setShowConfirmPassword(false);
         }
     };
 
@@ -83,31 +89,61 @@ const ChangePasswordModal = ({ isOpen, onClose, showToast }) => {
                     <div className="modal-body">
                         {error && <p className="error-message">{error}</p>}
                         <div className="input-group">
+                            <i className="fas fa-lock input-icon"></i>
                             <input
-                                type="password"
+                                type={showCurrentPassword ? "text" : "password"}
                                 placeholder="Current Password"
                                 value={currentPassword}
                                 onChange={(e) => setCurrentPassword(e.target.value)}
                                 required
+                                style={{ paddingRight: '45px' }}
                             />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                tabIndex={-1}
+                            >
+                                <i className={showCurrentPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
+                            </button>
                         </div>
                         <div className="input-group">
+                            <i className="fas fa-key input-icon"></i>
                             <input
-                                type="password"
+                                type={showNewPassword ? "text" : "password"}
                                 placeholder="New Password"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 required
+                                style={{ paddingRight: '45px' }}
                             />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                tabIndex={-1}
+                            >
+                                <i className={showNewPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
+                            </button>
                         </div>
                         <div className="input-group">
+                            <i className="fas fa-key input-icon"></i>
                             <input
-                                type="password"
+                                type={showConfirmPassword ? "text" : "password"}
                                 placeholder="Confirm New Password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 required
+                                style={{ paddingRight: '45px' }}
                             />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                tabIndex={-1}
+                            >
+                                <i className={showConfirmPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
+                            </button>
                         </div>
                     </div>
                     <div className="modal-footer">

@@ -4,6 +4,10 @@ import { submitFoundItem } from '../../firebase'; // Import the submitFoundItem 
 import Toast, { useToast } from '../Toast';
 
 const ReportItem = () => {
+    // Character limits
+    const MAX_ITEM_NAME = 40;
+    const MAX_LOCATION = 40;
+    const MAX_DESCRIPTION = 150;
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(0);
     const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = useState(false);
@@ -318,7 +322,7 @@ const ReportItem = () => {
                 <form id="reportForm" className="report-form" onSubmit={handleSubmit}>
                     {/* Step 1: Item Details */}
                     <div className={`form-step ${currentStep === 0 ? 'active' : ''}`}>
-                        <h2>Report Lost Item</h2>
+                        <h2>Report Found Item</h2>
                         <p>Please provide details about the item(s) you've found.</p>
                         
                         <div className="form-group">
@@ -329,7 +333,8 @@ const ReportItem = () => {
                                 placeholder="e.g. Blue Wallet, Student ID" 
                                 value={formData.itemName}
                                 onChange={handleInputChange}
-                                required 
+                                required
+                                maxLength={MAX_ITEM_NAME}
                             />
                         </div>
 
@@ -337,10 +342,11 @@ const ReportItem = () => {
                             <label htmlFor="description">Description</label>
                             <textarea 
                                 id="description" 
-                                placeholder="Describe the item in detail" 
+                                placeholder="Describe the Item" 
                                 value={formData.description}
                                 onChange={handleInputChange}
                                 required
+                                maxLength={MAX_DESCRIPTION}
                             ></textarea>
                         </div>
 
@@ -353,6 +359,7 @@ const ReportItem = () => {
                                 value={formData.location}
                                 onChange={handleInputChange}
                                 required 
+                                maxLength={MAX_LOCATION}
                             />
                         </div>
 
@@ -462,7 +469,8 @@ const ReportItem = () => {
                                 placeholder="Try to specify the exact location in which the item was found" 
                                 value={formData.exactLocation}
                                 onChange={handleInputChange}
-                                required 
+                                required
+                                maxLength={MAX_LOCATION}
                             />
                         </div>
 
@@ -474,6 +482,7 @@ const ReportItem = () => {
                                 placeholder="Engravings/ Special Markings if there are" 
                                 value={formData.uniqueIdentifier}
                                 onChange={handleInputChange}
+                                maxLength={MAX_ITEM_NAME}
                             />
                         </div>
 
@@ -484,6 +493,7 @@ const ReportItem = () => {
                                 placeholder="Provide additional details if you can"
                                 value={formData.additionalDetails}
                                 onChange={handleInputChange}
+                                maxLength={MAX_DESCRIPTION}
                             ></textarea>
                         </div>
 
@@ -504,39 +514,39 @@ const ReportItem = () => {
                     {/* Step 4: Confirmation */}
                     <div className={`form-step ${currentStep === 3 ? 'active' : ''}`}>
                         <h2>Confirm Submission</h2>
-                        <div className="confirmation-details">
+                        <div className="confirmation-details" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                             <p>Please review the details before submitting:</p>
-                            <div id="summaryDetails">
-                                <div className="summary-item">
+                            <div id="summaryDetails" style={{ display: 'grid', gap: 8 }}>
+                                <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                     <strong>Item Name:</strong> {formData.itemName}
                                 </div>
-                                <div className="summary-item">
+                                <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                     <strong>Description:</strong> {formData.description}
                                 </div>
-                                <div className="summary-item">
+                                <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                     <strong>Location:</strong> {formData.location}
                                 </div>
-                                <div className="summary-item">
+                                <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                     <strong>Date Found:</strong> {formData.dateFound}
                                 </div>
-                                <div className="summary-item">
+                                <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                     <strong>Category:</strong> {formData.category}
                                 </div>
-                                <div className="summary-item">
+                                <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                     <strong>Exact Location:</strong> {formData.exactLocation}
                                 </div>
                                 {formData.uniqueIdentifier && (
-                                    <div className="summary-item">
+                                    <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                         <strong>Unique Identifier:</strong> {formData.uniqueIdentifier}
                                     </div>
                                 )}
                                 {formData.additionalDetails && (
-                                    <div className="summary-item">
+                                    <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                         <strong>Additional Details:</strong> {formData.additionalDetails}
                                     </div>
                                 )}
                                 {uploadedImages.length > 0 && (
-                                    <div className="summary-item">
+                                    <div className="summary-item" style={{ whiteSpace: 'pre-wrap' }}>
                                         <strong>Uploaded Images:</strong> {uploadedImages.length} image(s)
                                     </div>
                                 )}

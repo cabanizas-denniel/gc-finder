@@ -148,11 +148,15 @@ body {
     font-size: 15px;
     color: #333;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     background-color: #f8f9fa;
     padding: 12px 15px;
     border-radius: 8px;
     transition: background-color 0.2s ease;
+    flex-wrap: wrap;
+    gap: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .detail-item i {
@@ -176,6 +180,9 @@ body {
     background-color: #f8f9fa;
     padding: 15px;
     border-radius: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow: visible;
 }
 
 .modal-footer {
@@ -670,9 +677,11 @@ header {
     color: #6c757d;
     font-size: 18px;
     transition: color 0.3s ease;
+    pointer-events: none;
+    z-index: 1;
 }
 
-.input-group input:focus + .input-icon {
+.input-group:focus-within .input-icon {
     color: var(--primary-color);
 }
 
@@ -689,19 +698,32 @@ header {
     border: none;
     color: #6c757d;
     cursor: pointer;
-    padding: 0;
+    padding: 5px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    z-index: 2;
+    border-radius: 4px;
 }
 
 .input-group .password-toggle:hover {
     color: var(--primary-color);
+    background-color: rgba(4, 81, 149, 0.05);
+}
+
+.input-group .password-toggle:active {
+    transform: translateY(-50%) scale(0.95);
 }
 
 .input-group .password-toggle:disabled {
     cursor: not-allowed;
     opacity: 0.5;
+}
+
+.input-group .password-toggle i {
+    font-size: 16px;
 }
 
 .error-message {
@@ -2455,11 +2477,47 @@ header {
 
 .thread-role-badge {
     font-size: 12px;
-    color: #555;
-    background: #eef2ff;
-    border: 1px solid #dbe4ff;
-    padding: 2px 8px;
+    font-weight: 600;
+    padding: 5px 14px;
     border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-transform: capitalize;
+}
+
+/* Student Role Badge */
+.thread-role-badge.student {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #1565c0;
+    border: 1.5px solid #90caf9;
+}
+
+.thread-role-badge.student:hover {
+    box-shadow: 0 3px 6px rgba(21, 101, 192, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Personnel Role Badge */
+.thread-role-badge.personnel {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    color: #e65100;
+    border: 1.5px solid #ffcc80;
+}
+
+.thread-role-badge.personnel:hover {
+    box-shadow: 0 3px 6px rgba(230, 81, 0, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Default/Official Role Badge (fallback) */
+.thread-role-badge:not(.student):not(.personnel) {
+    background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+    color: #7b1fa2;
+    border: 1.5px solid #ce93d8;
 }
 
 .thread-meta {

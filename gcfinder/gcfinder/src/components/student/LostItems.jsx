@@ -7,6 +7,11 @@ const LostItems = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [sortBy, setSortBy] = useState('date-newest');
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [lightboxSrc, setLightboxSrc] = useState(null);
+    const [contacting, setContacting] = useState(false);
+    const CONTACT_COOLDOWN_MS = 3000;
+    const [lastContactAt, setLastContactAt] = useState(0);
 
     // Resolve current user's email for ownership checks (supports students and faculty)
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -85,8 +90,15 @@ const LostItems = () => {
         }
     }, [items, sortBy]);
 
+    const openLightbox = (src) => { setLightboxSrc(src); setLightboxOpen(true); };
+    const closeLightbox = () => { setLightboxOpen(false); setLightboxSrc(null); };
+
     const handleContactAdmin = async (lostItem) => {
         try {
+            if (contacting) return;
+            const now = Date.now();
+            if (now - lastContactAt < CONTACT_COOLDOWN_MS) return;
+
             // Client-side guard: prevent contacting DO if this is the requester's own post
             const ownerByFlag = lostItem?.isOwner === true;
             const ownerByEmail = !!(lostItem?.requesterEmail && currentEmail) &&
@@ -103,6 +115,8 @@ const LostItems = () => {
                 alert('Unable to start conversation. Please re-login.');
                 return;
             }
+            setContacting(true);
+            setLastContactAt(now);
             const conversationId = await messageService.getOrCreateConversation([studentId], false);
             const text = `I think I found a lost item: ${lostItem.itemName}. Please assist.`;
             await messageService.sendMessage(
@@ -120,6 +134,8 @@ const LostItems = () => {
         } catch (e) {
             console.error('Failed to contact admin:', e);
             alert('Failed to contact the Disciplinary Office. Please try again later.');
+        } finally {
+            setContacting(false);
         }
     };
 
@@ -179,10 +195,14 @@ const LostItems = () => {
                 <div className="forum-list">
                     {sortedItems.map((it) => {
                         const role = (it.postedByRole || 'student');
-                        const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+                        // Map 'official' role to 'personnel' for display
+                        const displayRole = role === 'official' ? 'personnel' : role;
+                        const roleLabel = displayRole.charAt(0).toUpperCase() + displayRole.slice(1);
                         const status = (it.status || 'approved');
                         const isResolved = status === 'resolved';
                         const isArchived = status === 'archived';
+                        const mediaList = it.mediaUrls && Array.isArray(it.mediaUrls) ? it.mediaUrls : [];
+                        const primaryMedia = it.imageUrl || mediaList[0] || null;
                         return (
                             <div
                                 key={it.id}
@@ -190,12 +210,14 @@ const LostItems = () => {
                             >
                                 <div className="thread-row">
                                     <div className="thread-thumb">
-                                        {it.imageUrl ? (
+                                        {primaryMedia ? (
                                             <img
-                                                src={it.imageUrl}
+                                                src={primaryMedia}
                                                 alt={it.itemName}
                                                 loading="lazy"
                                                 decoding="async"
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => openLightbox(primaryMedia)}
                                             />
                                         ) : (
                                             <div className="thread-thumb-placeholder">
@@ -203,10 +225,10 @@ const LostItems = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="thread-content">
-                                        <div className="thread-title-row">
-                                            <h3>{it.itemName}</h3>
-                                            <span className="thread-role-badge">
+                                    <div className="thread-content" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                                        <div className="thread-title-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                                            <h3 style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{it.itemName}</h3>
+                                            <span className={`thread-role-badge ${displayRole}`}>
                                                 {roleLabel}
                                             </span>
                                             {isResolved && (
@@ -220,20 +242,38 @@ const LostItems = () => {
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="thread-meta">
+                                        <div className="thread-meta" style={{ flexWrap: 'wrap', gap: 8 }}>
                                             <span className="date-badge"><i className="fas fa-calendar"></i> {it.dateLost || 'Date unknown'}</span>
-                                            <span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {it.locationLost || 'Location unknown'}</span>
+                                            <span
+                                                className="location-badge-lost"
+                                                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', display: 'inline-flex', maxWidth: '100%' }}
+                                            >
+                                                <i className="fas fa-map-marker-alt"></i> {it.locationLost || 'Location unknown'}
+                                            </span>
                                         </div>
-                                        <div className="thread-description">
+                                        <div className="thread-description" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                                             {it.description || 'No description provided.'}
                                         </div>
+                                        {mediaList.length > 1 && (
+                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                                                {mediaList.map((m, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                        onClick={() => openLightbox(m)}
+                                                    >
+                                                        <img src={m} alt={`media-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 {!isResolved && !isArchived && !(it?.isOwner === true) && !(it?.requesterEmail && currentEmail && String(it.requesterEmail).toLowerCase() === String(currentEmail).toLowerCase()) && (
                                     <div className="thread-actions">
                                         <span className="thread-actions-prompt">Think you found this?</span>
                                         <div className="thread-actions-btn-wrapper">
-                                            <button className="claim" onClick={() => handleContactAdmin(it)}>
+                                            <button className="claim" onClick={() => handleContactAdmin(it)} disabled={contacting}>
                                                 <i className="fas fa-phone"></i> Contact the Disciplinary Office
                                             </button>
                                         </div>
@@ -256,6 +296,57 @@ const LostItems = () => {
                             </div>
                         );
                     })}
+                </div>
+            )}
+            {lightboxOpen && lightboxSrc && (
+                <div
+                    className="lightbox-overlay"
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.75)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2000,
+                        padding: '20px'
+                    }}
+                    onClick={() => { setLightboxOpen(false); setLightboxSrc(null); }}
+                >
+                    <div
+                        style={{
+                            maxWidth: '90vw',
+                            maxHeight: '90vh',
+                            background: '#000',
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                            position: 'relative'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={() => { setLightboxOpen(false); setLightboxSrc(null); }}
+                            style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                background: 'rgba(0,0,0,0.6)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: 32,
+                                height: 32,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ×
+                        </button>
+                        <img
+                            src={lightboxSrc}
+                            alt="media-full"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: '90vh' }}
+                        />
+                    </div>
                 </div>
             )}
         </div>

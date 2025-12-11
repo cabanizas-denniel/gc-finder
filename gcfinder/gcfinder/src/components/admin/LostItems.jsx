@@ -21,7 +21,10 @@ const AdminLostItems = () => {
     const [error, setError] = useState('');
     const [sortBy, setSortBy] = useState('date-newest');
     const [confirmModal, setConfirmModal] = useState({ open: false, action: null, item: null });
+    const [deleteModal, setDeleteModal] = useState(null);
     const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [lightboxSrc, setLightboxSrc] = useState(null);
 
     // Fetch requests
     const fetchRequests = async () => {
@@ -95,9 +98,9 @@ const AdminLostItems = () => {
         }
     };
 
-    // Sort items
-    const sortedItems = React.useMemo(() => {
-        const sorted = [...items];
+    // Sort items and requests with shared options
+    const sortList = React.useCallback((list) => {
+        const sorted = [...list];
         switch (sortBy) {
             case 'date-newest':
                 return sorted.sort((a, b) => new Date(b.dateLost || 0) - new Date(a.dateLost || 0));
@@ -114,7 +117,13 @@ const AdminLostItems = () => {
             default:
                 return sorted;
         }
-    }, [items, sortBy]);
+    }, [sortBy]);
+
+    const sortedItems = React.useMemo(() => sortList(items), [items, sortList]);
+    const sortedRequests = React.useMemo(() => sortList(requests), [requests, sortList]);
+
+    const openLightbox = (src) => { setLightboxSrc(src); setLightboxOpen(true); };
+    const closeLightbox = () => { setLightboxOpen(false); setLightboxSrc(null); };
 
     // Item action handlers
     const openConfirm = (action, item) => setConfirmModal({ open: true, action, item });
@@ -147,6 +156,12 @@ const AdminLostItems = () => {
             console.error('Delete failed', e);
             showToast('Failed to delete item. Please try again.', 'error');
         }
+    };
+
+    const confirmDeleteItem = async () => {
+        if (!deleteModal) return;
+        await handleDeleteItem(deleteModal.id);
+        setDeleteModal(null);
     };
 
     const handleDeleteAllArchived = async () => {
@@ -232,19 +247,25 @@ const AdminLostItems = () => {
                     }}
                 >
                     <i className="fas fa-search"></i>
-                    Published Items
+                    Approved Lost Items
                 </button>
             </div>
 
             {/* Requests Tab Content */}
             {activeTab === 'requests' && (
                 <>
-                    <div className="action-buttons" style={{ marginBottom: 15, display: 'flex', gap: 10 }}>
-                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="lost-items-sort-select">
-                            <option value="">All</option>
-                            <option value="pending">Pending</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
+                    <div className="action-buttons" style={{ marginBottom: 15, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="lost-items-sort-select"
+                        >
+                            <option value="date-newest">Date Lost (Newest First)</option>
+                            <option value="date-oldest">Date Lost (Oldest First)</option>
+                            <option value="name-asc">Item Name (A-Z)</option>
+                            <option value="name-desc">Item Name (Z-A)</option>
+                            <option value="location-asc">Location (A-Z)</option>
+                            <option value="location-desc">Location (Z-A)</option>
                         </select>
                         <button className="refresh-btn" onClick={fetchRequests}>
                             <i className="fas fa-sync-alt"></i> Refresh
@@ -271,6 +292,7 @@ const AdminLostItems = () => {
                                             <th>Item</th>
                                             <th>Date Lost</th>
                                             <th>Location</th>
+                                            <th>Description</th>
                                             <th>Role</th>
                                             <th>Requester</th>
                                             <th>Status</th>
@@ -278,21 +300,120 @@ const AdminLostItems = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {requests.map((r) => (
+                                        {sortedRequests.map((r) => {
+                                            const mediaList = Array.isArray(r.mediaUrls) ? r.mediaUrls : [];
+                                            const primaryMedia = r.imageUrl || mediaList[0] || null;
+                                            return (
                                             <tr key={r.id}>
                                                 <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                        <img src={r.imageUrl} alt={r.itemName} loading="lazy" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #eee' }} />
-                                                        <div className="user-name">{r.itemName}</div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                                        <div style={{ width: 64, height: 64, borderRadius: 6, overflow: 'hidden', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
+                                                            {primaryMedia ? (
+                                                                String(primaryMedia).startsWith('data:video') || String(primaryMedia).toLowerCase().includes('.mp4') ? (
+                                                                    <video
+                                                                        src={primaryMedia}
+                                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                                                                        onClick={() => openLightbox(primaryMedia)}
+                                                                    />
+                                                                ) : (
+                                                                    <img
+                                                                        src={primaryMedia}
+                                                                        alt={r.itemName}
+                                                                        loading="lazy"
+                                                                        style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                                                                        onClick={() => openLightbox(primaryMedia)}
+                                                                    />
+                                                                )
+                                                            ) : (
+                                                                <i className="fas fa-image" style={{ color: '#bbb' }}></i>
+                                                            )}
+                                                        </div>
+                                                        <div
+                                                            className="user-name"
+                                                            style={{
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'anywhere',
+                                                                maxWidth: 260
+                                                            }}
+                                                        >
+                                                            {r.itemName}
+                                                        </div>
+                                                        {mediaList.length > 1 && (
+                                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 360 }}>
+                                                                {mediaList.map((m, idx) => (
+                                                                    <div key={idx} style={{ width: 40, height: 40, borderRadius: 6, overflow: 'hidden', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                        {String(m).startsWith('data:video') || String(m).toLowerCase().includes('.mp4') ? (
+                                                                            <i
+                                                                                className="fas fa-file-video"
+                                                                                style={{ fontSize: 14, color: '#555', cursor: 'pointer' }}
+                                                                                onClick={() => openLightbox(m)}
+                                                                            ></i>
+                                                                        ) : (
+                                                                            <img
+                                                                                src={m}
+                                                                                alt={`media-${idx}`}
+                                                                                loading="lazy"
+                                                                                style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                                                                                onClick={() => openLightbox(m)}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td><span className="date-badge"><i className="fas fa-calendar"></i> {r.dateLost}</span></td>
-                                                <td><span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {r.locationLost}</span></td>
-                                                <td><span className={`role-badge ${r.requesterRole || 'student'}`}>{(r.requesterRole || 'student').charAt(0).toUpperCase() + (r.requesterRole || 'student').slice(1)}</span></td>
                                                 <td>
-                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                        <span className="user-name" style={{ fontWeight: 600 }}>{r.requesterName || 'N/A'}</span>
-                                                        <span style={{ color: '#666', fontSize: 12 }}>{r.requesterEmail || 'N/A'}</span>
+                                                    <span
+                                                        className="location-badge-lost"
+                                                        style={{
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'anywhere',
+                                                            display: 'inline-block',
+                                                            maxWidth: 220
+                                                        }}
+                                                    >
+                                                        <i className="fas fa-map-marker-alt"></i> {r.locationLost}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div style={{ width: 300, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                                                        {r.description || 'No description provided.'}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {(() => {
+                                                        const role = r.requesterRole || 'student';
+                                                        const displayRole = role === 'official' ? 'personnel' : role;
+                                                        const roleLabel = displayRole.charAt(0).toUpperCase() + displayRole.slice(1);
+                                                        return <span className={`role-badge ${displayRole}`}>{roleLabel}</span>;
+                                                    })()}
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                        <span
+                                                            className="user-name"
+                                                            style={{
+                                                                fontWeight: 600,
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'anywhere',
+                                                                maxWidth: 220
+                                                            }}
+                                                        >
+                                                            {r.requesterName || 'N/A'}
+                                                        </span>
+                                                        <span
+                                                            style={{
+                                                                color: '#666',
+                                                                fontSize: 12,
+                                                                wordBreak: 'break-word',
+                                                                overflowWrap: 'anywhere',
+                                                                maxWidth: 220
+                                                            }}
+                                                        >
+                                                            {r.requesterEmail || 'N/A'}
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td><span className={`user-status-badge ${r.status}`}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
@@ -311,7 +432,8 @@ const AdminLostItems = () => {
                                                     )}
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -369,11 +491,15 @@ const AdminLostItems = () => {
                     ) : (
                         <div className="forum-list">
                             {sortedItems.map((it) => {
-                                const role = (it.postedByRole || 'student');
-                                const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+                                const role = (it.requesterRole || it.postedByRole || it.role || 'student');
+                                // Map 'official' role to 'personnel' for display
+                                const displayRole = role === 'official' ? 'personnel' : role;
+                                const roleLabel = displayRole.charAt(0).toUpperCase() + displayRole.slice(1);
                                 const status = (it.status || 'approved');
                                 const isResolved = status === 'resolved';
                                 const isArchived = status === 'archived';
+                                const mediaList = Array.isArray(it.mediaUrls) ? it.mediaUrls : [];
+                                const primaryMedia = it.imageUrl || mediaList[0] || null;
                                 return (
                                     <div
                                         key={it.id}
@@ -381,8 +507,8 @@ const AdminLostItems = () => {
                                     >
                                         <div className="thread-row">
                                             <div className="thread-thumb">
-                                                {it.imageUrl ? (
-                                                    <img src={it.imageUrl} alt={it.itemName} loading="lazy" decoding="async" />
+                                                {primaryMedia ? (
+                                                    <img src={primaryMedia} alt={it.itemName} loading="lazy" decoding="async" style={{ cursor: 'pointer' }} onClick={() => openLightbox(primaryMedia)} />
                                                 ) : (
                                                     <div className="thread-thumb-placeholder">
                                                         <i className="fas fa-image"></i>
@@ -390,9 +516,9 @@ const AdminLostItems = () => {
                                                 )}
                                             </div>
                                             <div className="thread-content">
-                                                <div className="thread-title-row">
-                                                    <h3>{it.itemName}</h3>
-                                                    <span className="thread-role-badge">{roleLabel}</span>
+                                                <div className="thread-title-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                                                    <h3 style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{it.itemName}</h3>
+                                                    <span className={`thread-role-badge ${displayRole}`}>{roleLabel}</span>
                                                     {isResolved && (
                                                         <span className="lost-item-status-badge resolved">
                                                             <i className="fas fa-check-circle"></i> Found
@@ -404,11 +530,34 @@ const AdminLostItems = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="thread-meta">
+                                                <div className="thread-meta" style={{ flexWrap: 'wrap', gap: 8 }}>
                                                     <span className="date-badge"><i className="fas fa-calendar"></i> {it.dateLost || 'Date unknown'}</span>
-                                                    <span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {it.locationLost || 'Location unknown'}</span>
+                                                    <span
+                                                        className="location-badge-lost"
+                                                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', display: 'inline-flex', maxWidth: '100%' }}
+                                                    >
+                                                        <i className="fas fa-map-marker-alt"></i> {it.locationLost || 'Location unknown'}
+                                                    </span>
                                                 </div>
-                                                <div className="thread-description">{it.description || 'No description provided.'}</div>
+                                                <div
+                                                    className="thread-description"
+                                                    style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}
+                                                >
+                                                    {it.description || 'No description provided.'}
+                                                </div>
+                                                {mediaList.length > 1 && (
+                                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                                                        {mediaList.map((m, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                                onClick={() => openLightbox(m)}
+                                                            >
+                                                                <img src={m} alt={`media-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 <div className="thread-footer thread-credentials" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                                                         <div className="credential-badge">
@@ -440,7 +589,7 @@ const AdminLostItems = () => {
                                                         <button 
                                                             className="item-action-btn" 
                                                             title="Delete" 
-                                                            onClick={() => handleDeleteItem(it.id)}
+                                                            onClick={() => setDeleteModal(it)}
                                                             style={{ color: '#e74c3c' }}
                                                         >
                                                             <i className="fas fa-trash-alt"></i>
@@ -501,6 +650,80 @@ const AdminLostItems = () => {
                             <button className="confirm-modal-cancel-btn" onClick={closeConfirm}>Cancel</button>
                             <button className={`confirm-modal-confirm-btn ${confirmModal.action === 'archive' ? 'confirm-modal-confirm-btn-info' : 'confirm-modal-confirm-btn-warning'}`} onClick={performAction}>
                                 Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {lightboxOpen && lightboxSrc && (
+                <div
+                    className="lightbox-overlay"
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.75)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2000,
+                        padding: '20px'
+                    }}
+                    onClick={closeLightbox}
+                >
+                    <div
+                        style={{
+                            maxWidth: '90vw',
+                            maxHeight: '90vh',
+                            background: '#000',
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                            position: 'relative'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={closeLightbox}
+                            style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                background: 'rgba(0,0,0,0.6)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: 32,
+                                height: 32,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ×
+                        </button>
+                        <img
+                            src={lightboxSrc}
+                            alt="media-full"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: '90vh' }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {deleteModal && (
+                <div className="confirm-modal-overlay" onClick={() => setDeleteModal(null)}>
+                    <div className="confirm-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="confirm-modal-header">
+                            <div className="confirm-modal-icon confirm-modal-icon-warning">
+                                <i className="fas fa-exclamation"></i>
+                            </div>
+                            <h3 className="confirm-modal-title">Delete Published Item?</h3>
+                        </div>
+                        <div className="confirm-modal-message">
+                            Are you sure you want to delete "{deleteModal.itemName}"? This cannot be undone.
+                        </div>
+                        <div className="confirm-modal-actions">
+                            <button className="confirm-modal-cancel-btn" onClick={() => setDeleteModal(null)}>Cancel</button>
+                            <button className="confirm-modal-confirm-btn confirm-modal-confirm-btn-warning" onClick={confirmDeleteItem}>
+                                Delete
                             </button>
                         </div>
                     </div>

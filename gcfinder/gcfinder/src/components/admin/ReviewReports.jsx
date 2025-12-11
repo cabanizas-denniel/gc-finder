@@ -375,23 +375,23 @@ const ReviewReports = () => {
                                 <div className="report-image">
                                     <ImageGallery report={report} />
                                 </div>
-                                <div className="report-info">
-                                    <h3>{report.title}</h3>
-                                    <p className="report-category">{report.category}</p>
-                                    <p className="report-date">Reported on {report.date}</p>
-                                    <p className="report-description">{report.description}</p>
-                                    <p className="report-description-info"><i className="fas fa-map-marker-alt"></i> Location: {report.location}</p>
+                                <div className="report-info" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                                    <h3 style={{ whiteSpace: 'pre-wrap' }}>{report.title}</h3>
+                                    <p className="report-category" style={{ whiteSpace: 'pre-wrap' }}>{report.category}</p>
+                                    <p className="report-date" style={{ whiteSpace: 'pre-wrap' }}>Reported on {report.date}</p>
+                                    <p className="report-description" style={{ whiteSpace: 'pre-wrap' }}>{report.description}</p>
+                                    <p className="report-description-info" style={{ whiteSpace: 'pre-wrap' }}><i className="fas fa-map-marker-alt"></i> Location: {report.location}</p>
                                     {report.exactLocation && (
-                                        <p className="report-description-info"><i className="fas fa-map-marker-alt"></i> Exact Location: {report.exactLocation}</p>
+                                        <p className="report-description-info" style={{ whiteSpace: 'pre-wrap' }}><i className="fas fa-map-marker-alt"></i> Exact Location: {report.exactLocation}</p>
                                     )}
                                     {report.uniqueIdentifier && (
-                                        <p className="report-description-info"><i className="fas fa-qrcode"></i> Identifier: {report.uniqueIdentifier}</p>
+                                        <p className="report-description-info" style={{ whiteSpace: 'pre-wrap' }}><i className="fas fa-qrcode"></i> Identifier: {report.uniqueIdentifier}</p>
                                     )}
                                     {report.additionalDetails && (
-                                        <p className="report-description-info"><i className="fas fa-info-circle"></i> Additional Details: {report.additionalDetails}</p>
+                                        <p className="report-description-info" style={{ whiteSpace: 'pre-wrap' }}><i className="fas fa-info-circle"></i> Additional Details: {report.additionalDetails}</p>
                                     )}
                                     {report.submitter && (
-                                        <p className="report-description-info">
+                                        <p className="report-description-info" style={{ whiteSpace: 'pre-wrap' }}>
                                             <i className="fas fa-user"></i> Submitted By: {report.submitter.full_name}
                                             {report.submitter.student_id && ` (ID: ${report.submitter.student_id})`}
                                         </p>

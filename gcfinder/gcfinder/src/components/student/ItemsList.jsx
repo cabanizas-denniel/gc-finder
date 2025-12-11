@@ -527,10 +527,10 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                                     {item.status === 'Claiming' ? 'Being Claimed' : (item.status || 'N/A')}
                                 </div>
                             )}
-                            <h3>{item.name}</h3>
-                            <p><i className="fas fa-tag"> </i> {item.category}</p>
-                            <p><i className="fas fa-map-marker-alt"> </i> {item.location}</p>
-                            <p><i className="fas fa-calendar"></i> {item.date}</p>
+                            <h3 style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.name}</h3>
+                            <p style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}><i className="fas fa-tag"> </i> {item.category}</p>
+                            <p style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}><i className="fas fa-map-marker-alt"> </i> {item.location}</p>
+                            <p style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}><i className="fas fa-calendar"></i> {item.date}</p>
                             <button onClick={() => viewDetails(item.id)}>View Details</button>
                         </div>
                     ))}

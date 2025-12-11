@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { submitLostRequest, getLostRequests } from '../../admin-firebase';
 import Toast, { useToast } from '../Toast';
 
@@ -11,12 +11,17 @@ const LostRequests = () => {
         dateLost: '',
         locationLost: ''
     });
-    const [file, setFile] = useState(null);
-    const [imageDataUrl, setImageDataUrl] = useState('');
+    const MAX_ITEM_NAME = 40;
+    const MAX_LOCATION = 40;
+    const MAX_DESCRIPTION = 150;
+    const [mediaFiles, setMediaFiles] = useState([]); // { name, type, dataUrl, size }
+    const [totalBytes, setTotalBytes] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [requests, setRequests] = useState([]);
     const [filterStatus, setFilterStatus] = useState('');
     const [showReminder, setShowReminder] = useState(false);
+    const dropzoneRef = useRef(null);
+    const fileInputRef = useRef(null);
     const [loadingRequests, setLoadingRequests] = useState(true);
 
     const handleChange = (e) => {
@@ -26,8 +31,8 @@ const LostRequests = () => {
 
     const resetForm = () => {
         setForm({ itemName: '', description: '', dateLost: '', locationLost: '' });
-        setFile(null);
-        setImageDataUrl('');
+        setMediaFiles([]);
+        setTotalBytes(0);
     };
 
     const prepareImage = (selectedFile) => {
@@ -71,14 +76,84 @@ const LostRequests = () => {
         });
     };
 
+    const handleFiles = useCallback(async (files) => {
+        const list = Array.from(files || []);
+        if (!list.length) return;
+
+        const MAX_TOTAL = 35 * 1024 * 1024; // 35MB cap (matches UI text)
+        if (list.length > 5) {
+            showToast('Please select up to 5 files only', 'error');
+            return;
+        }
+
+        let runningTotal = 0;
+        for (const f of list) {
+            runningTotal += f.size;
+            if (runningTotal > MAX_TOTAL) {
+                showToast('Total upload must be 35MB or less', 'error');
+                return;
+            }
+        }
+
+        const processed = [];
+        for (const f of list) {
+            try {
+                const dataUrl = await prepareImage(f);
+                processed.push({ name: f.name, type: f.type, dataUrl, size: f.size });
+            } catch (err) {
+                console.error(err);
+                showToast(`Failed to process ${f.name}`, 'error');
+                return;
+            }
+        }
+
+        setMediaFiles(processed);
+        setTotalBytes(processed.reduce((sum, f) => sum + f.size, 0));
+
+        // reset input so same file selection can re-trigger change event
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }, [showToast]);
+
+    useEffect(() => {
+        const dropzone = dropzoneRef.current;
+        if (!dropzone) return;
+
+        const handleDragOver = (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        };
+
+        const handleDragLeave = () => {
+            dropzone.classList.remove('dragover');
+        };
+
+        const handleDrop = (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleFiles(e.dataTransfer.files);
+            }
+        };
+
+        dropzone.addEventListener('dragover', handleDragOver);
+        dropzone.addEventListener('dragleave', handleDragLeave);
+        dropzone.addEventListener('drop', handleDrop);
+
+        return () => {
+            dropzone.removeEventListener('dragover', handleDragOver);
+            dropzone.removeEventListener('dragleave', handleDragLeave);
+            dropzone.removeEventListener('drop', handleDrop);
+        };
+    }, [handleFiles]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.itemName || !form.description || !form.dateLost || !form.locationLost) {
             showToast('Please complete all fields', 'warning');
             return;
         }
-        if (!imageDataUrl) {
-            showToast('Please upload an image of the lost item', 'warning');
+        if (mediaFiles.length === 0) {
+            showToast('Please upload at least one file (image/video)', 'warning');
             return;
         }
         try {
@@ -86,7 +161,7 @@ const LostRequests = () => {
             const userData = JSON.parse(localStorage.getItem('userData') || '{}');
             const requesterName = userData.full_name || userData.displayName || userData.name || 'N/A';
             const requesterEmail = userData.userEmail || userData.email || userData.username || `${userData.student_id || userData.employee_id || ''}@gordoncollege.edu.ph`;
-            await submitLostRequest({ ...form, imageUrl: imageDataUrl, requesterName, requesterEmail });
+            await submitLostRequest({ ...form, mediaUrls: mediaFiles.map(f => f.dataUrl), requesterName, requesterEmail });
             showToast('Lost request submitted for review', 'success');
             resetForm();
             await fetchRequests();
@@ -123,11 +198,25 @@ const LostRequests = () => {
             <form onSubmit={handleSubmit} className="lost-request-form">
                 <div className="form-row">
                     <label>Item Name</label>
-                    <input className="lr-input" type="text" name="itemName" value={form.itemName} onChange={handleChange} />
+                    <input
+                        className="lr-input"
+                        type="text"
+                        name="itemName"
+                        value={form.itemName}
+                        onChange={handleChange}
+                        maxLength={MAX_ITEM_NAME}
+                    />
                 </div>
                 <div className="form-row">
                     <label>Description</label>
-                    <textarea className="lr-input" name="description" value={form.description} onChange={handleChange} rows="3" />
+                    <textarea
+                        className="lr-input"
+                        name="description"
+                        value={form.description}
+                        onChange={handleChange}
+                        rows="3"
+                        maxLength={MAX_DESCRIPTION}
+                    />
                 </div>
                 <div className="form-grid">
                     <div className="form-row">
@@ -136,58 +225,71 @@ const LostRequests = () => {
                     </div>
                     <div className="form-row">
                         <label>Location Lost</label>
-                        <input className="lr-input" type="text" name="locationLost" value={form.locationLost} onChange={handleChange} />
+                        <input
+                            className="lr-input"
+                            type="text"
+                            name="locationLost"
+                            value={form.locationLost}
+                            onChange={handleChange}
+                            maxLength={MAX_LOCATION}
+                        />
                     </div>
                 </div>
                 <div className="form-row">
-                    <label>Image Upload</label>
+                    <label>File Upload</label>
                     <div className="lr-image-upload-container">
                         <input
                             id="lost-item-image-upload"
                             className="lr-image-input"
                             type="file"
                             accept="image/*"
-                            onChange={async (e) => {
-                                const f = e.target.files?.[0] || null;
-                                setFile(f);
-                                setImageDataUrl('');
-                                if (f) {
-                                    try {
-                                        const dataUrl = await prepareImage(f);
-                                        setImageDataUrl(dataUrl);
-                                    } catch (err) {
-                                        console.error(err);
-                                        showToast('Failed to process image', 'error');
-                                    }
-                                }
-                            }}
+                            multiple
+                            ref={fileInputRef}
+                            onChange={(e) => handleFiles(e.target.files)}
                         />
-                        {!imageDataUrl ? (
-                            <label htmlFor="lost-item-image-upload" className="lr-image-upload-area">
+                        {mediaFiles.length === 0 ? (
+                            <label
+                                htmlFor="lost-item-image-upload"
+                                className="lr-image-upload-area"
+                                ref={dropzoneRef}
+                            >
                                 <div className="lr-upload-icon">
                                     <i className="fas fa-cloud-upload-alt"></i>
                                 </div>
                                 <div className="lr-upload-text">
                                     <span className="lr-upload-main-text">Click to upload or drag and drop</span>
-                                    <span className="lr-upload-sub-text">PNG, JPG, JPEG up to 800x800px</span>
+                                    <span className="lr-upload-sub-text">PNG, JPG, JPEG — up to 5 files, total ≤ 35MB</span>
                                 </div>
                             </label>
                         ) : (
-                            <div className="lr-image-preview-container">
-                                <div className="lr-image-preview">
-                                    <img alt="preview" src={imageDataUrl} />
-                                    <button
-                                        type="button"
-                                        className="lr-remove-image"
-                                        onClick={() => {
-                                            setImageDataUrl('');
-                                            setFile(null);
-                                            const input = document.getElementById('lost-item-image-upload');
-                                            if (input) input.value = '';
-                                        }}
-                                    >
-                                        <i className="fas fa-times"></i>
-                                    </button>
+                            <div className="lr-image-preview-container" style={{ gap: 12, flexWrap: 'wrap' }}>
+                                {mediaFiles.map((f, idx) => (
+                                    <div key={idx} className="lr-image-preview" style={{ width: 140, height: 140, position: 'relative' }}>
+                                        {f.type.startsWith('image/') ? (
+                                            <img alt={f.name} src={f.dataUrl} />
+                                        ) : (
+                                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f7f7f7', borderRadius: 8, color: '#555', padding: 8, textAlign: 'center' }}>
+                                                <i className="fas fa-file-video" style={{ fontSize: 28, marginBottom: 6 }}></i>
+                                                <div style={{ fontSize: 12, wordBreak: 'break-word' }}>{f.name}</div>
+                                            </div>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className="lr-remove-image"
+                                            onClick={() => {
+                                                const next = mediaFiles.filter((_, i) => i !== idx);
+                                                setMediaFiles(next);
+                                                setTotalBytes(next.reduce((sum, ff) => sum + ff.size, 0));
+                                                const input = document.getElementById('lost-item-image-upload');
+                                                if (input) input.value = '';
+                                            }}
+                                        >
+                                            <i className="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                ))}
+                                <div style={{ width: '100%', fontSize: 12, color: '#666' }}>
+                                    Total: {(totalBytes / (1024 * 1024)).toFixed(2)} MB
                                 </div>
                             </div>
                         )}

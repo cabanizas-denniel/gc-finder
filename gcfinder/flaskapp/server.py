@@ -1496,18 +1496,30 @@ def _sanitize_text(value, max_len=2000):
 
 def _get_user_role(uid):
     try:
+        # Check students collection first
         user_ref = db.collection('students').document(uid)
         docu = user_ref.get()
         if docu.exists:
             data = docu.to_dict()
             return (data.get('role') or 'student').lower()
+        
+        # If not found in students, check officials collection
+        official_ref = db.collection('officials').document(uid)
+        official_doc = official_ref.get()
+        if official_doc.exists:
+            data = official_doc.to_dict()
+            return (data.get('role') or 'official').lower()
     except Exception as e:
         logger.warning(f"Failed to get role for {uid}: {e}")
     return 'student'
 
 # ==== Additional Security Helpers ====
-_DATA_URL_IMAGE_RE = re.compile(r'^data:image/(jpeg|jpg|png);base64,[A-Za-z0-9+/=\r\n]+$')
+_DATA_URL_MEDIA_RE = re.compile(
+    r'^data:(image/(jpeg|jpg|png))(;[^;]+)*;base64,[A-Za-z0-9+/=\r\n]+$',
+    re.IGNORECASE
+)
 _DATE_YMD_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+_MAX_MEDIA_BYTES = 35 * 1024 * 1024  # 35MB combined limit for uploaded images
 
 def _is_valid_date_yyyy_mm_dd(date_str: str) -> bool:
     if not isinstance(date_str, str):
@@ -1521,23 +1533,71 @@ def _is_valid_date_yyyy_mm_dd(date_str: str) -> bool:
     except Exception:
         return False
 
-def _is_valid_image_data_url(image_url: str) -> bool:
-    if not isinstance(image_url, str):
-        return False
-    if not _DATA_URL_IMAGE_RE.match(image_url.strip()):
-        return False
-    # Basic size check on base64 length to avoid extremely large payloads (approx < 2MB)
-    # 4/3 expansion ratio for base64; be generous: up to ~3MB payloads
+def _estimate_data_url_bytes(media_url: str) -> int:
+    """Estimate decoded bytes of a data URL without fully decoding (base64 is ~4/3)."""
     try:
-        b64_part = image_url.split(',', 1)[1]
-        # Remove newlines for safety
+        b64_part = media_url.split(',', 1)[1]
         b64_part = b64_part.replace('\n', '').replace('\r', '')
-        # Rough upper bound; skip decoding for performance
-        if len(b64_part) > 4_200_000:  # ~3.1MB decoded
-            return False
-        return True
+        # Account for padding
+        padding = b64_part.count('=')
+        return int((len(b64_part) * 3) / 4) - padding
     except Exception:
-        return False
+        return 0
+
+
+def _validate_media_urls(media_urls_raw):
+    """
+    Validate incoming media list:
+    - Accept http/https/gs URLs as-is (sanitized length)
+    - Accept data URLs for images (png/jpg/jpeg) or mp4 video up to 35MB total decoded size
+    Returns (clean_list, error_message)
+    """
+    if not isinstance(media_urls_raw, list) or len(media_urls_raw) == 0:
+        return None, "At least one file is required"
+
+    total_bytes = 0
+    cleaned = []
+
+    for m in media_urls_raw:
+        if not isinstance(m, str):
+            return None, "Invalid file format"
+        m = m.strip()
+
+        if m.startswith('http://') or m.startswith('https://') or m.startswith('gs://'):
+            cleaned.append(_sanitize_text(m, 2048))
+            continue
+
+        if m.startswith('data:'):
+            if not _DATA_URL_MEDIA_RE.match(m):
+                return None, "Invalid file data (expected image/png|jpg|jpeg or video/mp4 data URL)"
+            est_bytes = _estimate_data_url_bytes(m)
+            if est_bytes <= 0:
+                return None, "Invalid file data (size check failed)"
+            if est_bytes > _MAX_MEDIA_BYTES:
+                return None, "Each image must be 35MB or less"
+            total_bytes += est_bytes
+            if total_bytes > _MAX_MEDIA_BYTES:
+                return None, "Combined images size must not exceed 35MB"
+            cleaned.append(m)
+            continue
+
+        return None, "Unsupported file reference"
+
+    return cleaned, None
+
+
+def _choose_primary_media(media_list):
+    """
+    Pick the best thumbnail candidate:
+    - Prefer the first image
+    - Fallback to the first file in the list
+    """
+    for m in media_list:
+        if isinstance(m, str) and m.startswith('data:image'):
+            return m
+        if isinstance(m, str) and m.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+            return m
+    return media_list[0] if media_list else None
 
 # Simple in-memory rate limiter for lost request creation
 _LR_RATE_WINDOW_SECONDS = 60  # 1 minute window
@@ -1579,15 +1639,17 @@ def create_lost_request():
     date_lost = _sanitize_text(payload.get('dateLost'), 64)
     location_lost = _sanitize_text(payload.get('locationLost'), 256)
     # Allow large data URLs for images (resized client-side). Limit generously to avoid truncation
-    image_url = _sanitize_text(payload.get('imageUrl'), 2000000)
-    if not all([item_name, description, date_lost, location_lost, image_url]):
-        return jsonify({"error": "Missing required fields"}), 400
-    # Basic image data URL validation to prevent malformed inputs
-    try:
-        if not _is_valid_image_data_url(image_url):
-            return jsonify({"error": "Invalid image format"}), 400
-    except Exception:
-        return jsonify({"error": "Invalid image format"}), 400
+    media_urls_raw = payload.get('mediaUrls')
+    if media_urls_raw is None and payload.get('imageUrl'):
+        # Backward compatibility: accept single imageUrl
+        media_urls_raw = [payload.get('imageUrl')]
+
+    media_urls, media_err = _validate_media_urls(media_urls_raw)
+    if media_err:
+        return jsonify({"error": media_err}), 400
+    primary_media = _choose_primary_media(media_urls)
+    if not primary_media:
+        return jsonify({"error": "At least one file is required"}), 400
     # Strict date validation YYYY-MM-DD
     if not _is_valid_date_yyyy_mm_dd(date_lost):
         return jsonify({"error": "Invalid date format (expected YYYY-MM-DD)"}), 400
@@ -1633,7 +1695,8 @@ def create_lost_request():
             'description': description,
             'dateLost': date_lost,
             'locationLost': location_lost,
-            'imageUrl': image_url,
+            'mediaUrls': media_urls,
+            'imageUrl': primary_media,
             'requesterId': uid,
             'requesterRole': role,
             'requesterName': requester_name,
@@ -1701,6 +1764,7 @@ def list_lost_requests():
                 'description': data.get('description'),
                 'dateLost': data.get('dateLost'),
                 'locationLost': data.get('locationLost'),
+                'mediaUrls': data.get('mediaUrls', []),
                 'imageUrl': data.get('imageUrl'),
                 'requesterRole': data.get('requesterRole', 'student'),
                 'status': data.get('status', 'pending'),
@@ -1730,7 +1794,8 @@ def approve_lost_request(request_id):
             'description': data.get('description'),
             'dateLost': data.get('dateLost'),
             'locationLost': data.get('locationLost'),
-            'imageUrl': data.get('imageUrl'),
+            'mediaUrls': data.get('mediaUrls', []),
+            'imageUrl': data.get('imageUrl') or _choose_primary_media(data.get('mediaUrls', [])),
             'postedByRole': data.get('requesterRole', 'student'),
             'status': 'approved',
             'createdAt': firestore.SERVER_TIMESTAMP,
@@ -1900,7 +1965,8 @@ def list_lost_items():
                 'description': data.get('description'),
                 'dateLost': data.get('dateLost'),
                 'locationLost': data.get('locationLost'),
-                'imageUrl': data.get('imageUrl'),
+                'mediaUrls': data.get('mediaUrls', []),
+                'imageUrl': data.get('imageUrl') or _choose_primary_media(data.get('mediaUrls', [])),
                 'postedByRole': data.get('postedByRole', 'student'),
                 'isOwner': is_owner,
                 **({'requesterName': requester_name, 'requesterEmail': requester_email, 'status': item_status} if is_admin else {}),
