@@ -83,7 +83,10 @@ const LostRequests = () => {
         }
         try {
             setSubmitting(true);
-            await submitLostRequest({ ...form, imageUrl: imageDataUrl });
+            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+            const requesterName = userData.full_name || userData.displayName || userData.name || 'N/A';
+            const requesterEmail = userData.userEmail || userData.email || userData.username || `${userData.student_id || userData.employee_id || ''}@gordoncollege.edu.ph`;
+            await submitLostRequest({ ...form, imageUrl: imageDataUrl, requesterName, requesterEmail });
             showToast('Lost request submitted for review', 'success');
             resetForm();
             await fetchRequests();

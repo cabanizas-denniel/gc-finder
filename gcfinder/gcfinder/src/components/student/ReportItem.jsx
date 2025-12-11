@@ -7,6 +7,7 @@ const ReportItem = () => {
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(0);
     const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = useState(false);
+    const [acceptFinalDisclaimer, setAcceptFinalDisclaimer] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         itemName: '',
@@ -174,6 +175,11 @@ const ReportItem = () => {
             alert('Please fill in all required fields');
             return;
         }
+
+        if (!acceptFinalDisclaimer) {
+            showToast('Please confirm the final disclaimer before submitting.', 'warning');
+            return;
+        }
         
         setIsSubmitting(true);
         
@@ -205,7 +211,7 @@ const ReportItem = () => {
         } finally {
             setIsSubmitting(false);
         }
-    }, [currentStep, formData, uploadedImages, validateStep, navigate]);
+    }, [currentStep, formData, uploadedImages, validateStep, navigate, acceptFinalDisclaimer, showToast]);
 
     // Handle file input change
     const handleFileInputChange = useCallback((e) => {
@@ -537,9 +543,19 @@ const ReportItem = () => {
                             </div>
                         </div>
 
-                        <div className="disclaimer">
-                        <p>By submitting this report, you confirm that all information provided is accurate and true, and that the item has already been, or will be, submitted to <strong>Room 122 (Disciplinary Office)</strong>.</p>
-                        <p>Please be advised that not adhering to the disclaimer may have consequences, potentially leading to a <strong>flag</strong> or <strong>ban</strong>.</p>
+                        <div className="disclaimer" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <input
+                                type="checkbox"
+                                id="acceptFinalDisclaimer"
+                                checked={acceptFinalDisclaimer}
+                                onChange={(e) => setAcceptFinalDisclaimer(e.target.checked)}
+                                style={{ marginTop: '4px' }}
+                                required
+                            />
+                            <label htmlFor="acceptFinalDisclaimer" style={{ lineHeight: 1.5 }}>
+                                By submitting this report, you confirm that all information provided is accurate and true, and that the item has already been, or will be, submitted to <strong>Room 122 (Disciplinary Office)</strong>.<br />
+                                Please be advised that not adhering to the disclaimer may have consequences, potentially leading to a <strong>flag</strong> or <strong>ban</strong>.
+                            </label>
                         </div>
 
                         <div className="form-buttons">
@@ -554,10 +570,10 @@ const ReportItem = () => {
                         <button 
                             type="submit" 
                             className="submit-btn"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || !acceptFinalDisclaimer}
                             style={{
                                 opacity: isSubmitting ? 0.7 : 1,
-                                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                cursor: (isSubmitting || !acceptFinalDisclaimer) ? 'not-allowed' : 'pointer',
                                 position: 'relative'
                             }}
                         >

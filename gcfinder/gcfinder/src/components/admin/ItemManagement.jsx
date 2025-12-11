@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllItems, deleteItemFromDb, archiveItemInDb, unarchiveItemInDb, deleteAllArchivedItems, auth } from '../../admin-firebase';
+import { getAllItems, deleteItemFromDb, archiveItemInDb, unarchiveItemInDb, deleteAllArchivedLostItems, auth } from '../../admin-firebase';
 import { AdminViewItemDetailsModal } from './ItemsLIst'; // Import the shared modal
 import Toast, { useToast } from '../Toast';
 
@@ -277,7 +277,7 @@ const ItemManagement = () => {
             type: 'danger',
             confirmAction: async () => {
                 try {
-                    const result = await deleteAllArchivedItems();
+                    const result = await deleteAllArchivedLostItems();
                     showToast(`Successfully deleted ${result.deleted_count} archived items!`, 'success');
                     fetchItems();
                 } catch (error) {

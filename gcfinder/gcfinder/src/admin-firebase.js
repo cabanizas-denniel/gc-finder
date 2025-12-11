@@ -514,6 +514,25 @@ export const rejectLostRequest = async (requestId, feedback) => {
   }
 };
 
+export const deleteLostRequest = async (requestId) => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-requests/${requestId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete lost request');
+    return data;
+  } catch (e) {
+    console.error('deleteLostRequest error:', e);
+    throw e;
+  }
+};
+
 export const getLostItemsPublic = async () => {
   try {
     const token = await getAuthToken();
@@ -610,11 +629,31 @@ export const unarchiveLostItem = async (itemId) => {
   }
 };
 
-// Delete all archived items permanently
-export const deleteAllArchivedItems = async () => {
+// Delete single lost item permanently
+export const deleteLostItem = async (itemId) => {
   try {
     const token = await getAuthToken();
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/archived/delete-all`, {
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-items/${itemId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete lost item');
+    return data;
+  } catch (e) {
+    console.error('deleteLostItem error:', e);
+    throw e;
+  }
+};
+
+// Delete all archived lost items permanently
+export const deleteAllArchivedLostItems = async () => {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/lost-items/archived/delete-all`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -9,6 +9,8 @@ import Toast, { useToast } from '../Toast';
 const ClaimVerification = () => {
     const [claims, setClaims] = useState([]);
     const [filteredClaims, setFilteredClaims] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 20; // show 20 at a time
     const [statusFilter, setStatusFilter] = useState('all');
     const [selectedClaim, setSelectedClaim] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -61,11 +63,11 @@ const ClaimVerification = () => {
 
     // Filter claims based on status
     useEffect(() => {
-        if (statusFilter === 'all') {
-            setFilteredClaims(claims);
-        } else {
-            setFilteredClaims(claims.filter(claim => claim.status === statusFilter));
-        }
+        const nextClaims = statusFilter === 'all'
+            ? claims
+            : claims.filter(claim => claim.status === statusFilter);
+        setFilteredClaims(nextClaims);
+        setCurrentPage(1); // reset pagination when filter changes
     }, [claims, statusFilter]);
 
     const fetchClaims = async () => {
@@ -136,7 +138,7 @@ const ClaimVerification = () => {
             setSelectedClaim(prev => ({
                 ...prev,
                 status: approve ? 'approved' : 'rejected',
-                rejectionReason: !approve && rejectionReason ? rejectionReason : prev.rejectionReason
+                rejectionReason: !approve && rejectionReason ? rejectionReason : prev?.rejectionReason
             }));
 
             // Show notification message for approved claims
@@ -313,7 +315,9 @@ const ClaimVerification = () => {
                 ) : filteredClaims.length === 0 ? (
                     <p>No claims found for selected filter</p>
                 ) : (
-                    filteredClaims.map((claim) => (
+                    filteredClaims
+                        .slice(0, currentPage * PAGE_SIZE)
+                        .map((claim) => (
                         <div 
                             key={claim.id}
                             className={`claim-item ${selectedClaim?.id === claim.id ? 'selected' : ''}`}
@@ -330,6 +334,16 @@ const ClaimVerification = () => {
                         </div>
                         
                     ))
+                )}
+                {filteredClaims.length > currentPage * PAGE_SIZE && (
+                    <div style={{ textAlign: 'center', padding: '12px' }}>
+                        <button 
+                            className="view-details-btn" 
+                            onClick={() => setCurrentPage(prev => prev + 1)}
+                        >
+                            Load more
+                        </button>
+                    </div>
                 )}
             </div>
         </div>

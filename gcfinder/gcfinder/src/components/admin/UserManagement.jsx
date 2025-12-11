@@ -1059,7 +1059,7 @@ const UserManagement = () => {
                                     onChange={(e) => setStudentData(e.target.value)}
                                     className="export-modal-date-input"
                                     placeholder={uploadMode === 'manual' 
-                                        ? `STUDENT:\n202400001,Juan Dela Cruz,1(Year Level),active/flagged/banned(Status),student(Role)\n\nOFFICIAL:\nP.Lopez,Peter Lopez,peter.lopez@gordoncollege.edu.ph,active/flagged/banned(Status),official(Role)`
+                                        ? `STUDENT:\n202400001,Juan Dela Cruz,1(Year Level),active/flagged/banned(Status),student(Role)\n\nPERSONNEL:\nP.Lopez,Peter Lopez,peter.lopez@gordoncollege.edu.ph,active/flagged/banned(Status),official(Role)`
                                         : "CSV data will appear here..."}
                                     rows="8"
                                     style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}
@@ -1322,6 +1322,11 @@ const UserManagement = () => {
                     )}
                 </div>
 
+                <div className="disclaimer">
+                    <p><strong>Flagging:</strong> Prevents the user from sending reports or messages to the Disciplinary Office, but still allows them to claim items.</p>
+                    <p><strong>Banning:</strong> Completely restricts the user from accessing the platform.</p>
+                </div>
+
                 {/* Pagination Controls */}
                 {(() => {
                     // Calculate total users after applying current tab and search filters
@@ -1359,10 +1364,7 @@ const UserManagement = () => {
                     return null; // No pagination needed if only one page or no users
                 })()}
 
-                <div className="disclaimer">
-                    <p><strong>Flagging:</strong> Prevents the user from sending reports or messages to the Disciplinary Office, but still allows them to claim items.</p>
-                    <p><strong>Banning:</strong> Completely restricts the user from accessing the platform.</p>
-                </div>
+
 
                 {/* Toast Notification */}
                 <Toast 

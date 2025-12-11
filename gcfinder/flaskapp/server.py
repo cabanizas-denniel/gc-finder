@@ -843,7 +843,9 @@ def delete_user():
             "claims": 0,
             "conversations": 0,
             "messages": 0,
-            "notifications": 0
+            "notifications": 0,
+            "lost_requests": 0,
+            "lost_items": 0
         }
 
         # Delete items where this user is the submitter (match uid or student_id)
@@ -887,6 +889,24 @@ def delete_user():
         for notif_doc in notif_query.stream():
             notif_doc.reference.delete()
             deleted_counts["notifications"] += 1
+
+        # Delete lost requests created by this user (and any published lost_items that came from them)
+        req_ids = []
+        lost_req_ref = db.collection('lost_requests')
+        for req_doc in lost_req_ref.where('requesterId', '==', uid).stream():
+            req_ids.append(req_doc.id)
+            req_doc.reference.delete()
+            deleted_counts["lost_requests"] += 1
+        # Delete linked lost_items for each sourceRequestId
+        lost_items_ref = db.collection('lost_items')
+        for rid in req_ids:
+            for li_doc in lost_items_ref.where('sourceRequestId', '==', rid).stream():
+                li_doc.reference.delete()
+                deleted_counts["lost_items"] += 1
+        # Also remove any stray lost_items directly tagged to this uid (defensive)
+        for li_doc in lost_items_ref.where('requesterId', '==', uid).stream():
+            li_doc.reference.delete()
+            deleted_counts["lost_items"] += 1
         
         return jsonify({
             "message": f"Successfully deleted user {uid}",
@@ -1583,14 +1603,27 @@ def create_lost_request():
     requester_email = None
     try:
         user_doc = db.collection('students').document(uid).get()
+        if not user_doc.exists:
+            user_doc = db.collection('officials').document(uid).get()
         if user_doc.exists:
             u = user_doc.to_dict()
-            requester_name = u.get('full_name') or u.get('name')
-            requester_email = u.get('email') or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else None)
+            requester_name = u.get('full_name') or u.get('name') or u.get('employee_name')
+            requester_email = (
+                u.get('email')
+                or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else None)
+                or (f"{u.get('employee_id')}@gordoncollege.edu.ph" if u.get('employee_id') else None)
+            )
+        # Fallbacks if still missing
+        if not requester_name:
+            requester_name = payload.get('requesterName') or request.user.get('name') or (request.user.get('email') or '').split('@')[0] or 'N/A'
         if not requester_email:
-            requester_email = f"{uid}@gordoncollege.edu.ph"
+            requester_email = payload.get('requesterEmail') or request.user.get('email') or f"{uid}@gordoncollege.edu.ph"
     except Exception as ue:
         logger.warning(f"Could not fetch requester profile for {uid}: {ue}")
+        if not requester_name:
+            requester_name = payload.get('requesterName') or request.user.get('name') or (request.user.get('email') or '').split('@')[0] or 'N/A'
+        if not requester_email:
+            requester_email = payload.get('requesterEmail') or request.user.get('email') or f"{uid}@gordoncollege.edu.ph"
 
     try:
         lost_ref = db.collection('lost_requests')
@@ -1645,15 +1678,20 @@ def list_lost_requests():
                 try:
                     req_id = data.get('requesterId')
                     if req_id:
+                        # Try students, then officials
                         user_doc = db.collection('students').document(req_id).get()
+                        if not user_doc.exists:
+                            user_doc = db.collection('officials').document(req_id).get()
                         if user_doc.exists:
                             u = user_doc.to_dict()
                             # Prefer live profile data, but fall back to stored values if missing
                             requester_name = (
-                                u.get('full_name') or u.get('name') or requester_name or 'N/A'
+                                u.get('full_name') or u.get('name') or u.get('employee_name') or requester_name or 'N/A'
                             )
                             requester_email = (
-                                u.get('email') or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else requester_email)
+                                u.get('email')
+                                or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else requester_email)
+                                or (f"{u.get('employee_id')}@gordoncollege.edu.ph" if u.get('employee_id') else requester_email)
                             )
                 except Exception as ue:
                     logger.warning(f"Failed to enrich requester info for {d.id}: {ue}")
@@ -1738,6 +1776,35 @@ def reject_lost_request(request_id):
         logger.error(f"Error rejecting lost request {request_id}: {e}")
         return jsonify({'error': 'Failed to reject lost request'}), 500
 
+@app.route('/api/lost-requests/<request_id>', methods=['DELETE'])
+@admin_required
+def delete_lost_request(request_id):
+    """
+    Permanently delete a lost request. Admin only.
+    Also deletes any published lost_items linked via sourceRequestId.
+    """
+    try:
+        req_ref = db.collection('lost_requests').document(request_id)
+        req_doc = req_ref.get()
+        if not req_doc.exists:
+            return jsonify({'error': 'Request not found'}), 404
+
+        # Delete linked lost_items
+        items_ref = db.collection('lost_items')
+        linked_items = items_ref.where('sourceRequestId', '==', request_id).stream()
+        deleted_items = 0
+        for li in linked_items:
+            li.reference.delete()
+            deleted_items += 1
+
+        # Delete the request
+        req_ref.delete()
+
+        return jsonify({'message': 'Lost request deleted', 'deleted_items': deleted_items}), 200
+    except Exception as e:
+        logger.error(f"Error deleting lost request {request_id}: {e}")
+        return jsonify({'error': 'Failed to delete lost request'}), 500
+
 @app.route('/api/lost-items', methods=['GET'])
 @login_required
 def list_lost_items():
@@ -1765,8 +1832,8 @@ def list_lost_items():
             if not is_admin and item_status in ('resolved', 'archived'):
                 continue
             # Build requester info for admins, compute ownership flag for all
-            requester_name = None
-            requester_email = None
+            requester_name = data.get('requesterName')
+            requester_email = data.get('requesterEmail')
             if is_admin:
                 try:
                     source_id = data.get('sourceRequestId')
@@ -1776,11 +1843,36 @@ def list_lost_items():
                             req_data = req_doc.to_dict()
                             rid = req_data.get('requesterId')
                             if rid:
+                                # Try students, then officials so officials show up too
                                 user_doc = db.collection('students').document(rid).get()
+                                if not user_doc.exists:
+                                    user_doc = db.collection('officials').document(rid).get()
                                 if user_doc.exists:
                                     u = user_doc.to_dict()
-                                    requester_name = u.get('full_name') or u.get('name') or 'N/A'
-                                    requester_email = u.get('email') or f"{u.get('student_id')}@gordoncollege.edu.ph"
+                                    requester_name = (
+                                        u.get('full_name') or u.get('name') or u.get('employee_name') or requester_name or 'N/A'
+                                    )
+                                    requester_email = (
+                                        u.get('email')
+                                        or (f"{u.get('student_id')}@gordoncollege.edu.ph" if u.get('student_id') else requester_email)
+                                        or (f"{u.get('employee_id')}@gordoncollege.edu.ph" if u.get('employee_id') else requester_email)
+                                        or requester_email
+                                    )
+                            # If profile lookup failed or fields missing, fall back to stored request values
+                            if not requester_name:
+                                requester_name = (
+                                    req_data.get('requesterName')
+                                    or req_data.get('full_name')
+                                    or req_data.get('name')
+                                    or req_data.get('employee_name')
+                                    or 'N/A'
+                                )
+                            if not requester_email:
+                                requester_email = (
+                                    req_data.get('requesterEmail')
+                                    or req_data.get('email')
+                                    or requester_email
+                                )
                 except Exception as ue:
                     logger.warning(f"Failed to enrich lost item {d.id} with requester info: {ue}")
             # Ownership flag (no PII exposure)
@@ -1904,6 +1996,42 @@ def unarchive_lost_item(item_id):
     except Exception as e:
         logger.error(f"Error unarchiving lost item {item_id}: {e}")
         return jsonify({'error': 'Failed to unarchive lost item'}), 500
+
+@app.route('/api/lost-items/<item_id>', methods=['DELETE'])
+@admin_required
+def delete_lost_item(item_id):
+    """
+    Permanently delete a lost item. Admin only.
+    """
+    try:
+        ref = db.collection('lost_items').document(item_id)
+        doc = ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Lost item not found'}), 404
+        ref.delete()
+        return jsonify({'message': f'Lost item {item_id} deleted'}), 200
+    except Exception as e:
+        logger.error(f"Error deleting lost item {item_id}: {e}")
+        return jsonify({'error': 'Failed to delete lost item'}), 500
+
+@app.route('/api/lost-items/archived/delete-all', methods=['DELETE'])
+@admin_required
+def delete_all_archived_lost_items():
+    """
+    Permanently delete all archived lost items. Admin only.
+    """
+    try:
+        deleted_count = 0
+        items_ref = db.collection('lost_items')
+        for status_value in ['Archived', 'archived']:
+            q = items_ref.where('status', '==', status_value).stream()
+            for doc_snap in q:
+                doc_snap.reference.delete()
+                deleted_count += 1
+        return jsonify({'message': 'Archived lost items deleted', 'deleted_count': deleted_count}), 200
+    except Exception as e:
+        logger.error(f"Error deleting archived lost items: {e}")
+        return jsonify({'error': 'Failed to delete archived lost items'}), 500
 
 @app.route('/api/users/<uid>/status', methods=['PUT'])
 @admin_required

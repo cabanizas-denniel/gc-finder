@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getLostRequests, approveLostRequest, rejectLostRequest, getLostItemsPublic, resolveLostItem, unresolveLostItem, archiveLostItem, unarchiveLostItem } from '../../admin-firebase';
+import { getLostRequests, approveLostRequest, rejectLostRequest, deleteLostRequest, getLostItemsPublic, resolveLostItem, unresolveLostItem, archiveLostItem, unarchiveLostItem, deleteLostItem, deleteAllArchivedLostItems } from '../../admin-firebase';
 import Toast, { useToast } from '../Toast';
 
 const AdminLostItems = () => {
@@ -21,6 +21,7 @@ const AdminLostItems = () => {
     const [error, setError] = useState('');
     const [sortBy, setSortBy] = useState('date-newest');
     const [confirmModal, setConfirmModal] = useState({ open: false, action: null, item: null });
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
     // Fetch requests
     const fetchRequests = async () => {
@@ -82,7 +83,9 @@ const AdminLostItems = () => {
     const handleReject = async (id) => {
         try {
             await rejectLostRequest(id, feedback);
-            showToast('Request rejected', 'success');
+            // After rejecting, delete the request
+            await deleteLostRequest(id);
+            showToast('Request rejected and removed', 'success');
             setRejectingId(null);
             setFeedback('');
             fetchRequests();
@@ -132,6 +135,32 @@ const AdminLostItems = () => {
             showToast('Failed to update item. Please try again.', 'error');
         } finally {
             closeConfirm();
+        }
+    };
+
+    const handleDeleteItem = async (itemId) => {
+        try {
+            await deleteLostItem(itemId);
+            showToast('Lost item deleted permanently', 'success');
+            fetchItems();
+        } catch (e) {
+            console.error('Delete failed', e);
+            showToast('Failed to delete item. Please try again.', 'error');
+        }
+    };
+
+    const handleDeleteAllArchived = async () => {
+        try {
+            setBulkDeleteLoading(true);
+            const result = await deleteAllArchivedLostItems();
+            const deletedCount = result?.deleted_count ?? 0;
+            showToast(`Deleted ${deletedCount} archived item(s)`, 'success');
+            fetchItems();
+        } catch (e) {
+            console.error('Bulk delete failed', e);
+            showToast('Failed to delete archived items. Please try again.', 'error');
+        } finally {
+            setBulkDeleteLoading(false);
         }
     };
 
@@ -294,7 +323,7 @@ const AdminLostItems = () => {
             {/* Items Tab Content */}
             {activeTab === 'items' && (
                 <>
-                    <div className="action-buttons" style={{ marginBottom: 15, display: 'flex', gap: 10 }}>
+                    <div className="action-buttons" style={{ marginBottom: 15, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
@@ -310,6 +339,15 @@ const AdminLostItems = () => {
                         <button className="refresh-btn" onClick={fetchItems}>
                             <i className="fas fa-sync-alt"></i> Refresh
                         </button>
+                        {items.some(it => (it.status || '').toLowerCase() === 'archived') && (
+                            <button 
+                                className="export-btn" 
+                                onClick={handleDeleteAllArchived} 
+                                disabled={bulkDeleteLoading}
+                            >
+                                <i className="fas fa-trash-alt"></i> {bulkDeleteLoading ? 'Deleting...' : 'Delete All Archived'}
+                            </button>
+                        )}
                     </div>
 
                     {itemsLoading ? (
@@ -399,6 +437,14 @@ const AdminLostItems = () => {
                                                                 <i className="fas fa-archive"></i>
                                                             </button>
                                                         )}
+                                                        <button 
+                                                            className="item-action-btn" 
+                                                            title="Delete" 
+                                                            onClick={() => handleDeleteItem(it.id)}
+                                                            style={{ color: '#e74c3c' }}
+                                                        >
+                                                            <i className="fas fa-trash-alt"></i>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>

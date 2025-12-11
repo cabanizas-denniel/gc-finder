@@ -107,8 +107,12 @@ const OfficialLogin = () => {
       const enhancedUserData = {
         ...userData,
         userType: 'official', // Important: Mark as official
-        displayName: userData.full_name || userData.name || "Official",
-        userEmail: userData.email || `${userData.employee_id}@gordoncollege.edu.ph`,
+        displayName: userData.full_name || userData.name || userData.employee_name || "Official",
+        userEmail: userData.email || `${userData.employee_id || userData.id}@gordoncollege.edu.ph`,
+        student_id: userData.student_id || userData.employee_id || userData.id, // align with student shape
+        full_name: userData.full_name || userData.name || userData.employee_name || "Official",
+        requesterName: userData.full_name || userData.name || userData.employee_name || "Official",
+        requesterEmail: userData.email || `${userData.employee_id || userData.id}@gordoncollege.edu.ph`,
         profilePicture: userData.profileUrl || null,
       };
       

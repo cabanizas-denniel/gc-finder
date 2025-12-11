@@ -226,6 +226,12 @@ export const loginWithOfficialId = async (academicEmail, password) => {
     return {
       id: officialDoc.id,
       userType: 'official', // Mark as official for Layout component
+      student_id: officialData.student_id || officialData.employee_id || officialDoc.id,
+      full_name: officialData.full_name || officialData.name || officialData.employee_name || 'Official',
+      name: officialData.full_name || officialData.name || officialData.employee_name || 'Official',
+      requesterName: officialData.full_name || officialData.name || officialData.employee_name || 'Official',
+      requesterEmail: officialData.email || `${officialData.employee_id || officialDoc.id}@gordoncollege.edu.ph`,
+      email: officialData.email || `${officialData.employee_id || officialDoc.id}@gordoncollege.edu.ph`,
       ...officialData
     };
   } catch (error) {
