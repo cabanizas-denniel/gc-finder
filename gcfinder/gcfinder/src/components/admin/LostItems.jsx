@@ -1,16 +1,45 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { getLostItemsPublic, resolveLostItem, unresolveLostItem, archiveLostItem, unarchiveLostItem } from '../../admin-firebase';
+import React, { useEffect, useState } from 'react';
+import { getLostRequests, approveLostRequest, rejectLostRequest, getLostItemsPublic, resolveLostItem, unresolveLostItem, archiveLostItem, unarchiveLostItem } from '../../admin-firebase';
+import Toast, { useToast } from '../Toast';
 
 const AdminLostItems = () => {
+    const { toast, showToast, hideToast } = useToast();
+    
+    // Tab state: 'requests' or 'items'
+    const [activeTab, setActiveTab] = useState('requests');
+    
+    // Requests state (pending lost requests)
+    const [requests, setRequests] = useState([]);
+    const [statusFilter, setStatusFilter] = useState('pending');
+    const [requestsLoading, setRequestsLoading] = useState(false);
+    const [rejectingId, setRejectingId] = useState(null);
+    const [feedback, setFeedback] = useState('');
+    
+    // Items state (approved lost items)
     const [items, setItems] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [itemsLoading, setItemsLoading] = useState(true);
     const [error, setError] = useState('');
     const [sortBy, setSortBy] = useState('date-newest');
     const [confirmModal, setConfirmModal] = useState({ open: false, action: null, item: null });
 
-    const fetchItems = useCallback(async () => {
+    // Fetch requests
+    const fetchRequests = async () => {
         try {
-            setLoading(true);
+            setRequestsLoading(true);
+            const data = await getLostRequests(statusFilter || undefined);
+            setRequests(data);
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to load lost requests', 'error');
+        } finally {
+            setRequestsLoading(false);
+        }
+    };
+
+    // Fetch items
+    const fetchItems = async () => {
+        try {
+            setItemsLoading(true);
             setError('');
             const data = await getLostItemsPublic();
             setItems(data || []);
@@ -18,83 +47,76 @@ const AdminLostItems = () => {
             console.error(e);
             setError('Failed to load lost items');
         } finally {
-            setLoading(false);
+            setItemsLoading(false);
         }
-    }, []);
+    };
 
-    useEffect(() => { fetchItems(); }, [fetchItems]);
+    // Fetch requests when tab is active or filter changes
+    useEffect(() => {
+        if (activeTab === 'requests') {
+            fetchRequests();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, statusFilter]);
 
-    // Sort items based on selected sort option
+    // Fetch items when items tab becomes active
+    useEffect(() => {
+        if (activeTab === 'items') {
+            fetchItems();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]);
+
+    // Request handlers
+    const handleApprove = async (id) => {
+        try {
+            await approveLostRequest(id);
+            showToast('Request approved and published', 'success');
+            fetchRequests();
+        } catch (e) {
+            console.error(e);
+            showToast(e.message || 'Approve failed', 'error');
+        }
+    };
+
+    const handleReject = async (id) => {
+        try {
+            await rejectLostRequest(id, feedback);
+            showToast('Request rejected', 'success');
+            setRejectingId(null);
+            setFeedback('');
+            fetchRequests();
+        } catch (e) {
+            console.error(e);
+            showToast(e.message || 'Reject failed', 'error');
+        }
+    };
+
+    // Sort items
     const sortedItems = React.useMemo(() => {
         const sorted = [...items];
         switch (sortBy) {
             case 'date-newest':
-                return sorted.sort((a, b) => {
-                    const dateA = new Date(a.dateLost || 0);
-                    const dateB = new Date(b.dateLost || 0);
-                    return dateB - dateA;
-                });
+                return sorted.sort((a, b) => new Date(b.dateLost || 0) - new Date(a.dateLost || 0));
             case 'date-oldest':
-                return sorted.sort((a, b) => {
-                    const dateA = new Date(a.dateLost || 0);
-                    const dateB = new Date(b.dateLost || 0);
-                    return dateA - dateB;
-                });
+                return sorted.sort((a, b) => new Date(a.dateLost || 0) - new Date(b.dateLost || 0));
             case 'name-asc':
-                return sorted.sort((a, b) => {
-                    const nameA = (a.itemName || '').toLowerCase();
-                    const nameB = (b.itemName || '').toLowerCase();
-                    return nameA.localeCompare(nameB);
-                });
+                return sorted.sort((a, b) => (a.itemName || '').toLowerCase().localeCompare((b.itemName || '').toLowerCase()));
             case 'name-desc':
-                return sorted.sort((a, b) => {
-                    const nameA = (a.itemName || '').toLowerCase();
-                    const nameB = (b.itemName || '').toLowerCase();
-                    return nameB.localeCompare(nameA);
-                });
+                return sorted.sort((a, b) => (b.itemName || '').toLowerCase().localeCompare((a.itemName || '').toLowerCase()));
             case 'location-asc':
-                return sorted.sort((a, b) => {
-                    const locA = (a.locationLost || '').toLowerCase();
-                    const locB = (b.locationLost || '').toLowerCase();
-                    return locA.localeCompare(locB);
-                });
+                return sorted.sort((a, b) => (a.locationLost || '').toLowerCase().localeCompare((b.locationLost || '').toLowerCase()));
             case 'location-desc':
-                return sorted.sort((a, b) => {
-                    const locA = (a.locationLost || '').toLowerCase();
-                    const locB = (b.locationLost || '').toLowerCase();
-                    return locB.localeCompare(locA);
-                });
-            case 'role-asc':
-                return sorted.sort((a, b) => {
-                    const roleA = (a.postedByRole || 'student').toLowerCase();
-                    const roleB = (b.postedByRole || 'student').toLowerCase();
-                    return roleA.localeCompare(roleB);
-                });
-            case 'role-desc':
-                return sorted.sort((a, b) => {
-                    const roleA = (a.postedByRole || 'student').toLowerCase();
-                    const roleB = (b.postedByRole || 'student').toLowerCase();
-                    return roleB.localeCompare(roleA);
-                });
-            case 'requester-asc':
-                return sorted.sort((a, b) => {
-                    const nameA = (a.requesterName || '').toLowerCase();
-                    const nameB = (b.requesterName || '').toLowerCase();
-                    return nameA.localeCompare(nameB);
-                });
-            case 'requester-desc':
-                return sorted.sort((a, b) => {
-                    const nameA = (a.requesterName || '').toLowerCase();
-                    const nameB = (b.requesterName || '').toLowerCase();
-                    return nameB.localeCompare(nameA);
-                });
+                return sorted.sort((a, b) => (b.locationLost || '').toLowerCase().localeCompare((a.locationLost || '').toLowerCase()));
             default:
                 return sorted;
         }
     }, [items, sortBy]);
 
+    // Item action handlers
     const openConfirm = (action, item) => setConfirmModal({ open: true, action, item });
     const closeConfirm = () => setConfirmModal({ open: false, action: null, item: null });
+    
     const performAction = async () => {
         const { action, item } = confirmModal;
         try {
@@ -104,134 +126,267 @@ const AdminLostItems = () => {
             else if (action === 'archive') await archiveLostItem(item.id);
             else if (action === 'unarchive') await unarchiveLostItem(item.id);
             await fetchItems();
+            showToast(`Item ${action}d successfully`, 'success');
         } catch (e) {
             console.error('Action failed', e);
-            alert('Failed to update item. Please try again.');
+            showToast('Failed to update item. Please try again.', 'error');
         } finally {
             closeConfirm();
         }
     };
 
+    // Count pending requests for badge
+    const pendingCount = requests.filter(r => r.status === 'pending').length;
+
     return (
-        <div className="browse-items-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                <div>
-                    <h1>Lost Items</h1>
-                    <p className="subtitle">Approved lost requests (admin view shows requester)</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {!loading && items.length > 0 && (
-                        <>
-                            <select
-                                id="sort-lost-items-admin"
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="lost-items-sort-select"
-                            >
-                                <option value="date-newest">Date Lost (Newest First)</option>
-                                <option value="date-oldest">Date Lost (Oldest First)</option>
-                                <option value="name-asc">Item Name (A-Z)</option>
-                                <option value="name-desc">Item Name (Z-A)</option>
-                                <option value="location-asc">Location (A-Z)</option>
-                                <option value="location-desc">Location (Z-A)</option>
-                                <option value="role-asc">Posted By (Student → Staff)</option>
-                                <option value="role-desc">Posted By (Staff → Student)</option>
-                                <option value="requester-asc">Requester Name (A-Z)</option>
-                                <option value="requester-desc">Requester Name (Z-A)</option>
-                            </select>
-                        </>
-                    )}
-                    <button className="refresh-btn" onClick={fetchItems}><i className="fas fa-sync-alt"></i> Refresh</button>
+        <div className="user-management-container">
+            <div className="page-header">
+                <div className="page-header-content">
+                    <h1>Lost Items Management</h1>
+                    <p className="admin-subtitle">Review requests and manage published lost items</p>
                 </div>
             </div>
-            {loading ? (
-                <div className="loading-message">
-                    <i className="fas fa-spinner fa-pulse"></i>
-                    <p>Loading lost items...</p>
-                </div>
-            ) : error ? (
-                <div className="error-message">
-                    <i className="fas fa-exclamation-circle"></i>
-                    <p>{error}</p>
-                </div>
-            ) : items.length === 0 ? (
-                <div className="no-results">
+
+            {/* Tab Navigation */}
+            <div className="tab-navigation" style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid #e0e0e0' }}>
+                <button
+                    className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('requests')}
+                    style={{
+                        padding: '12px 24px',
+                        border: 'none',
+                        background: activeTab === 'requests' ? 'var(--primary-color)' : 'transparent',
+                        color: activeTab === 'requests' ? 'white' : '#666',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        borderRadius: '8px 8px 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    <i className="fas fa-clipboard-list"></i>
+                    Pending Requests
+                    {statusFilter === 'pending' && pendingCount > 0 && (
+                        <span style={{
+                            background: activeTab === 'requests' ? 'white' : 'var(--primary-color)',
+                            color: activeTab === 'requests' ? 'var(--primary-color)' : 'white',
+                            borderRadius: '50%',
+                            width: 22,
+                            height: 22,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 12,
+                            fontWeight: 700
+                        }}>
+                            {pendingCount}
+                        </span>
+                    )}
+                </button>
+                <button
+                    className={`tab-btn ${activeTab === 'items' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('items')}
+                    style={{
+                        padding: '12px 24px',
+                        border: 'none',
+                        background: activeTab === 'items' ? 'var(--primary-color)' : 'transparent',
+                        color: activeTab === 'items' ? 'white' : '#666',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        borderRadius: '8px 8px 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        transition: 'all 0.2s'
+                    }}
+                >
                     <i className="fas fa-search"></i>
-                    <h3>No lost items found</h3>
-                    <p>Try refreshing the list</p>
-                </div>
-            ) : (
-                <div className="forum-list">
-                    {sortedItems.map((it) => {
-                        const role = (it.postedByRole || 'student');
-                        const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
-                        const status = (it.status || 'approved');
-                        const isResolved = status === 'resolved';
-                        const isArchived = status === 'archived';
-                        return (
-                            <div
-                                key={it.id}
-                                className={`forum-thread ${isResolved ? 'item-resolved' : ''} ${isArchived ? 'item-archived' : ''}`}
-                            >
-                                <div className="thread-row">
-                                    <div className="thread-thumb">
-                                        {it.imageUrl ? (
-                                            <img
-                                                src={it.imageUrl}
-                                                alt={it.itemName}
-                                            />
-                                        ) : (
-                                            <div className="thread-thumb-placeholder">
-                                                <i className="fas fa-image"></i>
+                    Published Items
+                </button>
+            </div>
+
+            {/* Requests Tab Content */}
+            {activeTab === 'requests' && (
+                <>
+                    <div className="action-buttons" style={{ marginBottom: 15, display: 'flex', gap: 10 }}>
+                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="lost-items-sort-select">
+                            <option value="">All</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                        <button className="refresh-btn" onClick={fetchRequests}>
+                            <i className="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+
+                    <div className="users-table-container">
+                        {requestsLoading ? (
+                            <div className="loading-message">
+                                <i className="fas fa-spinner fa-pulse"></i>
+                                <p>Loading requests...</p>
+                            </div>
+                        ) : requests.length === 0 ? (
+                            <div className="no-results">
+                                <i className="fas fa-clipboard-check"></i>
+                                <h3>No requests found</h3>
+                                <p>Try adjusting the filter</p>
+                            </div>
+                        ) : (
+                            <div className="mobile-table-wrapper">
+                                <table className="users-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Date Lost</th>
+                                            <th>Location</th>
+                                            <th>Role</th>
+                                            <th>Requester</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {requests.map((r) => (
+                                            <tr key={r.id}>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                        <img src={r.imageUrl} alt={r.itemName} loading="lazy" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #eee' }} />
+                                                        <div className="user-name">{r.itemName}</div>
+                                                    </div>
+                                                </td>
+                                                <td><span className="date-badge"><i className="fas fa-calendar"></i> {r.dateLost}</span></td>
+                                                <td><span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {r.locationLost}</span></td>
+                                                <td><span className={`role-badge ${r.requesterRole || 'student'}`}>{(r.requesterRole || 'student').charAt(0).toUpperCase() + (r.requesterRole || 'student').slice(1)}</span></td>
+                                                <td>
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span className="user-name" style={{ fontWeight: 600 }}>{r.requesterName || 'N/A'}</span>
+                                                        <span style={{ color: '#666', fontSize: 12 }}>{r.requesterEmail || 'N/A'}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span className={`user-status-badge ${r.status}`}>{r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
+                                                <td className="actions">
+                                                    {r.status === 'pending' ? (
+                                                        <>
+                                                            <button className="action-btn view" title="Approve" onClick={() => handleApprove(r.id)}>
+                                                                <i className="fas fa-check"></i>
+                                                            </button>
+                                                            <button className="action-btn ban" title="Reject" onClick={() => setRejectingId(r.id)}>
+                                                                <i className="fas fa-times"></i>
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <span style={{ color: '#666', fontSize: 12 }}>—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+
+            {/* Items Tab Content */}
+            {activeTab === 'items' && (
+                <>
+                    <div className="action-buttons" style={{ marginBottom: 15, display: 'flex', gap: 10 }}>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="lost-items-sort-select"
+                        >
+                            <option value="date-newest">Date Lost (Newest First)</option>
+                            <option value="date-oldest">Date Lost (Oldest First)</option>
+                            <option value="name-asc">Item Name (A-Z)</option>
+                            <option value="name-desc">Item Name (Z-A)</option>
+                            <option value="location-asc">Location (A-Z)</option>
+                            <option value="location-desc">Location (Z-A)</option>
+                        </select>
+                        <button className="refresh-btn" onClick={fetchItems}>
+                            <i className="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+
+                    {itemsLoading ? (
+                        <div className="loading-message">
+                            <i className="fas fa-spinner fa-pulse"></i>
+                            <p>Loading lost items...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="error-message">
+                            <i className="fas fa-exclamation-circle"></i>
+                            <p>{error}</p>
+                        </div>
+                    ) : items.length === 0 ? (
+                        <div className="no-results">
+                            <i className="fas fa-search"></i>
+                            <h3>No published lost items</h3>
+                            <p>Approved requests will appear here</p>
+                        </div>
+                    ) : (
+                        <div className="forum-list">
+                            {sortedItems.map((it) => {
+                                const role = (it.postedByRole || 'student');
+                                const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+                                const status = (it.status || 'approved');
+                                const isResolved = status === 'resolved';
+                                const isArchived = status === 'archived';
+                                return (
+                                    <div
+                                        key={it.id}
+                                        className={`forum-thread ${isResolved ? 'item-resolved' : ''} ${isArchived ? 'item-archived' : ''}`}
+                                    >
+                                        <div className="thread-row">
+                                            <div className="thread-thumb">
+                                                {it.imageUrl ? (
+                                                    <img src={it.imageUrl} alt={it.itemName} loading="lazy" decoding="async" />
+                                                ) : (
+                                                    <div className="thread-thumb-placeholder">
+                                                        <i className="fas fa-image"></i>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="thread-content">
-                                        <div className="thread-title-row">
-                                            <h3>{it.itemName}</h3>
-                                            <span className="thread-role-badge">
-                                                {roleLabel}
-                                            </span>
-                                            {isResolved && (
-                                                <span className="lost-item-status-badge resolved">
-                                                    <i className="fas fa-check-circle"></i> Found
-                                                </span>
-                                            )}
-                                            {isArchived && (
-                                                <span className="lost-item-status-badge archived">
-                                                    <i className="fas fa-archive"></i> Archived
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="thread-meta">
-                                            <span className="date-badge"><i className="fas fa-calendar"></i> {it.dateLost || 'Date unknown'}</span>
-                                            <span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {it.locationLost || 'Location unknown'}</span>
-                                        </div>
-                                        <div className="thread-description">
-                                            {it.description || 'No description provided.'}
-                                        </div>
-                                        <div className="thread-footer thread-credentials" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                                <div className="credential-badge">
-                                                    <i className="fas fa-user"></i> {it.requesterName || 'Requester: N/A'}
+                                            <div className="thread-content">
+                                                <div className="thread-title-row">
+                                                    <h3>{it.itemName}</h3>
+                                                    <span className="thread-role-badge">{roleLabel}</span>
+                                                    {isResolved && (
+                                                        <span className="lost-item-status-badge resolved">
+                                                            <i className="fas fa-check-circle"></i> Found
+                                                        </span>
+                                                    )}
+                                                    {isArchived && (
+                                                        <span className="lost-item-status-badge archived">
+                                                            <i className="fas fa-archive"></i> Archived
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <a
-                                                    className="credential-email"
-                                                    href={it.requesterEmail ? `mailto:${it.requesterEmail}` : undefined}
-                                                    onClick={(e) => { if (!it.requesterEmail) e.preventDefault(); }}
-                                                >
-                                                    <i className="fas fa-envelope"></i> {it.requesterEmail || 'N/A'}
-                                                </a>
-                                            </div>
-                                            <div className="item-actions">
-                                                {(() => { const status = (it.status || 'approved'); return (
-                                                    <>
+                                                <div className="thread-meta">
+                                                    <span className="date-badge"><i className="fas fa-calendar"></i> {it.dateLost || 'Date unknown'}</span>
+                                                    <span className="location-badge-lost"><i className="fas fa-map-marker-alt"></i> {it.locationLost || 'Location unknown'}</span>
+                                                </div>
+                                                <div className="thread-description">{it.description || 'No description provided.'}</div>
+                                                <div className="thread-footer thread-credentials" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                                        <div className="credential-badge">
+                                                            <i className="fas fa-user"></i> {it.requesterName || 'N/A'}
+                                                        </div>
+                                                        <a className="credential-email" href={it.requesterEmail ? `mailto:${it.requesterEmail}` : undefined} onClick={(e) => { if (!it.requesterEmail) e.preventDefault(); }}>
+                                                            <i className="fas fa-envelope"></i> {it.requesterEmail || 'N/A'}
+                                                        </a>
+                                                    </div>
+                                                    <div className="item-actions">
                                                         {status === 'resolved' ? (
                                                             <button className="item-action-btn" title="Unresolve" onClick={() => openConfirm('unresolve', it)}>
                                                                 <i className="fas fa-undo"></i>
                                                             </button>
                                                         ) : (
-                                                            <button className="item-action-btn" title="Mark Resolved" onClick={() => openConfirm('resolve', it)}>
+                                                            <button className="item-action-btn" title="Mark as Found" onClick={() => openConfirm('resolve', it)}>
                                                                 <i className="fas fa-check"></i>
                                                             </button>
                                                         )}
@@ -244,18 +399,41 @@ const AdminLostItems = () => {
                                                                 <i className="fas fa-archive"></i>
                                                             </button>
                                                         )}
-                                                    </>
-                                                ); })()}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                );
+                            })}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Reject Modal */}
+            {rejectingId && (
+                <div className="export-modal-overlay" onClick={() => setRejectingId(null)}>
+                    <div className="export-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="export-modal-header">
+                            <h2 className="export-modal-title">Reject Request</h2>
+                            <button onClick={() => setRejectingId(null)} className="export-modal-close-btn" aria-label="close">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="export-modal-date-input-group">
+                            <label>Feedback (optional)</label>
+                            <textarea className="export-modal-date-input" rows="4" value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+                        </div>
+                        <div className="export-modal-actions">
+                            <button className="export-modal-cancel-btn" onClick={() => setRejectingId(null)}>Cancel</button>
+                            <button className="export-modal-confirm-btn" onClick={() => handleReject(rejectingId)} style={{ backgroundColor: '#e74c3c' }}>Reject</button>
+                        </div>
+                    </div>
                 </div>
             )}
 
+            {/* Confirm Action Modal */}
             {confirmModal.open && (
                 <div className="confirm-modal-overlay" onClick={closeConfirm}>
                     <div className="confirm-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -264,7 +442,7 @@ const AdminLostItems = () => {
                                 <i className={confirmModal.action === 'archive' || confirmModal.action === 'unarchive' ? 'fas fa-archive' : 'fas fa-exclamation'}></i>
                             </div>
                             <h3 className="confirm-modal-title">
-                                {confirmModal.action === 'resolve' && 'Mark as Resolved?'}
+                                {confirmModal.action === 'resolve' && 'Mark as Found?'}
                                 {confirmModal.action === 'unresolve' && 'Unresolve Item?'}
                                 {confirmModal.action === 'archive' && 'Archive Item?'}
                                 {confirmModal.action === 'unarchive' && 'Unarchive Item?'}
@@ -282,10 +460,10 @@ const AdminLostItems = () => {
                     </div>
                 </div>
             )}
+
+            <Toast message={toast.message} show={toast.show} onClose={hideToast} type={toast.type} />
         </div>
     );
 };
 
 export default AdminLostItems;
-
-

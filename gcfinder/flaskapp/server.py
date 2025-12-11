@@ -438,6 +438,7 @@ CORS(app, resources={
     }
 })
 
+
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -1940,6 +1941,21 @@ def get_items():
                 updated_at = item_data.get('updatedAt')
                 date_field = item_data.get('date')
                 
+                # Return full image data - thumbnails caused quality issues
+                image_data_list = item_data.get('imageData', [])
+                full_images = []
+                main_image = None
+                
+                if image_data_list and len(image_data_list) > 0:
+                    main_image = image_data_list[0].get('dataUrl') or image_data_list[0].get('thumbnail')
+                    # Include full image data
+                    full_images = [{
+                        'id': img.get('id'),
+                        'name': img.get('name'),
+                        'thumbnail': img.get('thumbnail') or img.get('dataUrl'),
+                        'dataUrl': img.get('dataUrl') or img.get('thumbnail')  # Full quality image
+                    } for img in image_data_list]
+                
                 items.append({
                     'id': doc.id,
                     'name': item_data.get('name'),
@@ -1950,7 +1966,8 @@ def get_items():
                     'date': date_field.isoformat() if hasattr(date_field, 'isoformat') else date_field,
                     'status': item_data.get('status'),
                     'adminApproval': item_data.get('adminApproval'),
-                    'imageData': item_data.get('imageData'),
+                    'imageData': full_images,  # Full quality images
+                    'image': main_image,  # Main image for display
                     'submitter': item_data.get('submitter'),
                     'uniqueIdentifier': item_data.get('uniqueIdentifier'),
                     'additionalDetails': item_data.get('additionalDetails'),
@@ -2063,6 +2080,14 @@ def browse_items():
                 updated_at = item_data.get('updatedAt')
                 date_field = item_data.get('date')
                 
+                # Return full quality images
+                image_data_list = item_data.get('imageData', [])
+                main_image = None
+                if image_data_list and len(image_data_list) > 0:
+                    first_image = image_data_list[0]
+                    # Use full quality image
+                    main_image = first_image.get('dataUrl') or first_image.get('thumbnail')
+                
                 items.append({
                     'id': item_id,
                     'name': item_data.get('name'),
@@ -2071,8 +2096,14 @@ def browse_items():
                     'date': date_field.isoformat() if hasattr(date_field, 'isoformat') else date_field,
                     'status': item_data.get('status'),
                     'description': item_data.get('description'),
-                    'imageData': item_data.get('imageData'),
-                    'image': item_data.get('imageData', [])[0].get('dataUrl') if item_data.get('imageData') and len(item_data.get('imageData')) > 0 else None,
+                    # Return full quality image data
+                    'imageData': [{
+                        'id': img.get('id'),
+                        'name': img.get('name'),
+                        'thumbnail': img.get('thumbnail') or img.get('dataUrl'),
+                        'dataUrl': img.get('dataUrl') or img.get('thumbnail')  # Full quality image
+                    } for img in image_data_list] if image_data_list else [],
+                    'image': main_image,
                     'exactLocation': item_data.get('exactLocation'),
                     'uniqueIdentifier': item_data.get('uniqueIdentifier'),
                     'additionalDetails': item_data.get('additionalDetails'),
@@ -2197,6 +2228,73 @@ def delete_item_endpoint(item_id):
     except Exception as e:
         logger.error(f"Error deleting item: {e}")
         return jsonify({"error": "Failed to delete item"}), 500
+
+@app.route('/api/items/<item_id>/student-delete', methods=['DELETE'])
+@login_required
+def student_delete_own_item(item_id):
+    """Allow students to delete their own pending (not yet approved) reports"""
+    try:
+        # Get the current user's ID from the token
+        id_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        decoded_token = auth.verify_id_token(id_token)
+        user_uid = decoded_token['uid']
+        
+        # Get the user's student_id from their profile
+        user_student_id = None
+        
+        # Try students collection first
+        student_doc = db.collection('students').document(user_uid).get()
+        if student_doc.exists:
+            user_student_id = student_doc.to_dict().get('student_id') or student_doc.to_dict().get('studentId')
+        
+        # Try officials collection if not found in students
+        if not user_student_id:
+            official_doc = db.collection('officials').document(user_uid).get()
+            if official_doc.exists:
+                user_student_id = official_doc.to_dict().get('employee_id') or official_doc.to_dict().get('employeeId') or user_uid
+        
+        # Fallback to UID if no student_id found
+        if not user_student_id:
+            user_student_id = user_uid
+        
+        # Get the item
+        item_ref = db.collection('items').document(item_id)
+        item_doc = item_ref.get()
+        
+        if not item_doc.exists:
+            return jsonify({"error": "Item not found"}), 404
+        
+        item_data = item_doc.to_dict()
+        
+        # Verify the item belongs to the requesting user
+        submitter = item_data.get('submitter', {})
+        item_submitter_id = submitter.get('student_id') or submitter.get('id') or item_data.get('submitterId')
+        
+        logger.info(f"Delete check: user_student_id={user_student_id}, item_submitter_id={item_submitter_id}")
+        
+        if item_submitter_id != user_student_id:
+            return jsonify({"error": "You can only delete your own reports"}), 403
+        
+        # Verify the item is still pending (not yet approved)
+        if item_data.get('adminApproval') == True:
+            return jsonify({"error": "Cannot delete approved items. Contact admin."}), 403
+        
+        # Delete the item
+        item_ref.delete()
+        
+        # Also delete any associated claims (shouldn't be any for pending items, but just in case)
+        claims_ref = db.collection('claims')
+        claims_query = claims_ref.where('itemId', '==', item_id)
+        claims_snapshot = claims_query.stream()
+        for claim_doc in claims_snapshot:
+            claim_doc.reference.delete()
+        
+        logger.info(f"User {user_uid} (student_id: {user_student_id}) deleted their pending report {item_id}")
+        return jsonify({"message": "Report deleted successfully"}), 200
+        
+    except Exception as e:
+        logger.error(f"Error in student delete: {e}", exc_info=True)
+        return jsonify({"error": "Failed to delete report"}), 500
 
 @app.route('/api/items/<item_id>/archive', methods=['POST'])
 @admin_required
@@ -2447,14 +2545,15 @@ def get_dashboard_stats():
             category = item_data.get('category', 'Uncategorized')
             category_counts[category] = category_counts.get(category, 0) + 1
             
-            # Resolution rate
+            # Resolution rate (excludes archived items - they're no longer active cases)
             status = item_data.get('status')
             admin_approval = item_data.get('adminApproval', False)
             
             if status in ['Claimed', 'Claiming']:
                 resolved_count += 1
-            elif status == 'Unclaimed' or (status == 'Pending' and admin_approval) or status == 'Archived':
+            elif status == 'Unclaimed' or (status == 'Pending' and admin_approval):
                 unresolved_count += 1
+            # Note: 'Archived' items are excluded from resolution stats
         
         # Format category distribution for pie chart
         item_category_distribution = [{'name': key, 'value': value} for key, value in category_counts.items()]

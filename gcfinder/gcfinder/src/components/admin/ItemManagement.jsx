@@ -162,8 +162,6 @@ const ItemManagement = () => {
                 return <span className="item-status-badge claiming">Claiming</span>;
             case 'claimed':
                 return <span className="item-status-badge claimed">Claimed</span>;
-            case 'disapproved':
-                return <span className="item-status-badge disapproved">Disapproved</span>;
             case 'pending':
                 return <span className="item-status-badge pending">Pending</span>;
             case 'archived':
@@ -549,13 +547,6 @@ const ItemManagement = () => {
                         >
                             <i className="fas fa-check-circle"></i> Claimed
                             <span className="item-count">{getTabCount('claimed')}</span>
-                        </button>
-                        <button 
-                            className={`item-tab ${activeTab === 'disapproved' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('disapproved')}
-                        >
-                            <i className="fas fa-times-circle"></i> Disapproved
-                            <span className="item-count">{getTabCount('disapproved')}</span>
                         </button>
                         <button 
                             className={`item-tab ${activeTab === 'archived' ? 'active' : ''}`}

@@ -57,7 +57,7 @@ const LostRequests = () => {
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.9); // 90% quality
                         resolve(resizedDataUrl);
                     };
                     img.onerror = reject;
@@ -113,7 +113,7 @@ const LostRequests = () => {
     return (
         <div className="lost-requests-container" style={{ padding: 20 }}>
             <div className="lost-requests-header">
-                <h1>Lost Requests</h1>
+                <h1>Report Lost</h1>
                 <p className="admin-subtitle">All submissions are reviewed before being shown publicly.</p>
             </div>
 
@@ -255,7 +255,7 @@ const LostRequests = () => {
                         </div>
                         <div className="export-modal-description" style={{ padding: '20px 0', textAlign: 'center' }}>
                             <div style={{ fontSize: '3rem', color: 'var(--primary-color)', marginBottom: '15px' }}>
-                                <i className="fas fa-info-circle"></i>
+                                <i className="fas fa-exclamation-circle"></i>
                             </div>
                             <p style={{ fontSize: '1rem', lineHeight: '1.6', color: '#333', margin: 0 }}>
                                 Please note that <strong>the Disciplinary Office is not responsible if the item is not found</strong>.

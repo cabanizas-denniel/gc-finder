@@ -107,50 +107,6 @@ export const getAllUsers = async () => {
   }
 };
 
-// Submit found item to Firebase
-export const submitFoundItem = async (formData, images) => {
-  try {
-    // Storing images directly to Firestore
-    const imageData = images.map(image => ({
-      id: image.id,
-      dataUrl: image.src,
-      name: image.name
-    }));
-    
-    // Create item object
-    const itemData = {
-      name: formData.itemName,
-      description: formData.description,
-      location: formData.location,
-      date: formData.dateFound,
-      category: formData.category,
-      exactLocation: formData.exactLocation,
-      uniqueIdentifier: formData.uniqueIdentifier || '',
-      additionalDetails: formData.additionalDetails || '',
-      imageData: imageData,
-      status: 'Unclaimed',
-      adminApproval: true,
-      submitter: {
-        full_name: 'Disciplinary Office',
-        student_id: 'N/A',
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-    
-    // Add to Firestore
-    const itemsRef = collection(db, 'items');
-    const docRef = await addDoc(itemsRef, itemData);
-    
-    return {
-      id: docRef.id,
-      ...itemData
-    };
-  } catch (error) {
-    console.error('Error submitting item:', error);
-    throw error;
-  }
-};
 
 // Get items that need admin approval via backend API (secure)
 export const getPendingItems = async () => {

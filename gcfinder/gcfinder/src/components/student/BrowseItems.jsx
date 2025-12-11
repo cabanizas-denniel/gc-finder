@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { browseItems } from '../../admin-firebase';
 import ItemsList from './ItemsList';
 
+const ITEMS_PER_PAGE = 20;
+
 const BrowseItems = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
@@ -11,7 +13,14 @@ const BrowseItems = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
     const fileInputRef = useRef(null);
+    
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const paginatedItems = filteredItems.slice(startIndex, endIndex);
 
     useEffect(() => {
         const fetchItemsAndUserClaims = async () => {
@@ -59,8 +68,15 @@ const BrowseItems = () => {
             });
     
             setFilteredItems(filtered);
+            setCurrentPage(1); // Reset to first page when filters change
         }
     }, [searchTerm, selectedCategory, includeClaimed, items]);
+    
+    // Pagination handlers
+    const handlePageChange = useCallback((page) => {
+        setCurrentPage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
 
     const handleItemClaimedLocally = useCallback((itemId, newStatus) => {
         setItems(prevItems => prevItems.filter(item => item.id !== itemId));
@@ -195,15 +211,85 @@ const BrowseItems = () => {
             </div>
 
             {loading || isSearching ? (
-                <p>Loading items...</p>
+                <div className="loading-message">
+                    <i className="fas fa-spinner fa-pulse"></i>
+                    <p>Loading items...</p>
+                </div>
             ) : error ? (
                 <p style={{ color: 'red' }}>{error}</p>
             ) : (
-                <ItemsList 
-                    items={filteredItems} 
-                    emptyMessage="No items match your search criteria or available to claim." 
-                    onItemClaimed={handleItemClaimedLocally} 
-                />
+                <>
+                    {/* Show item count and current range */}
+                    {filteredItems.length > 0 && (
+                        <div className="pagination-info">
+                            <p>Showing {startIndex + 1}-{Math.min(endIndex, filteredItems.length)} of {filteredItems.length} items</p>
+                        </div>
+                    )}
+                    
+                    <ItemsList 
+                        items={paginatedItems} 
+                        emptyMessage="No items match your search criteria or available to claim." 
+                        onItemClaimed={handleItemClaimedLocally} 
+                    />
+                    
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="pagination-controls">
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(1)}
+                                disabled={currentPage === 1}
+                            >
+                                <i className="fas fa-angle-double-left"></i>
+                            </button>
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                            >
+                                <i className="fas fa-angle-left"></i>
+                            </button>
+                            
+                            {/* Page numbers */}
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(page => {
+                                    // Show first, last, current, and pages around current
+                                    return page === 1 || 
+                                           page === totalPages || 
+                                           Math.abs(page - currentPage) <= 1;
+                                })
+                                .map((page, index, array) => (
+                                    <React.Fragment key={page}>
+                                        {index > 0 && array[index - 1] !== page - 1 && (
+                                            <span className="pagination-ellipsis">...</span>
+                                        )}
+                                        <button
+                                            className={`pagination-btn ${currentPage === page ? 'active' : ''}`}
+                                            onClick={() => handlePageChange(page)}
+                                        >
+                                            {page}
+                                        </button>
+                                    </React.Fragment>
+                                ))
+                            }
+                            
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                            >
+                                <i className="fas fa-angle-right"></i>
+                            </button>
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(totalPages)}
+                                disabled={currentPage === totalPages}
+                            >
+                                <i className="fas fa-angle-double-right"></i>
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </section>
     );

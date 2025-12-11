@@ -12,6 +12,9 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
     const [showModal, setShowModal] = useState(false);
     const [showClaimModal, setShowClaimModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
+    const [displayItems, setDisplayItems] = useState(items || []);
     const [selectedItem, setSelectedItem] = useState(null);
     const [claimForm, setClaimForm] = useState({
         lastSeenLocation: '',
@@ -28,6 +31,10 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
 
     // Toast notification
     const { toast, showToast, hideToast } = useToast();
+
+    useEffect(() => {
+        setDisplayItems(items || []);
+    }, [items]);
 
     const handleContact = useCallback(() => {
         navigate('/messages');
@@ -57,12 +64,12 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
 
     // Item detail view handler
     const viewDetails = useCallback((itemId) => {
-        const item = items.find(item => item.id === itemId);
+        const item = displayItems.find(item => item.id === itemId);
         if (item) {
             setSelectedItem(item);
             setShowModal(true);
         }
-    }, [items]);
+    }, [displayItems]);
     
     // Close modal
     const closeModal = useCallback(() => {
@@ -214,20 +221,35 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
         fileInputRef.current?.click();
     }, []);
 
-    const handleDeleteItem = async (itemIdToDelete) => {
-        if (window.confirm("Are you sure you want to delete this report? This action cannot be undone.")) {
-            try {
-                await deleteStudentReportedItem(itemIdToDelete);
-                showToast('Report deleted successfully.', 'success');
-                if (onItemUpdated) {
-                    onItemUpdated(itemIdToDelete, 'deleted'); // Notify parent to remove the item
-                }
-                closeModal(); // Close the modal after successful deletion
-            } catch (error) {
-                console.error("Error deleting item:", error);
-                showToast('Failed to delete report. Please try again.', 'error');
+    const requestDeleteItem = (itemIdToDelete) => {
+        setPendingDeleteId(itemIdToDelete);
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteItem = async () => {
+        if (!pendingDeleteId) return;
+        try {
+            await deleteStudentReportedItem(pendingDeleteId);
+            showToast('Report deleted successfully.', 'success');
+            // Update local list immediately
+            setDisplayItems(prev => prev.filter(item => item.id !== pendingDeleteId));
+            if (onItemUpdated) {
+                onItemUpdated(pendingDeleteId, 'deleted'); // Notify parent to remove the item
             }
+            setShowModal(false);
+            setSelectedItem(null);
+        } catch (error) {
+            console.error("Error deleting item:", error);
+            showToast('Failed to delete report. Please try again.', 'error');
+        } finally {
+            setShowDeleteConfirm(false);
+            setPendingDeleteId(null);
         }
+    };
+
+    const cancelDeleteItem = () => {
+        setShowDeleteConfirm(false);
+        setPendingDeleteId(null);
     };
 
     return (
@@ -296,7 +318,17 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                                     {selectedItem.createdAt && (
                                         <div className="detail-item">
                                             <i className="fas fa-clock"></i> <strong>Reported on:</strong> {
-                                                new Date(selectedItem.createdAt.seconds * 1000).toLocaleDateString()
+                                                (() => {
+                                                    // Handle both Firestore timestamp and ISO string formats
+                                                    let date;
+                                                    if (selectedItem.createdAt.seconds) {
+                                                        date = new Date(selectedItem.createdAt.seconds * 1000);
+                                                    } else {
+                                                        date = new Date(selectedItem.createdAt);
+                                                    }
+                                                    // Format as YYYY-MM-DD
+                                                    return date.toISOString().split('T')[0];
+                                                })()
                                             }
                                         </div>
                                     )}
@@ -331,7 +363,7 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                             {isReporter(selectedItem) && selectedItem.adminApproval === false && (
                                 <button 
                                     className="btn delete-report-modal-btn"
-                                    onClick={() => handleDeleteItem(selectedItem.id)}
+                                    onClick={() => requestDeleteItem(selectedItem.id)}
                                     title="Delete this report"
                                 >
                                     <i className="fas fa-trash-alt"></i> Delete Report
@@ -463,9 +495,9 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
             )}
 
             {/* Items Grid */}
-            {items.length > 0 ? (
+            {displayItems.length > 0 ? (
                 <div className="items-grid">
-                    {items.map(item => (
+                    {displayItems.map(item => (
                         <div key={item.id} className="recent-item-card">
                             {isReporter(item) && (
                                 <div className="user-submitted-indicator">
@@ -473,7 +505,12 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                                 </div>
                             )}
                             <div className="item-card-image-container">
-                                <img src={item.image || ''} alt={item.image ? item.name : 'No image available'} />
+                                <img 
+                                    src={item.image || ''} 
+                                    alt={item.image ? item.name : 'No image available'}
+                                    loading="lazy"
+                                    decoding="async"
+                                />
                                 {item.adminApproval === false && item.status !== 'Disapproved' && (
                                     <div className="pending-approval-indicator">
                                         <i className="fas fa-hourglass-half"></i> Pending Approval from Admin
@@ -500,6 +537,31 @@ const ItemsList = ({ items, title, emptyMessage = "No items found.", onItemUpdat
                 </div>
             ) : (
                 <p>{emptyMessage}</p>
+            )}
+
+            {/* Delete confirmation modal */}
+            {showDeleteConfirm && (
+                <div className="modal-overlay" onClick={cancelDeleteItem}>
+                    <div
+                        className="modal-content"
+                        style={{ maxWidth: '420px', width: '90%' }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="modal-header">
+                            <h2>Delete Report</h2>
+                            <button className="close-button" onClick={cancelDeleteItem}>×</button>
+                        </div>
+                        <div className="modal-body">
+                            <p>Are you sure you want to delete this report? This action cannot be undone.</p>
+                        </div>
+                        <div className="modal-footer" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+                            <button className="btn back" onClick={cancelDeleteItem}>Cancel</button>
+                            <button className="btn delete-report-modal-btn" onClick={confirmDeleteItem}>
+                                <i className="fas fa-trash-alt"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Toast Notification */}
@@ -590,7 +652,7 @@ export const ClaimsGridDisplay = ({ claims, onViewDetails }) => {
                         {claim.claimStatus || 'N/A'}
                     </div>
                     {claim.itemImage ? (
-                        <img src={claim.itemImage} alt={claim.itemName} />
+                        <img src={claim.itemImage} alt={claim.itemName} loading="lazy" decoding="async" />
                     ) : (
                         <div style={{
                             width: '100%',

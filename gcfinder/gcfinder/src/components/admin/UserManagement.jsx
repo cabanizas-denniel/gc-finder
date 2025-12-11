@@ -41,6 +41,7 @@ const UserManagement = () => {
 
     // Batch Add Students Modal State
     const [batchAddModalOpen, setBatchAddModalOpen] = useState(false);
+    const [showBatchAddConfirm, setShowBatchAddConfirm] = useState(false);
     const [studentData, setStudentData] = useState('');
     const [uploadFile, setUploadFile] = useState(null);
     const [uploadMode, setUploadMode] = useState('manual'); // 'manual' or 'file'
@@ -732,7 +733,11 @@ const UserManagement = () => {
                         <button className="export-btn" onClick={handleOpenExportModal}>
                             <i className="fas fa-download"></i> Export Data
                         </button>
-                        <button className="batch-add-btn" onClick={handleOpenBatchAddModal}>
+                        <button 
+                            className="export-btn"
+                            onClick={() => setShowBatchAddConfirm(true)}
+                            title="Batch add students"
+                        >
                             <i className="fas fa-user-plus"></i> Batch Add Students
                         </button>
                         <button className="refresh-btn" onClick={() => window.location.reload()}>
@@ -1054,7 +1059,7 @@ const UserManagement = () => {
                                     onChange={(e) => setStudentData(e.target.value)}
                                     className="export-modal-date-input"
                                     placeholder={uploadMode === 'manual' 
-                                        ? `STUDENT:\n202400001,Juan Dela Cruz,1,active,student\n\nOFFICIAL:\nP.Lopez,Peter Lopez,peter.lopez@gordoncollege.edu.ph,active,official`
+                                        ? `STUDENT:\n202400001,Juan Dela Cruz,1(Year Level),active/flagged/banned(Status),student(Role)\n\nOFFICIAL:\nP.Lopez,Peter Lopez,peter.lopez@gordoncollege.edu.ph,active/flagged/banned(Status),official(Role)`
                                         : "CSV data will appear here..."}
                                     rows="8"
                                     style={{resize: 'vertical', fontFamily: 'monospace', fontSize: '13px'}}
@@ -1366,8 +1371,45 @@ const UserManagement = () => {
                     onClose={hideToast} 
                     type={toast.type} 
                 />
+
+                {/* Batch Add Confirmation Modal */}
+                {showBatchAddConfirm && (
+                    <div className="export-modal-overlay" onClick={() => setShowBatchAddConfirm(false)}>
+                        <div className="export-modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '520px'}}>
+                            <div className="export-modal-header">
+                                <h2 className="export-modal-title">Batch Add Students</h2>
+                                <button onClick={() => setShowBatchAddConfirm(false)} className="export-modal-close-btn" aria-label="close">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <p className="export-modal-description" style={{marginBottom: '12px'}}>
+                                Passwords are auto-generated to maintain consistency:
+                            </p>
+                            <ul style={{ marginLeft: '18px', marginBottom: '16px', color: '#333' }}>
+                                <li><strong>Students:</strong> GC + last 5 digits of school ID + current year (e.g., <code>GC123452025</code>)</li>
+                                <li><strong>Officials:</strong> GC + last name + current year (e.g., <code>GCSantos2025</code>)</li>
+                            </ul>
+                            <p style={{ color: '#555', marginBottom: '16px' }}>
+                                Continue to upload your CSV or paste rows in the batch add modal.
+                            </p>
+                            <div className="export-modal-actions">
+                                <button className="export-modal-cancel-btn" onClick={() => setShowBatchAddConfirm(false)}>Cancel</button>
+                                <button 
+                                    className="export-modal-confirm-btn" 
+                                    onClick={() => {
+                                        setShowBatchAddConfirm(false);
+                                        setBatchAddModalOpen(true);
+                                    }}
+                                    style={{ backgroundColor: '#045195' }}
+                                >
+                                    Proceed
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
     );
 };
 
-export default UserManagement;
+export default UserManagement; 

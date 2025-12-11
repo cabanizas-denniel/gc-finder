@@ -186,6 +186,8 @@ const LostItems = () => {
                                             <img
                                                 src={it.imageUrl}
                                                 alt={it.itemName}
+                                                loading="lazy"
+                                                decoding="async"
                                             />
                                         ) : (
                                             <div className="thread-thumb-placeholder">

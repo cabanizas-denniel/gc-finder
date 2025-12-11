@@ -65,12 +65,27 @@ const ReportItem = () => {
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
                         
-                        // Get resized data URL - reduce quality
-                        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.7); // Reduce quality to 70%
+                        // Get resized data URL with good quality
+                        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.9); // 90% quality
+                        
+                        // Generate a thumbnail for list views
+                        const thumbCanvas = document.createElement('canvas');
+                        const THUMB_SIZE = 150;
+                        thumbCanvas.width = THUMB_SIZE;
+                        thumbCanvas.height = THUMB_SIZE;
+                        const thumbCtx = thumbCanvas.getContext('2d');
+                        
+                        // Center crop for thumbnail
+                        const minDim = Math.min(width, height);
+                        const sx = (width - minDim) / 2;
+                        const sy = (height - minDim) / 2;
+                        thumbCtx.drawImage(canvas, sx, sy, minDim, minDim, 0, 0, THUMB_SIZE, THUMB_SIZE);
+                        const thumbnailDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.7); // 70% quality thumbnail
                         
                         newImages.push({
                             id: Date.now() + Math.random().toString(36).substring(2, 9),
                             src: resizedDataUrl,
+                            thumbnail: thumbnailDataUrl, // Small version for lists
                             name: file.name
                         });
                         

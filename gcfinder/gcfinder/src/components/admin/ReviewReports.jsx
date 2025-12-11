@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPendingItems, approveItem, disapproveItem } from '../../admin-firebase';
+import { getPendingItems, approveItem, deleteItemFromDb } from '../../admin-firebase';
 
 const ReviewReports = () => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -92,21 +92,22 @@ const ReviewReports = () => {
     const handleDisapproveItem = async (itemId) => {
         try {
             setLoading(true);
-            await disapproveItem(itemId);
+            // Permanently delete the item instead of just disapproving
+            await deleteItemFromDb(itemId);
             
-            // Remove the disapproved item from the list
+            // Remove the deleted item from the list
             setReports(prev => prev.filter(report => report.id !== itemId));
             
-            // Add notification for successful disapproval
+            // Add notification for successful deletion
             setNotifications(prev => [{
                 id: Date.now(),
-                title: 'Item Disapproved',
-                description: 'An item has been disapproved',
+                title: 'Item Deleted',
+                description: 'Item has been permanently deleted',
                 time: 'Just now'
             }, ...prev]);
         } catch (err) {
-            console.error('Error disapproving item:', err);
-            setError('Failed to disapprove item. Please try again.');
+            console.error('Error deleting item:', err);
+            setError('Failed to delete item. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -407,8 +408,9 @@ const ReviewReports = () => {
                                             className="disapprove-btn"
                                             onClick={() => handleDisapproveItem(report.id)}
                                             disabled={loading}
+                                            title="Permanently delete this item"
                                         >
-                                            Disapprove Item
+                                            <i className="fas fa-trash-alt"></i> Disapprove Item
                                         </button>
                                     </div>
                                 </div>

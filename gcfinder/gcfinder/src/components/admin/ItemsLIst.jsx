@@ -51,11 +51,15 @@ export const AdminViewItemDetailsModal = ({ show, item, onClose, loading }) => {
                                     <img 
                                         src={item.imageData[currentImageIndex].dataUrl} 
                                         alt={item.imageData[currentImageIndex].name || `${item.name} - Image ${currentImageIndex + 1}`}
+                                        loading="lazy"
+                                        decoding="async"
                                     />
                                 ) : singleFallbackImage ? (
                                     <img 
                                         src={item.image} 
-                                        alt={item.name || 'Item Image'} 
+                                        alt={item.name || 'Item Image'}
+                                        loading="lazy"
+                                        decoding="async"
                                     />
                                 ) : (
                                     <p>No image available</p>

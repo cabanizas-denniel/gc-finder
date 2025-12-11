@@ -63,9 +63,11 @@ export const loginWithStudentId = async (studentId, password) => {
 export const submitFoundItem = async (formData, images) => {
   try {
     // Instead of uploading to Storage, store image data directly
+    // Include thumbnail for faster list loading
     const imageData = images.map(image => ({
       id: image.id,
-      dataUrl: image.src, // Already contains the resized data URL
+      dataUrl: image.src, // Full resized image for detail view
+      thumbnail: image.thumbnail || image.src, // Small thumbnail for list view (fallback to src if no thumbnail)
       name: image.name
     }));
     
@@ -173,11 +175,21 @@ export const submitItemClaim = async (itemData, claimerData, claimDetails) => {
 // Function for students to delete their own reported item if it's still pending approval
 export const deleteStudentReportedItem = async (itemId) => {
   try {
-    const itemRef = doc(db, 'items', itemId);
-    // Optional: You might want to add a security check here to ensure the item
-    // indeed belongs to the current user and is pending, though the UI should enforce this.
-    // For example, fetch the item, check submitter ID and adminApproval status before deleting.
-    await deleteDoc(itemRef);
+    // Use backend API to delete (Firestore rules only allow admins to delete)
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/items/${itemId}/student-delete`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete report');
+    }
+
     console.log("Student reported item deleted successfully: ", itemId);
     return true;
   } catch (error) {

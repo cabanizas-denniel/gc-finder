@@ -63,10 +63,8 @@ const Layout = () => {
 
     const navigationItems = [
         { path: 'admin/dashboard', icon: 'fas fa-home', label: 'Dashboard' },
-        { path: 'admin/report-items', icon: 'fas fa-file-alt', label: 'Report Found Item' },
-        { path: 'admin/review-reports', icon: 'fas fa-clipboard-list', label: 'Review Reports' },
-        { path: 'admin/lost-requests', icon: 'fas fa-question-circle', label: 'Lost Reports' },
-        { path: 'admin/lost-items', icon: 'fas fa-bullhorn', label: 'Lost Items' },
+        { path: 'admin/review-reports', icon: 'fas fa-clipboard-list', label: 'Found Reports' },
+        { path: 'admin/lost-items', icon: 'fas fa-search', label: 'Review Lost Items' },
         { path: 'admin/claim-verification', icon: 'fas fa-check-circle', label: 'Verify Claims' },
         { path: 'admin/user-management', icon: 'fas fa-users', label: 'Manage Users' },
         { path: 'admin/item-management', icon: 'fas fa-box', label: 'Manage Items' },

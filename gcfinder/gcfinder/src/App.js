@@ -1,38 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import ErrorBoundary from './components/ErrorBoundary';
-// Student imports
-import Login from './components/student/Login';
-import Dashboard from './components/student/Dashboard';
-import ReportItem from './components/student/ReportItem';
-import BrowseItems from './components/student/BrowseItems';
-import MyClaims from './components/student/MyClaims';
-import Messages from './components/student/Messages';
-import Help from './components/student/Help';
-import LostRequests from './components/student/LostRequests';
-import LostItems from './components/student/LostItems';
-import NotFound from './components/student/NotFound';
-import Layout from './components/student/Layout';
-// Official/Faculty imports (shares components with students)
-import OfficialLogin from './components/official/Login';
-// Admin imports
-import AdminLogin from './components/admin/Login';
-import AdminDashboard from './components/admin/Dashboard';
-import AdminLayout from './components/admin/Layout';
-import ReportItems from './components/admin/ReportItems';
-import ReviewReports from './components/admin/ReviewReports';
-import ClaimVerification from './components/admin/ClaimVerification';
-import UserManagement from './components/admin/UserManagement';
-import ItemManagement from './components/admin/ItemManagement';
-import AdminMessages from './components/admin/Messages';
-import AdminHelp from './components/admin/Help';
-import AdminLostRequests from './components/admin/LostRequests';
-import AdminLostItems from './components/admin/LostItems';
 import './styles/student-styles.css';
 import './styles/admin-styles.css';
 import './styles/shared-styles.css';
+
+// Loading spinner component
+const LoadingSpinner = () => (
+    <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        fontSize: '1.2rem',
+        backgroundColor: '#fff'
+    }}>
+        <i className="fas fa-spinner fa-pulse" style={{ marginRight: '10px' }}></i>
+        Loading...
+    </div>
+);
+
+// LAZY LOAD COMPONENTS for faster initial page load
+// Student components
+const Login = lazy(() => import('./components/student/Login'));
+const Dashboard = lazy(() => import('./components/student/Dashboard'));
+const ReportItem = lazy(() => import('./components/student/ReportItem'));
+const BrowseItems = lazy(() => import('./components/student/BrowseItems'));
+const MyClaims = lazy(() => import('./components/student/MyClaims'));
+const Messages = lazy(() => import('./components/student/Messages'));
+const Help = lazy(() => import('./components/student/Help'));
+const LostRequests = lazy(() => import('./components/student/LostRequests'));
+const LostItems = lazy(() => import('./components/student/LostItems'));
+const NotFound = lazy(() => import('./components/student/NotFound'));
+const Layout = lazy(() => import('./components/student/Layout'));
+
+// Official/Faculty
+const OfficialLogin = lazy(() => import('./components/official/Login'));
+
+// Admin components
+const AdminLogin = lazy(() => import('./components/admin/Login'));
+const AdminDashboard = lazy(() => import('./components/admin/Dashboard'));
+const AdminLayout = lazy(() => import('./components/admin/Layout'));
+const ReviewReports = lazy(() => import('./components/admin/ReviewReports'));
+const ClaimVerification = lazy(() => import('./components/admin/ClaimVerification'));
+const UserManagement = lazy(() => import('./components/admin/UserManagement'));
+const ItemManagement = lazy(() => import('./components/admin/ItemManagement'));
+const AdminMessages = lazy(() => import('./components/admin/Messages'));
+const AdminHelp = lazy(() => import('./components/admin/Help'));
+const AdminLostItems = lazy(() => import('./components/admin/LostItems'));
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const [loading, setLoading] = useState(true);
@@ -108,6 +125,7 @@ function App() {
     return (
         <ErrorBoundary>
             <Router>
+                <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                 {/* Student Routes */}
                 <Route path="/" element={<Login />} />
@@ -184,9 +202,7 @@ function App() {
                 <Route path="/admin" element={<AdminLogin />} />
                 <Route element={<ProtectedAdminLayout />}>
                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                    <Route path="/admin/report-items" element={<ReportItems />} />
                     <Route path="/admin/review-reports" element={<ReviewReports />} />
-                    <Route path="/admin/lost-requests" element={<AdminLostRequests />} />
                     <Route path="/admin/lost-items" element={<AdminLostItems />} />
                     <Route path="/admin/claim-verification" element={<ClaimVerification />} />
                     <Route path="/admin/user-management" element={<UserManagement />} />
@@ -196,6 +212,7 @@ function App() {
                 </Route>
                 <Route path="*" element={<NotFound />} />
                 </Routes>
+                </Suspense>
             </Router>
         </ErrorBoundary>
     );
