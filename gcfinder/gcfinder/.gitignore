@@ -21,3 +21,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+.gcfinder-database-firebase-adminsdk-fbsvc-0447799241.json
+.gcfinder-database-firebase-adminsdk-fbsvc-b58cf917d6.json
